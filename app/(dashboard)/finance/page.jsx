@@ -4,7 +4,8 @@ import { getTransactions, insertTransaction, getInvoices, getSetting, upsertSett
 import { fmtDate } from '@/lib/shop'
 import { todayStr, exportJpeg, uploadFile } from '@/lib/docUtils'
 import { supabase } from '@/lib/supabase'
-import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import dynamic from 'next/dynamic'
+const ExpenseChart = dynamic(() => import('@/components/charts/ExpenseChart'), { ssr: false, loading: () => <div style={{height:280}} /> })
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
@@ -213,20 +214,7 @@ export default function FinancePage() {
               <h2 style={{ fontSize:14, fontWeight:700 }}>📊 ค่าใช้จ่ายแยกตามหมวดหมู่</h2>
             </div>
             <div style={{ padding:16 }}>
-              {expByType.length===0 ? (
-                <div style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ยังไม่มีข้อมูลค่าใช้จ่าย</div>
-              ) : (
-                <ResponsiveContainer width="100%" height={280}>
-                  <BarChart data={expByType} layout="vertical" margin={{ left:10 }}>
-                    <XAxis type="number" tick={{ fontSize:11 }} tickFormatter={v=>v>=1000?(v/1000).toFixed(0)+'K':v} />
-                    <YAxis type="category" dataKey="name" tick={{ fontSize:11 }} width={90} />
-                    <Tooltip formatter={v=>[`฿${v.toLocaleString()}`, 'ยอดรวม']} />
-                    <Bar dataKey="total" barSize={18} radius={[0,4,4,0]}>
-                      {expByType.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]} />)}
-                    </Bar>
-                  </BarChart>
-                </ResponsiveContainer>
-              )}
+              <ExpenseChart data={expByType} />
             </div>
           </div>
           <div className="card">
