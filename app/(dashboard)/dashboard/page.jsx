@@ -1,7 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { getDashboardStats, getJobOrders, getTransactions, getCustomers } from '@/lib/db'
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts'
+import dynamic from 'next/dynamic'
+
+const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
+const CustomerCharts = dynamic(() => import('@/components/charts/CustomerCharts'), { ssr: false, loading: () => <div style={{height:150}} /> })
 
 
 const bestSellers = [
@@ -117,23 +120,7 @@ export default function DashboardPage() {
             <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ข้อมูลจริงจาก Supabase</span>
           </div>
           <div style={{ padding: '16px 20px 20px' }}>
-            <ResponsiveContainer width="100%" height={200}>
-              <BarChart data={monthlyData} margin={{ top: 4, right: 8, left: 0, bottom: 0 }}
-                barSize={14}>
-                <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
-                <XAxis dataKey="name" tick={{ fontSize: 12, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false} />
-                <YAxis tick={{ fontSize: 11, fill: 'var(--text-muted)' }} axisLine={false} tickLine={false}
-                  tickFormatter={v => v >= 1000 ? (v/1000).toFixed(0)+'K' : v} />
-                <Tooltip
-                  contentStyle={{ background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 8, fontSize: 12 }}
-                  formatter={(v, name) => [`฿${v.toLocaleString()}`, name]}
-                />
-                <Legend wrapperStyle={{ fontSize: 12 }} />
-                <Bar dataKey="รายรับ"  fill="var(--primary)" radius={[4,4,0,0]} />
-                <Bar dataKey="รายจ่าย" fill="var(--info)"    radius={[4,4,0,0]} />
-                <Bar dataKey="กำไร"    fill="var(--success)" radius={[4,4,0,0]} />
-              </BarChart>
-            </ResponsiveContainer>
+            <RevenueChart data={monthlyData} />
           </div>
         </div>
 
@@ -164,64 +151,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Customer Charts */}
-      {loaded && (() => {
-        const now = new Date()
-        const thisMonth = customers.filter(c => {
-          const d = new Date(c.created_at)
-          return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
-        })
-        const platformData = Object.entries(
-          customers.reduce((acc,c)=>{ const p=c.platform||'อื่น ๆ'; acc[p]=(acc[p]||0)+1; return acc }, {})
-        ).map(([name,value])=>({name,value}))
-        const typeData = Object.entries(
-          customers.reduce((acc,c)=>{ const t=c.type||'บุคคลธรรมดา'; acc[t]=(acc[t]||0)+1; return acc }, {})
-        ).map(([name,value])=>({name,value}))
-        const PIE_COLORS = ['var(--primary)','var(--info)','var(--success)','var(--warning)','#8B5CF6']
-        return (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
-            <div className="card">
-              <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
-                <h2 style={{ fontSize:14, fontWeight:700 }}>👥 ภาพรวมลูกค้า</h2>
-              </div>
-              <div style={{ padding:16, display:'flex', gap:20, alignItems:'center' }}>
-                <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                  <div style={{ textAlign:'center' }}>
-                    <div style={{ fontSize:28, fontWeight:900, color:'var(--primary)' }}>{customers.length}</div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>ลูกค้าทั้งหมด</div>
-                  </div>
-                  <div style={{ textAlign:'center' }}>
-                    <div style={{ fontSize:22, fontWeight:800, color:'var(--success)' }}>+{thisMonth.length}</div>
-                    <div style={{ fontSize:11, color:'var(--text-muted)' }}>เดือนนี้</div>
-                  </div>
-                </div>
-                <ResponsiveContainer width="100%" height={140}>
-                  <PieChart>
-                    <Pie data={typeData} dataKey="value" nameKey="name" outerRadius={60} label={({name,value})=>`${name} ${value}`} labelLine={false} fontSize={10}>
-                      {typeData.map((_,i)=><Cell key={i} fill={PIE_COLORS[i%PIE_COLORS.length]} />)}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-            <div className="card">
-              <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
-                <h2 style={{ fontSize:14, fontWeight:700 }}>📱 ลูกค้าตาม Platform</h2>
-              </div>
-              <div style={{ padding:16 }}>
-                <ResponsiveContainer width="100%" height={150}>
-                  <BarChart data={platformData} layout="vertical" margin={{left:10}}>
-                    <XAxis type="number" tick={{fontSize:11}} />
-                    <YAxis type="category" dataKey="name" tick={{fontSize:11}} width={80} />
-                    <Tooltip />
-                    <Bar dataKey="value" name="จำนวน" fill="var(--primary)" radius={[0,4,4,0]} barSize={14} />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
-        )
-      })()}
+      {loaded && customers.length > 0 && <CustomerCharts customers={customers} />}
 
       {/* Best Sellers */}
       <div className="card">
