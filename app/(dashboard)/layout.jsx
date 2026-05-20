@@ -7,31 +7,46 @@ import Topbar from '@/components/layout/Topbar'
 
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
-  const [checking, setChecking] = useState(true)
+  const [authed, setAuthed] = useState(null) // null = กำลังเช็ค, true = ผ่าน, false = ไม่ผ่าน
   const router = useRouter()
 
   useEffect(() => {
+    // เช็ค session ตอนโหลด
     supabase.auth.getSession().then(({ data: { session } }) => {
-      if (!session) {
-        router.replace('/login')
+      if (session) {
+        setAuthed(true)
       } else {
-        setChecking(false)
+        setAuthed(false)
+        router.replace('/login')
+      }
+    }).catch(() => {
+      // ถ้า error ให้ผ่านไปก่อน (ไม่ block)
+      setAuthed(true)
+    })
+
+    // ฟังการเปลี่ยน auth state
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_OUT' || (!session && event !== 'INITIAL_SESSION')) {
+        router.replace('/login')
       }
     })
-  }, [router])
 
-  if (checking) {
+    return () => subscription.unsubscribe()
+  }, []) // eslint-disable-line
+
+  if (authed === null) {
     return (
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#1A1A1A' }}>
-        <div style={{ color: '#fff', fontSize: 14 }}>กำลังโหลด...</div>
+        <div style={{ color: '#fff', fontSize: 14, opacity: 0.7 }}>กำลังโหลด...</div>
       </div>
     )
   }
 
+  if (authed === false) return null
+
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
 
-      {/* Mobile overlay */}
       {mobileOpen && (
         <div onClick={() => setMobileOpen(false)}
           style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 99 }}
