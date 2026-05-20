@@ -1,0 +1,258 @@
+@import "tailwindcss";
+
+:root {
+  --primary: #B80F0B;
+  --primary-dark: #8B0B08;
+  --primary-light: #F8E8E8;
+  --primary-mid: #D94040;
+  --sidebar-bg: #1A1A1A;
+  --sidebar-text: #C8C8C8;
+  --bg: #F5F6FA;
+  --card: #FFFFFF;
+  --border: #E5E7EB;
+  --text: #1F2937;
+  --text-muted: #6B7280;
+  --success: #10B981;
+  --warning: #F59E0B;
+  --info: #3B82F6;
+  --danger: #EF4444;
+  --radius: 10px;
+  --shadow: 0 2px 8px rgba(0,0,0,0.08);
+  --shadow-md: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Segoe UI', 'Noto Sans Thai', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+}
+
+/* ===== GLOBAL INPUT STYLES ===== */
+input[type=text],
+input[type=email],
+input[type=number],
+input[type=password],
+input[type=date],
+select,
+textarea {
+  padding: 9px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: 8px;
+  font-size: 13.5px;
+  color: var(--text);
+  background: #fff;
+  outline: none;
+  font-family: inherit;
+  transition: border-color .15s, box-shadow .15s;
+}
+input:focus,
+select:focus,
+textarea:focus {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px rgba(184,15,11,.1);
+}
+textarea { resize: vertical; min-height: 80px; }
+
+/* ===== GLOBAL BUTTON ===== */
+button { font-family: inherit; cursor: pointer; transition: all .15s; }
+
+/* ===== CARD ===== */
+.card {
+  background: var(--card);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  border: 1px solid var(--border);
+}
+
+/* ===== TABS (underline style) ===== */
+.tabs {
+  display: flex;
+  gap: 0;
+  border-bottom: 2px solid var(--border);
+  margin-bottom: 20px;
+}
+.tab {
+  padding: 10px 20px;
+  font-size: 13.5px;
+  font-weight: 600;
+  color: var(--text-muted);
+  cursor: pointer;
+  border-bottom: 2px solid transparent;
+  margin-bottom: -2px;
+  transition: color .15s, border-color .15s;
+  user-select: none;
+}
+.tab:hover { color: var(--primary); }
+.tab.active { color: var(--primary); border-bottom-color: var(--primary); }
+
+/* ===== TABLE ===== */
+table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+thead tr { border-bottom: 2px solid var(--border); }
+th {
+  padding: 10px 14px;
+  text-align: left;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  white-space: nowrap;
+  background: #FAFAFA;
+}
+td {
+  padding: 11px 14px;
+  border-bottom: 1px solid #F3F4F6;
+  color: var(--text);
+  vertical-align: middle;
+}
+tbody tr:hover { background: #FAFAFA; }
+tbody tr:last-child td { border-bottom: none; }
+
+/* ===== BADGE ===== */
+.badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11.5px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.badge-red    { background: #FEE2E2; color: #991B1B; }
+.badge-green  { background: #D1FAE5; color: #065F46; }
+.badge-blue   { background: #DBEAFE; color: #1E40AF; }
+.badge-yellow { background: #FEF3C7; color: #92400E; }
+.badge-gray   { background: #F3F4F6; color: #374151; }
+.badge-purple { background: #EDE9FE; color: #5B21B6; }
+.badge-cyan   { background: #CFFAFE; color: #0E7490; }
+
+/* ===== PROGRESS BAR ===== */
+.progress-wrap { background: #F3F4F6; border-radius: 20px; height: 7px; width: 100%; }
+.progress-bar  { height: 7px; border-radius: 20px; background: var(--primary); transition: width .3s; }
+.progress-bar.green { background: var(--success); }
+.progress-bar.blue  { background: var(--info); }
+
+/* ===== BUTTONS ===== */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 16px;
+  border-radius: 8px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all .15s;
+  font-family: inherit;
+  text-decoration: none;
+  white-space: nowrap;
+}
+.btn-primary { background: var(--primary); color: #fff; border: none; }
+.btn-primary:hover { background: var(--primary-dark); }
+.btn-outline { background: #fff; color: var(--text); border: 1.5px solid var(--border); }
+.btn-outline:hover { border-color: var(--primary); color: var(--primary); }
+.btn-success { background: var(--success); color: #fff; border: none; }
+.btn-danger  { background: var(--danger);  color: #fff; border: none; }
+.btn-sm { padding: 6px 12px; font-size: 12px; }
+
+/* ===== PAGE HEADER ===== */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.page-header h1 { font-size: 20px; font-weight: 800; color: var(--text); }
+.page-header p  { font-size: 13px; color: var(--text-muted); margin-top: 2px; }
+
+/* ===== SCROLLBAR ===== */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+
+/* ===== RESPONSIVE — Mobile (≤768px) ===== */
+@media (max-width: 768px) {
+
+  /* ── Layout ── */
+  .main-content { margin-left: 0 !important; }
+  main { padding: 12px !important; }
+
+  /* ── Sidebar: hidden by default, slide in when .mobile-open ── */
+  .sidebar {
+    transform: translateX(-100%);
+    width: 260px !important;
+    z-index: 100;
+  }
+  .sidebar.mobile-open { transform: translateX(0); }
+
+  /* Hide desktop collapse button on mobile */
+  .sidebar-collapse-btn { display: none !important; }
+
+  /* ── Topbar ── */
+  .topbar-hamburger { display: flex !important; }
+  .topbar-subtitle   { display: none !important; }
+  .topbar-username   { display: none !important; }
+
+  /* ── Grid columns → collapse ── */
+  /* KPI 3-4 col → 2 col */
+  main [style*="repeat(3,1fr)"],
+  main [style*="repeat(3, 1fr)"],
+  main [style*="repeat(4,1fr)"],
+  main [style*="repeat(4, 1fr)"] {
+    grid-template-columns: 1fr 1fr !important;
+  }
+  /* Form 2 col → 1 col */
+  main [style*="repeat(2,1fr)"],
+  main [style*="repeat(2, 1fr)"] {
+    grid-template-columns: 1fr !important;
+  }
+
+  /* ── Cards ── */
+  .card { border-radius: 8px !important; }
+
+  /* ── Tables ── */
+  table { font-size: 12px !important; }
+  th, td { padding: 6px 8px !important; white-space: nowrap; }
+
+  /* ── Typography ── */
+  h1 { font-size: 15px !important; }
+  h2 { font-size: 13px !important; }
+
+  /* ── Buttons ── */
+  .btn { min-height: 38px; font-size: 13px !important; }
+  .btn-sm { min-height: 30px !important; font-size: 12px !important; }
+
+  /* ── Document views (print-area) ── */
+  #print-area { padding: 20px !important; }
+  #print-area [style*="repeat("] { grid-template-columns: 1fr !important; }
+}
+
+/* ===== PRINT — A4 เฉพาะ #print-area ===== */
+@media print {
+  @page { size: A4 portrait; margin: 15mm; }
+
+  /* โคลน element ขึ้น body โดยตรงผ่าน printDoc() → ซ่อนทุกอย่างยกเว้น clone */
+  body.is-printing > *:not(#__print_clone__) { display: none !important; }
+  body.is-printing #__print_clone__ {
+    display: block !important;
+    position: static !important;
+    width: 100% !important;
+    background: #fff !important;
+  }
+
+  /* fallback: ถ้าเรียก window.print() โดยตรง */
+  body:not(.is-printing) * { visibility: hidden; }
+  body:not(.is-printing) #print-area { visibility: visible; position: fixed; top: 0; left: 0; width: 100%; background: #fff; }
+  body:not(.is-printing) #print-area * { visibility: visible; }
+
+  .no-print { display: none !important; }
+  tr { page-break-inside: avoid; }
+}

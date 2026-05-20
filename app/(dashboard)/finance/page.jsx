@@ -1,0 +1,332 @@
+'use client'
+import { useState, useEffect } from 'react'
+import { getTransactions, insertTransaction, getInvoices, getSetting, upsertSetting } from '@/lib/db'
+import { fmtDate } from '@/lib/shop'
+import { todayStr, exportJpeg, uploadFile } from '@/lib/docUtils'
+import { supabase } from '@/lib/supabase'
+import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, Cell } from 'recharts'
+import LoadingSpinner from '@/components/ui/LoadingSpinner'
+
+const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
+const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','งานสกรีน','เสื้อพิมพ์ลาย','ถุงผ้า','อื่น ๆ']
+const emptyForm = { description:'', type:'รายรับ', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', note:'' }
+
+export default function FinancePage() {
+  const [txs, setTxs]           = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [expTypes, setExpTypes] = useState(DEFAULT_EXP_TYPES)
+  const [newType, setNewType]   = useState('')
+  const [loading, setLoading]   = useState(true)
+  const [tab, setTab]           = useState('all')
+  const [showForm, setShowForm] = useState(false)
+  const [form, setForm]         = useState(emptyForm)
+  const [saving, setSaving]     = useState(false)
+  // WHT tab
+  const [whtFile, setWhtFile]   = useState({}) // {invId: File}
+  const [whtUploading, setWhtUploading] = useState(null)
+
+  useEffect(()=>{ load() },[])
+
+  async function load() {
+    const [tRes, iRes, etRes] = await Promise.all([getTransactions(), getInvoices(), getSetting('expense_types')])
+    setTxs(tRes.data||[])
+    setInvoices(iRes.data||[])
+    if (etRes.data?.value) setExpTypes(etRes.data.value)
+    setLoading(false)
+  }
+
+  async function handleSave() {
+    if (!form.description||!form.amount) return
+    setSaving(true)
+    const code = 'TX-' + Date.now()
+    const { error } = await insertTransaction({
+      code,
+      description: form.description,
+      type:        form.type,
+      category:    form.category || null,
+      amount:      parseFloat(form.amount),
+      transaction_date: form.transaction_date,
+      invoice_id:  form.invoice_id || null,
+      note:        form.note || null,
+    })
+    if (error) console.error('insertTransaction error:', error)
+    setForm(emptyForm); setShowForm(false); setSaving(false)
+    load()
+  }
+
+  async function addExpType() {
+    if (!newType.trim() || expTypes.includes(newType.trim())) return
+    const updated = [...expTypes, newType.trim()]
+    setExpTypes(updated); setNewType('')
+    await upsertSetting('expense_types', updated)
+  }
+
+  async function handleWhtUpload(inv) {
+    const file = whtFile[inv.id]
+    if (!file) return
+    setWhtUploading(inv.id)
+    const { updateInvoice } = await import('@/lib/db')
+    const url = await uploadFile(supabase, 'wht-files', file)
+    await updateInvoice(inv.id, { wht_file_url: url })
+    setWhtFile(f => ({ ...f, [inv.id]: null }))
+    setWhtUploading(null)
+    load()
+  }
+
+  const income  = txs.filter(t=>t.type==='รายรับ')
+  const expense = txs.filter(t=>t.type==='รายจ่าย')
+  const totalIn  = income.reduce((s,t)=>s+t.amount,0)
+  const totalOut = expense.reduce((s,t)=>s+t.amount,0)
+  const profit   = totalIn - totalOut
+
+  const filtered = tab==='income' ? income : tab==='expense' ? expense : txs
+
+  // Chart: expenses by category
+  const expByType = expTypes.map(cat => ({
+    name: cat,
+    total: expense.filter(t=>t.category===cat).reduce((s,t)=>s+t.amount,0),
+  })).filter(d=>d.total>0)
+
+  // Cost per invoice
+  const costPerInv = invoices.map(inv => ({
+    ...inv,
+    revenue: inv.total || 0,
+    cost:    txs.filter(t=>t.invoice_id===inv.id && t.type==='รายจ่าย').reduce((s,t)=>s+t.amount,0),
+  })).filter(inv=>inv.revenue>0||inv.cost>0)
+
+  // WHT invoices
+  const whtInvoices = invoices.filter(i=>(i.wht_pct||0)>0)
+  const totalWht    = whtInvoices.reduce((s,i)=>s+(i.wht_amount||0),0)
+
+  const CHART_COLORS = ['var(--primary)','var(--info)','var(--success)','var(--warning)','#8B5CF6','#EC4899','#14B8A6','#F97316']
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+      {/* KPI */}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
+        {[
+          { label:'รายรับรวม',   value:`฿${totalIn.toLocaleString()}`,  accent:'var(--success)', icon:'💰' },
+          { label:'รายจ่ายรวม',  value:`฿${totalOut.toLocaleString()}`, accent:'var(--danger)',  icon:'💸' },
+          { label:'กำไรสุทธิ',   value:`฿${profit.toLocaleString()}`,   accent:profit>=0?'var(--primary)':'var(--danger)', icon:'📈' },
+          { label:'รายการทั้งหมด', value:txs.length+' รายการ',           accent:'var(--info)', icon:'📋' },
+        ].map(k=>(
+          <div key={k.label} style={{ background:'var(--card)', borderRadius:'var(--radius)', padding:'16px 18px', boxShadow:'var(--shadow)', border:'1px solid var(--border)', position:'relative', overflow:'hidden' }}>
+            <div style={{ position:'absolute', top:0, left:0, width:4, height:'100%', background:k.accent, borderRadius:'10px 0 0 10px' }} />
+            <div style={{ position:'absolute', right:14, top:'50%', transform:'translateY(-50%)', fontSize:28, opacity:.1 }}>{k.icon}</div>
+            <div style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600, textTransform:'uppercase' }}>{k.label}</div>
+            <div style={{ fontSize:22, fontWeight:800, color:k.accent, marginTop:4 }}>{k.value}</div>
+          </div>
+        ))}
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10 }}>
+        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+          {[['all','ทั้งหมด'],['income','รายรับ'],['expense','รายจ่าย'],['chart','กราฟรายจ่าย'],['cost','ต้นทุนต่อ Invoice']].map(([v,l])=>(
+            <button key={v} onClick={()=>setTab(v)}
+              className={tab===v?'btn btn-primary btn-sm':'btn btn-outline btn-sm'}>{l}</button>
+          ))}
+        </div>
+        {['all','income','expense'].includes(tab) && (
+          <button className="btn btn-primary" onClick={()=>setShowForm(!showForm)}>
+            {showForm?'✕ ปิด':'+ เพิ่มรายการ'}
+          </button>
+        )}
+      </div>
+
+      {/* Add form */}
+      {showForm && ['all','income','expense'].includes(tab) && (
+        <div className="card" style={{ padding:20 }}>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>➕ เพิ่มรายการ</div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, gridColumn:'1 / -1' }}>
+              <label>รายการ *</label>
+              <input type="text" placeholder="รายละเอียด..." value={form.description}
+                onChange={e=>setForm({...form,description:e.target.value})} />
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label>ประเภท</label>
+              <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>
+                <option>รายรับ</option><option>รายจ่าย</option>
+              </select>
+            </div>
+            {form.type==='รายรับ' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <label>ประเภทรายรับ</label>
+                <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})}>
+                  <option value="">— เลือกประเภท —</option>
+                  {DEFAULT_INC_TYPES.map(t=><option key={t}>{t}</option>)}
+                </select>
+              </div>
+            )}
+            {form.type==='รายจ่าย' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <label>หมวดหมู่รายจ่าย</label>
+                <div style={{ display:'flex', gap:6 }}>
+                  <select value={form.category} onChange={e=>setForm({...form,category:e.target.value})} style={{ flex:1 }}>
+                    <option value="">— เลือกหมวด —</option>
+                    {expTypes.map(t=><option key={t}>{t}</option>)}
+                  </select>
+                  <button className="btn btn-outline btn-sm" title="เพิ่มหมวดหมู่"
+                    onClick={()=>{const n=prompt('ชื่อหมวดหมู่ใหม่');if(n&&n.trim()&&!expTypes.includes(n.trim())){const u=[...expTypes,n.trim()];setExpTypes(u);upsertSetting('expense_types',u)}}}>+</button>
+                </div>
+              </div>
+            )}
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label>จำนวน (฿) *</label>
+              <input type="number" min="0" placeholder="0" value={form.amount}
+                onChange={e=>setForm({...form,amount:e.target.value})} />
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label>วันที่</label>
+              <input type="date" value={form.transaction_date}
+                onChange={e=>setForm({...form,transaction_date:e.target.value})} />
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label>ผูก Invoice (ถ้ามี)</label>
+              <select value={form.invoice_id} onChange={e=>setForm({...form,invoice_id:e.target.value})}>
+                <option value="">— ไม่ผูก —</option>
+                {invoices.map(i=><option key={i.id} value={i.id}>{i.code} – {i.customers?.name}</option>)}
+              </select>
+            </div>
+            <div style={{ display:'flex', flexDirection:'column', gap:4, gridColumn:'1 / -1' }}>
+              <label>หมายเหตุ</label>
+              <input type="text" placeholder="หมายเหตุ..." value={form.note}
+                onChange={e=>setForm({...form,note:e.target.value})} />
+            </div>
+          </div>
+          <div style={{ display:'flex', gap:8, marginTop:14 }}>
+            <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
+              {saving?'กำลังบันทึก...':'💾 บันทึก'}
+            </button>
+            <button className="btn btn-outline btn-sm" onClick={()=>setShowForm(false)}>ยกเลิก</button>
+          </div>
+        </div>
+      )}
+
+      {/* Chart tab */}
+      {tab==='chart' && (
+        <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
+          <div className="card">
+            <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
+              <h2 style={{ fontSize:14, fontWeight:700 }}>📊 ค่าใช้จ่ายแยกตามหมวดหมู่</h2>
+            </div>
+            <div style={{ padding:16 }}>
+              {expByType.length===0 ? (
+                <div style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ยังไม่มีข้อมูลค่าใช้จ่าย</div>
+              ) : (
+                <ResponsiveContainer width="100%" height={280}>
+                  <BarChart data={expByType} layout="vertical" margin={{ left:10 }}>
+                    <XAxis type="number" tick={{ fontSize:11 }} tickFormatter={v=>v>=1000?(v/1000).toFixed(0)+'K':v} />
+                    <YAxis type="category" dataKey="name" tick={{ fontSize:11 }} width={90} />
+                    <Tooltip formatter={v=>[`฿${v.toLocaleString()}`, 'ยอดรวม']} />
+                    <Bar dataKey="total" barSize={18} radius={[0,4,4,0]}>
+                      {expByType.map((_,i)=><Cell key={i} fill={CHART_COLORS[i%CHART_COLORS.length]} />)}
+                    </Bar>
+                  </BarChart>
+                </ResponsiveContainer>
+              )}
+            </div>
+          </div>
+          <div className="card">
+            <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
+              <h2 style={{ fontSize:14, fontWeight:700 }}>📋 สรุปค่าใช้จ่ายตามหมวด</h2>
+            </div>
+            <div style={{ padding:16, display:'flex', flexDirection:'column', gap:8 }}>
+              {expByType.sort((a,b)=>b.total-a.total).map((d,i)=>(
+                <div key={d.name} style={{ display:'flex', justifyContent:'space-between', padding:'6px 10px', background:'var(--bg)', borderRadius:6 }}>
+                  <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                    <div style={{ width:10, height:10, borderRadius:2, background:CHART_COLORS[i%CHART_COLORS.length], flexShrink:0 }} />
+                    <span style={{ fontSize:13 }}>{d.name}</span>
+                  </div>
+                  <span style={{ fontWeight:700, fontSize:13 }}>฿{d.total.toLocaleString()}</span>
+                </div>
+              ))}
+              {expByType.length===0 && <div style={{ color:'var(--text-muted)', fontSize:13 }}>ไม่มีข้อมูล</div>}
+              <div style={{ borderTop:'1px solid var(--border)', paddingTop:8, display:'flex', justifyContent:'space-between', fontWeight:800 }}>
+                <span>รวมทั้งหมด</span>
+                <span style={{ color:'var(--danger)' }}>฿{totalOut.toLocaleString()}</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Cost per Invoice */}
+      {tab==='cost' && (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)' }}>
+            <h2 style={{ fontSize:14, fontWeight:700 }}>💹 ต้นทุนและกำไรต่อ Invoice</h2>
+          </div>
+          {loading ? <LoadingSpinner /> : (
+            <div style={{ overflowX:'auto' }}>
+              <table>
+                <thead>
+                  <tr><th>Invoice</th><th>ลูกค้า</th><th>รายรับ</th><th>ต้นทุน</th><th>กำไร</th><th>Margin</th></tr>
+                </thead>
+                <tbody>
+                  {costPerInv.length===0 && (
+                    <tr><td colSpan={6} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ยังไม่มีข้อมูล — ผูกรายการกับ Invoice ก่อน</td></tr>
+                  )}
+                  {costPerInv.map(inv=>{
+                    const g = inv.revenue - inv.cost
+                    const m = inv.revenue>0?((g/inv.revenue)*100).toFixed(1):0
+                    return (
+                      <tr key={inv.id}>
+                        <td style={{ color:'var(--primary)', fontFamily:'monospace', fontWeight:700 }}>{inv.code}</td>
+                        <td>{inv.customers?.name||'—'}</td>
+                        <td style={{ color:'var(--success)', fontWeight:700 }}>฿{inv.revenue.toLocaleString()}</td>
+                        <td style={{ color:'var(--danger)', fontWeight:700 }}>฿{inv.cost.toLocaleString()}</td>
+                        <td style={{ color:g>=0?'var(--success)':'var(--danger)', fontWeight:800 }}>฿{g.toLocaleString()}</td>
+                        <td><span className={parseFloat(m)>=30?'badge badge-green':'badge badge-yellow'}>{m}%</span></td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Transactions table */}
+      {['all','income','expense'].includes(tab) && (
+        <div className="card" style={{ overflow:'hidden' }}>
+          {loading ? <LoadingSpinner /> : (
+            <>
+              <div style={{ overflowX:'auto' }}>
+                <table>
+                  <thead>
+                    <tr><th>วันที่</th><th>รายการ</th><th>หมวด</th><th>ประเภท</th><th>จำนวน</th><th>Invoice</th><th>หมายเหตุ</th></tr>
+                  </thead>
+                  <tbody>
+                    {filtered.map(t=>(
+                      <tr key={t.id}>
+                        <td style={{ fontSize:12, color:'var(--text-muted)', whiteSpace:'nowrap' }}>{fmtDate(t.transaction_date)}</td>
+                        <td style={{ fontSize:13 }}>{t.description}</td>
+                        <td style={{ fontSize:12 }}>{t.category ? <span className="badge badge-gray">{t.category}</span> : '—'}</td>
+                        <td><span className={t.type==='รายรับ'?'badge badge-green':'badge badge-red'}>{t.type}</span></td>
+                        <td style={{ fontWeight:700, fontFamily:'monospace', color:t.type==='รายรับ'?'var(--success)':'var(--danger)' }}>
+                          {t.type==='รายรับ'?'+':'-'}฿{(t.amount||0).toLocaleString()}
+                        </td>
+                        <td style={{ fontSize:12, color:'var(--info)' }}>{t.invoices?.code||'—'}</td>
+                        <td style={{ fontSize:12, color:'var(--text-muted)' }}>{t.note||'—'}</td>
+                      </tr>
+                    ))}
+                    {filtered.length===0 && (
+                      <tr><td colSpan={7} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+              <div style={{ padding:'10px 14px', borderTop:'1px solid var(--border)', fontSize:12, color:'var(--text-muted)' }}>
+                แสดง {filtered.length} จาก {txs.length} รายการ
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
