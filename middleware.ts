@@ -1,42 +1,28 @@
-import { createServerClient } from '@supabase/ssr'
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({ request })
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        getAll() { return request.cookies.getAll() },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value, options }) => {
-            request.cookies.set(name, value)
-            response.cookies.set(name, value, options)
-          })
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
+export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl
 
-  // ถ้าไม่ได้ login และไม่ได้อยู่หน้า login → redirect ไป /login
-  if (!user && pathname !== '/login') {
+  // ดู session cookie ที่ Supabase เก็บไว้
+  const cookies = request.cookies.getAll()
+  const hasSession = cookies.some(c =>
+    c.name.startsWith('sb-') && c.name.endsWith('-auth-token')
+  )
+
+  // ถ้าไม่มี session และไม่ได้อยู่หน้า login → redirect ไป /login
+  if (!hasSession && pathname !== '/login') {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 
-  // ถ้า login แล้วและพยายามเข้า /login → redirect ไป /dashboard
-  if (user && pathname === '/login') {
+  // ถ้ามี session และอยู่หน้า login → redirect ไป /dashboard
+  if (hasSession && pathname === '/login') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
-  return response
+  return NextResponse.next()
 }
 
 export const config = {
-  matcher: ['/((?!_next/static|_next/image|favicon.ico|api).*)'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico|manifest.json|icon-|api).*)'],
 }
