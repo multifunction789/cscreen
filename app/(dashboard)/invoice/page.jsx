@@ -227,8 +227,8 @@ export default function InvoicePage() {
             }}>
               {/* Brand */}
               <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
-                <img src="/logo.jpg" alt="C-Screen"
-                  style={{ height:64, width:64, objectFit:'contain', borderRadius:10, flexShrink:0 }} />
+                <img src="/cscreen-logo.png" alt="C-Screen"
+                  style={{ height:72, width:72, objectFit:'contain', flexShrink:0 }} />
                 <div style={{ lineHeight:1.7 }}>
                   <div style={{ fontWeight:900, fontSize:13, color:'#111' }}>
                     ร้าน C-Screen สกรีนเสื้อ-ตัด-เย็บ-ปัก ครบวงจร - หนองจอก
@@ -259,17 +259,6 @@ export default function InvoicePage() {
                   padding:'4px 10px', borderRadius:99, background:'#fff7ed',
                   color:'#9a3412', fontSize:11, fontWeight:800, border:'1px solid #fed7aa',
                 }}>รอชำระเงิน</div>
-                <div style={{ fontSize:10, lineHeight:2, marginTop:6, color:'#6b7280' }}>
-                  <div><span style={{ color:'#aaa' }}>เลขที่ </span>
-                    <strong style={{ fontFamily:'monospace', fontSize:12, color:'#B80F0B' }}>{view.code}</strong>
-                  </div>
-                  <div><span style={{ color:'#aaa' }}>วันที่ </span>
-                    <strong>{fmtDate(view.document_date||view.created_at)}</strong>
-                  </div>
-                  {view.due_date && <div><span style={{ color:'#aaa' }}>ครบกำหนด </span>
-                    <strong style={{ color:'#B80F0B' }}>{fmtDate(view.due_date)}</strong>
-                  </div>}
-                </div>
               </div>
             </div>
 
@@ -384,11 +373,9 @@ export default function InvoicePage() {
                 {view.notes
                   ? <span>{view.notes}</span>
                   : <>
-                      1) เริ่มผลิตหลังได้รับมัดจำและลูกค้ายืนยันแบบ Artwork เท่านั้น<br/>
-                      2) ระยะเวลาผลิตประมาณ 5–7 วันทำการ หลังยืนยันแบบ<br/>
-                      3) สีจริงอาจแตกต่างจากหน้าจอเล็กน้อย ขึ้นอยู่กับเนื้อผ้าและระบบพิมพ์<br/>
-                      4) งานสั่งผลิตเฉพาะ ไม่รับยกเลิกหลังเริ่มผลิต<br/>
-                      5) กรุณาตรวจสอบรายการและจำนวนก่อนชำระเงิน
+                      1) กรุณาตรวจสอบรายการและจำนวนก่อนชำระเงิน<br/>
+                      2) ระยะเวลาผลิตประมาณ 7–14 วันทำการ หลังยืนยันแบบ<br/>
+                      3) สีจริงอาจแตกต่างจากหน้าจอเล็กน้อย ขึ้นอยู่กับเนื้อผ้า
                     </>
                 }
               </div>
@@ -406,7 +393,7 @@ export default function InvoicePage() {
                   </div>
                 ))}
                 {/* Grand total */}
-                <div style={{ display:'flex', justifyContent:'space-between', padding:'11px 12px', background:'linear-gradient(90deg,#B80F0B,#8B0000)', color:'#fff', fontSize:17, fontWeight:900 }}>
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'11px 12px', background:'linear-gradient(90deg,#d1fae5,#a7f3d0)', color:'#065f46', fontSize:17, fontWeight:900 }}>
                   <span>ยอดสุทธิ</span>
                   <span style={{ fontFamily:'monospace' }}>{(view.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</span>
                 </div>
@@ -416,41 +403,40 @@ export default function InvoicePage() {
 
             {/* ── PAYMENT ── */}
             <div style={{
-              marginTop:12, display:'grid', gridTemplateColumns:'1fr 132px', gap:14,
+              marginTop:10, display:'grid', gridTemplateColumns:'1fr 88px', gap:12,
               alignItems:'center', border:'1px solid rgba(184,15,11,.18)',
-              borderRadius:12, padding:13, background:'linear-gradient(135deg,#fff,#FEF2F2)',
+              borderRadius:10, padding:'9px 12px', background:'linear-gradient(135deg,#fff,#FEF2F2)',
             }}>
               <div>
-                <div style={{ fontSize:12, color:'#8B0000', fontWeight:900, marginBottom:7 }}>
+                <div style={{ fontSize:11.5, color:'#8B0000', fontWeight:900, marginBottom:4 }}>
                   ช่องทางชำระเงิน / PAYMENT METHOD
                 </div>
-                <div style={{ fontSize:16, fontWeight:900, letterSpacing:.4, color:'#111', marginBottom:3 }}>
+                <div style={{ fontSize:14, fontWeight:900, letterSpacing:.4, color:'#111', marginBottom:2 }}>
                   {SHOP.bankAccount} ธนาคารกสิกรไทย
                 </div>
-                <div style={{ fontSize:12, color:'#374151', margin:'2px 0' }}>
+                <div style={{ fontSize:11.5, color:'#374151', margin:'1px 0' }}>
                   ชื่อบัญชี: {SHOP.bankName}
                 </div>
-                <div style={{ fontSize:10.5, color:'#555', marginTop:5 }}>
-                  หลังโอนเงิน กรุณาส่งสลิปพร้อมแจ้งเลขที่ใบแจ้งหนี้&nbsp;
-                  <strong>{view.code}</strong>&nbsp;ทาง LINE:&nbsp;<strong>{SHOP.line}</strong>
+                <div style={{ fontSize:10, color:'#555', marginTop:3 }}>
+                  โอนแล้วส่งสลิปพร้อมแจ้งเลขที่&nbsp;<strong>{view.code}</strong>&nbsp;ทาง LINE:&nbsp;<strong>{SHOP.line}</strong>
                 </div>
               </div>
               <div style={{
-                width:126, height:126, borderRadius:12,
-                border:'2px dashed rgba(184,15,11,.4)', background:'#fff',
+                width:88, height:88, borderRadius:8,
+                border:'1px solid rgba(184,15,11,.3)', background:'#fff',
                 overflow:'hidden', flexShrink:0,
               }}>
-                <img src="/invoice-sample.jpg" alt="QR PromptPay"
+                <img src="/qr-payment.jpg" alt="QR PromptPay"
                   style={{ width:'100%', height:'100%', objectFit:'contain' }} />
               </div>
             </div>
 
             {/* ── SIGNATURE ── */}
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginTop:14, fontSize:12 }}>
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16, marginTop:10, fontSize:12 }}>
               {['ผู้รับเอกสาร / ลูกค้า', 'ผู้ออกเอกสาร / C-SCREEN'].map(t => (
-                <div key={t} style={{ border:'1px solid #e5e7eb', borderRadius:12, padding:12, minHeight:88 }}>
-                  <div style={{ fontWeight:900, color:'#374151' }}>{t}</div>
-                  <div style={{ marginTop:44, borderTop:'1px solid #9ca3af', paddingTop:6, textAlign:'center', color:'#6b7280' }}>
+                <div key={t} style={{ border:'1px solid #e5e7eb', borderRadius:10, padding:'8px 12px', minHeight:58 }}>
+                  <div style={{ fontWeight:900, color:'#374151', fontSize:11 }}>{t}</div>
+                  <div style={{ marginTop:20, borderTop:'1px solid #d1d5db', paddingTop:4, textAlign:'center', color:'#9ca3af', fontSize:10.5 }}>
                     ลงชื่อ / วันที่
                   </div>
                 </div>
