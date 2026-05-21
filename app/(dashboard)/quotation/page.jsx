@@ -50,7 +50,12 @@ export default function QuotationPage() {
       await updateQuotation(editId, payload)
       setEditId(null)
     } else {
-      const code = 'QT-'+String((rows.length||0)+1).padStart(4,'0')
+      const { data: allQt } = await getQuotations()
+      const maxQtNum = (allQt || []).reduce((max, r) => {
+        const n = parseInt(r.code?.replace('QT-', '') || '0')
+        return n > max ? n : max
+      }, 0)
+      const code = 'QT-' + String(maxQtNum + 1).padStart(4, '0')
       await insertQuotation({ ...payload, code })
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
@@ -105,57 +110,125 @@ export default function QuotationPage() {
             <button className="btn btn-outline" onClick={()=>printDoc()}>🖨️ พิมพ์</button>
           </div>
         </div>
-        <div id="print-area" style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:8, padding:40, maxWidth:794, margin:'0 auto' }}>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:24 }}>
-            <div>
-              <div style={{ fontSize:22, fontWeight:900, color:'var(--primary)' }}>C-SCREEN</div>
-              <div style={{ fontSize:11, color:'#666', maxWidth:260, lineHeight:1.6 }}>
-                {SHOP.address}<br/>Tel: {SHOP.tel} | Line: {SHOP.line}<br/>
-                เลขผู้เสียภาษี: {SHOP.taxId}
-              </div>
-            </div>
-            <div style={{ textAlign:'right' }}>
-              <div style={{ fontSize:22, fontWeight:900 }}>ใบเสนอราคา</div>
-              <div style={{ color:'var(--primary)', fontFamily:'monospace', fontWeight:700 }}>{view.code}</div>
-              <div style={{ fontSize:12, color:'#666' }}>วันที่: {fmtDate(view.document_date||view.created_at)}</div>
-              {view.valid_until && <div style={{ fontSize:12, color:'#666' }}>ใช้ได้ถึง: {fmtDate(view.valid_until)}</div>}
-            </div>
-          </div>
-          <div style={{ background:'#F9FAFB', borderRadius:8, padding:'12px 16px', marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#888', marginBottom:4 }}>ลูกค้า</div>
-            <div style={{ fontSize:14, fontWeight:700 }}>{cust.name||view.customers?.name}</div>
-            {cust.address && <div style={{ fontSize:12, color:'#666' }}>{cust.address}</div>}
-            {cust.phone && <div style={{ fontSize:12, color:'#666' }}>Tel: {cust.phone}</div>}
-          </div>
-          <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:16 }}>
-            <thead>
-              <tr style={{ background:'var(--primary)', color:'#fff' }}>
-                <th style={{ padding:'8px 12px', textAlign:'left', fontSize:12 }}>รายการ</th>
-                <th style={{ padding:'8px 12px', textAlign:'right', fontSize:12, width:70 }}>จำนวน</th>
-                <th style={{ padding:'8px 12px', textAlign:'right', fontSize:12, width:110 }}>ราคา/หน่วย</th>
-                <th style={{ padding:'8px 12px', textAlign:'right', fontSize:12, width:120 }}>จำนวนเงิน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(view.items&&view.items.length ? view.items : [{ desc:view.item_desc||'', qty:1, price:view.total||0, amount:view.total||0 }]).map((it,i)=>(
-                <tr key={i} style={{ borderBottom:'1px solid #eee' }}>
-                  <td style={{ padding:'8px 12px', fontSize:13 }}>{it.desc}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'right', fontSize:13 }}>{it.qty}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'right', fontSize:13 }}>฿{(it.price||0).toLocaleString()}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'right', fontWeight:600, fontSize:13 }}>฿{(it.amount||0).toLocaleString()}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <div style={{ minWidth:200, display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:16, fontWeight:800, color:'var(--primary)', borderTop:'2px solid var(--primary)' }}>
-              <span>ยอดรวม</span><span>฿{(view.total||0).toLocaleString()}</span>
-            </div>
-          </div>
-          <div style={{ marginTop:20, padding:12, background:'#F9FAFB', borderRadius:6, fontSize:12, color:'#666' }}>
-            <span className={STATUS_BADGE[view.status]||'badge badge-gray'}>{view.status}</span>
-          </div>
+        <div id="print-area" style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:8, maxWidth:794, margin:'0 auto', fontFamily:"'Sarabun','Noto Sans Thai',sans-serif" }}>
+
+  {/* Header */}
+  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', padding:'24px 32px 20px', borderBottom:'3px solid var(--primary)' }}>
+    <div style={{ display:'flex', gap:16, alignItems:'flex-start' }}>
+      <div style={{ width:64, height:64, background:'var(--primary)', borderRadius:10, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+        <div style={{ color:'#fff', fontWeight:900, fontSize:20, letterSpacing:-1, lineHeight:1 }}>C<br/>S</div>
+      </div>
+      <div>
+        <div style={{ fontWeight:800, fontSize:14, color:'#1a1a1a' }}>{SHOP.name}</div>
+        <div style={{ fontSize:11, color:'#555', lineHeight:1.7, marginTop:2 }}>
+          {SHOP.address}<br/>
+          เลขประจำตัวผู้เสียภาษี: {SHOP.taxId}<br/>
+          Tel: {SHOP.tel} | Line: {SHOP.line} | FB: {SHOP.fb}
         </div>
+      </div>
+    </div>
+    <div style={{ textAlign:'right' }}>
+      <div style={{ display:'inline-block', border:'2px solid var(--primary)', borderRadius:8, padding:'8px 24px', marginBottom:8 }}>
+        <div style={{ fontSize:18, fontWeight:900, color:'var(--primary)', letterSpacing:1 }}>ใบเสนอราคา</div>
+        <div style={{ fontSize:12, fontWeight:600, color:'#666', letterSpacing:2 }}>QUOTATION</div>
+      </div>
+      <div style={{ fontSize:11, color:'#888', marginTop:4 }}>สำหรับลูกค้า</div>
+    </div>
+  </div>
+
+  {/* Customer + Doc Info */}
+  <div style={{ display:'grid', gridTemplateColumns:'1fr auto', gap:0, margin:'0 32px', borderBottom:'1px solid #e5e7eb', paddingBottom:16, paddingTop:16 }}>
+    <div style={{ display:'grid', gridTemplateColumns:'80px 1fr', rowGap:4, fontSize:12 }}>
+      <span style={{ color:'#888', fontWeight:600 }}>ชื่อลูกค้า</span>
+      <span style={{ fontWeight:700, fontSize:13 }}>{cust.name || view.customers?.name}</span>
+      <span style={{ color:'#888', fontWeight:600 }}>ที่อยู่</span>
+      <span style={{ color:'#444' }}>{cust.address || '-'}</span>
+      <span style={{ color:'#888', fontWeight:600 }}>เบอร์โทร</span>
+      <span style={{ color:'#444' }}>{cust.phone || '-'}</span>
+      <span style={{ color:'#888', fontWeight:600 }}>เลขภาษี</span>
+      <span style={{ color:'#444' }}>{cust.tax_id || '-'}</span>
+    </div>
+    <div style={{ textAlign:'right', fontSize:12, display:'flex', flexDirection:'column', gap:4 }}>
+      <div><span style={{ color:'#888', fontWeight:600 }}>วันที่: </span><span style={{ fontWeight:700 }}>{fmtDate(view.document_date||view.created_at)}</span></div>
+      <div><span style={{ color:'#888', fontWeight:600 }}>เลขที่: </span><span style={{ fontWeight:700, color:'var(--primary)', fontFamily:'monospace' }}>{view.code}</span></div>
+      {view.valid_until && <div><span style={{ color:'#888', fontWeight:600 }}>ใช้ได้ถึง: </span><span style={{ fontWeight:600, color:'#EF4444' }}>{fmtDate(view.valid_until)}</span></div>}
+    </div>
+  </div>
+
+  {/* Items Table */}
+  <div style={{ padding:'0 32px' }}>
+    <table style={{ width:'100%', borderCollapse:'collapse', marginTop:12, fontSize:12 }}>
+      <thead>
+        <tr style={{ background:'var(--primary)', color:'#fff' }}>
+          <th style={{ padding:'8px 10px', textAlign:'center', width:36, fontWeight:700 }}>ลำดับ</th>
+          <th style={{ padding:'8px 10px', textAlign:'left', fontWeight:700 }}>รายละเอียด</th>
+          <th style={{ padding:'8px 10px', textAlign:'center', width:70, fontWeight:700 }}>จำนวน</th>
+          <th style={{ padding:'8px 10px', textAlign:'right', width:90, fontWeight:700 }}>ราคา/หน่วย</th>
+          <th style={{ padding:'8px 10px', textAlign:'right', width:100, fontWeight:700 }}>จำนวนเงิน (บาท)</th>
+        </tr>
+      </thead>
+      <tbody>
+        {(view.items&&view.items.length ? view.items : [{ desc:view.item_desc||'', qty:1, price:view.total||0, amount:view.total||0 }]).map((it,i) => (
+          <tr key={i} style={{ borderBottom:'1px solid #f3f4f6', background: i%2===0?'#fff':'#fafafa' }}>
+            <td style={{ padding:'7px 10px', textAlign:'center', color:'#666' }}>{i+1}</td>
+            <td style={{ padding:'7px 10px' }}>{it.desc}</td>
+            <td style={{ padding:'7px 10px', textAlign:'center' }}>{it.qty}</td>
+            <td style={{ padding:'7px 10px', textAlign:'right' }}>{(it.price||0).toLocaleString()}</td>
+            <td style={{ padding:'7px 10px', textAlign:'right', fontWeight:600 }}>{(it.amount||0).toLocaleString()}</td>
+          </tr>
+        ))}
+        {Array.from({ length: Math.max(0, 8-(view.items&&view.items.length?view.items.length:1)) }).map((_,i)=>(
+          <tr key={`e${i}`} style={{ borderBottom:'1px solid #f3f4f6' }}>
+            <td style={{ padding:'7px 10px' }}>&nbsp;</td>
+            <td style={{ padding:'7px 10px' }}></td>
+            <td></td><td></td><td></td>
+          </tr>
+        ))}
+        <tr style={{ borderTop:'2px solid #e5e7eb', background:'#f9fafb' }}>
+          <td colSpan={4} style={{ padding:'6px 10px', fontWeight:700, fontSize:11, color:'#666' }}>
+            รวมยอดสุทธิ
+          </td>
+          <td style={{ padding:'6px 10px', textAlign:'right', fontWeight:700 }}>{(view.total||0).toLocaleString()}</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+
+  {/* Total Box */}
+  <div style={{ display:'flex', justifyContent:'flex-end', padding:'12px 32px 8px' }}>
+    <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 16px', fontSize:14, fontWeight:800, color:'#fff', background:'var(--primary)', borderRadius:6, minWidth:200 }}>
+      <span>GRAND TOTAL</span><span>{(view.total||0).toLocaleString()} บาท</span>
+    </div>
+  </div>
+
+  {/* Notes + Status */}
+  <div style={{ padding:'0 32px 16px', fontSize:11, color:'#555' }}>
+    {view.status && (
+      <div style={{ marginBottom:8 }}>
+        <span style={{ fontWeight:700 }}>สถานะ: </span>
+        <span className={STATUS_BADGE[view.status]||'badge badge-gray'}>{view.status}</span>
+      </div>
+    )}
+    <div style={{ fontSize:10, color:'#888', lineHeight:1.6 }}>
+      ใบเสนอราคานี้มีอายุ 30 วัน นับจากวันที่ออกเอกสาร หากมีข้อสงสัยกรุณาติดต่อ Tel: {SHOP.tel}
+    </div>
+  </div>
+
+  {/* Signature Row */}
+  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:0, borderTop:'1px dashed #d1d5db', margin:'0 32px 24px', paddingTop:16 }}>
+    {[
+      { title:'ผู้รับใบเสนอราคา', lines:['ลงชื่อ_________________________','วันที่__________________________'] },
+      { title:'', lines:['ผู้เสนอราคา_____________________','วันที่__________________________'] },
+      { title:'ร้าน C-Screen', lines:['ผู้มีอำนาจลงนาม________________','วันที่__________________________'] },
+    ].map((box,i) => (
+      <div key={i} style={{ padding:'0 16px', borderRight: i<2?'1px dashed #d1d5db':'none', fontSize:11, color:'#555' }}>
+        {box.title && <div style={{ fontWeight:700, marginBottom:8 }}>{box.title}</div>}
+        {box.lines.map((l,j) => <div key={j} style={{ marginBottom:8, marginTop: j===0&&!box.title?24:0 }}>{l}</div>)}
+      </div>
+    ))}
+  </div>
+
+</div>
       </div>
     )
   }
