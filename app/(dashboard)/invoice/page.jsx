@@ -11,6 +11,33 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null }
 
+/* ── Thai Baht → Words ─────────────────────────────────── */
+function thaiAmountToWords(amount) {
+  const ones = ['','หนึ่ง','สอง','สาม','สี่','ห้า','หก','เจ็ด','แปด','เก้า']
+  const pos  = ['','สิบ','ร้อย','พัน','หมื่น','แสน']
+  function chunk(n) {
+    if (n === 0) return ''
+    const s = String(n); let out = ''
+    for (let i = 0; i < s.length; i++) {
+      const d = parseInt(s[i]), p = s.length - i - 1
+      if (d === 0) continue
+      if (p === 1 && d === 1) { out += 'สิบ'; continue }
+      if (p === 1 && d === 2) { out += 'ยี่สิบ'; continue }
+      out += ones[d] + pos[p]
+    }
+    return out
+  }
+  const fixed = parseFloat(amount || 0).toFixed(2)
+  const [bStr, sStr] = fixed.split('.')
+  const baht = parseInt(bStr), satang = parseInt(sStr)
+  let result = baht === 0 ? 'ศูนย์'
+    : baht >= 1000000 ? chunk(Math.floor(baht/1000000)) + 'ล้าน' + chunk(baht % 1000000)
+    : chunk(baht)
+  result += 'บาท'
+  if (satang > 0) result += chunk(satang) + 'สตางค์'
+  return result + 'ถ้วน'
+}
+
 function calcItems(items) {
   return items.map(it => ({ ...it, amount: (parseFloat(it.qty)||0) * (parseFloat(it.price)||0) }))
 }
@@ -174,71 +201,267 @@ export default function InvoicePage() {
           </div>
         )}
 
-        <div id="print-area" style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:8, padding:40 }}>
-          <div style={{ display:'flex', justifyContent:'space-between', marginBottom:24 }}>
-            <div>
-              <div style={{ fontSize:22, fontWeight:900, color:'var(--primary)', letterSpacing:-1 }}>C-SCREEN</div>
-              <div style={{ fontSize:11, color:'#666', maxWidth:260, lineHeight:1.6 }}>
-                {SHOP.address}<br/>Tel: {SHOP.tel} | Line: {SHOP.line}<br/>
-                เลขประจำตัวผู้เสียภาษี: {SHOP.taxId}
+        {/* INVOICE PRINT AREA — A4 Portrait */}
+        <div id="print-area" style={{
+          position:'relative', background:'#fff', width:754, margin:'0 auto',
+          fontFamily:'"Sarabun", Arial, Tahoma, sans-serif',
+          fontSize:11, color:'#111827', lineHeight:1.5, overflow:'hidden',
+          border:'1px solid #e5e7eb', borderRadius:4,
+        }}>
+          {/* Top stripe */}
+          <div style={{ height:7, background:'linear-gradient(90deg,#6D0000,#B80F0B,#E53935)' }} />
+
+          {/* Watermark */}
+          <div style={{
+            position:'absolute', right:-30, top:110, fontSize:96, fontWeight:900,
+            color:'rgba(184,15,11,.04)', letterSpacing:3, transform:'rotate(-90deg)',
+            pointerEvents:'none', userSelect:'none',
+          }}>C-SCREEN</div>
+
+          <div style={{ padding:'18px 26px 22px' }}>
+
+            {/* ── HEADER ── */}
+            <div style={{
+              display:'grid', gridTemplateColumns:'1.35fr .65fr', gap:16,
+              paddingBottom:14, borderBottom:'1px solid #e5e7eb',
+            }}>
+              {/* Brand */}
+              <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
+                <img src="/logo.jpg" alt="C-Screen"
+                  style={{ height:64, width:64, objectFit:'contain', borderRadius:10, flexShrink:0 }} />
+                <div style={{ lineHeight:1.7 }}>
+                  <div style={{ fontWeight:900, fontSize:13, color:'#111' }}>
+                    ร้าน C-Screen สกรีนเสื้อ-ตัด-เย็บ-ปัก ครบวงจร - หนองจอก
+                  </div>
+                  <div style={{ fontSize:9.5, color:'#374151' }}>
+                    68/148 หมู่บ้านอมรทรัพย์ ซอยอยู่วิทยา 18 ถนนสุวินทวงศ์ แขวงกระทุ่มราย
+                  </div>
+                  <div style={{ fontSize:9.5, color:'#374151' }}>
+                    เขตหนองจอก กรุงเทพมหานคร 10530 &nbsp;เลขประจำตัวผู้เสียภาษี {SHOP.taxId}
+                  </div>
+                  <div style={{ display:'flex', flexWrap:'wrap', gap:4, marginTop:5 }}>
+                    {[`Tel: ${SHOP.tel}`, `LINE: ${SHOP.line}`, `FB: ${SHOP.fb}`, 'TT: ซีสกรีน'].map(t => (
+                      <span key={t} style={{
+                        padding:'2px 7px', borderRadius:99, background:'#FEF2F2',
+                        color:'#8B0000', fontSize:9.5, fontWeight:700,
+                        border:'1px solid rgba(184,15,11,.15)',
+                      }}>{t}</span>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              {/* Doc badge */}
+              <div style={{ textAlign:'right' }}>
+                <div style={{ fontSize:28, fontWeight:900, color:'#B80F0B', lineHeight:1 }}>ใบแจ้งหนี้</div>
+                <div style={{ fontSize:11, letterSpacing:2, color:'#6b7280', fontWeight:700, marginTop:3 }}>INVOICE</div>
+                <div style={{
+                  display:'inline-block', marginTop:8,
+                  padding:'4px 10px', borderRadius:99, background:'#fff7ed',
+                  color:'#9a3412', fontSize:11, fontWeight:800, border:'1px solid #fed7aa',
+                }}>รอชำระเงิน</div>
+                <div style={{ fontSize:10, lineHeight:2, marginTop:6, color:'#6b7280' }}>
+                  <div><span style={{ color:'#aaa' }}>เลขที่ </span>
+                    <strong style={{ fontFamily:'monospace', fontSize:12, color:'#B80F0B' }}>{view.code}</strong>
+                  </div>
+                  <div><span style={{ color:'#aaa' }}>วันที่ </span>
+                    <strong>{fmtDate(view.document_date||view.created_at)}</strong>
+                  </div>
+                  {view.due_date && <div><span style={{ color:'#aaa' }}>ครบกำหนด </span>
+                    <strong style={{ color:'#B80F0B' }}>{fmtDate(view.due_date)}</strong>
+                  </div>}
+                </div>
               </div>
             </div>
-            <div style={{ textAlign:'right' }}>
-              <div style={{ fontSize:24, fontWeight:900, color:'var(--text)', marginBottom:4 }}>ใบแจ้งหนี้</div>
-              <div style={{ fontSize:13, color:'var(--primary)', fontFamily:'monospace', fontWeight:700 }}>{view.code}</div>
-              <div style={{ fontSize:12, color:'#666', marginTop:4 }}>วันที่: {fmtDate(view.document_date||view.created_at)}</div>
-              {view.due_date && <div style={{ fontSize:12, color:'#666' }}>ครบกำหนด: {fmtDate(view.due_date)}</div>}
+
+            {/* ── INFO GRID ── */}
+            <div style={{ display:'grid', gridTemplateColumns:'1.1fr .9fr', gap:12, marginTop:12 }}>
+              {/* Customer */}
+              <div style={{ border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden' }}>
+                <div style={{ padding:'7px 12px', background:'linear-gradient(90deg,#FEF2F2,#fff)', borderBottom:'1px solid #e5e7eb', fontSize:11, color:'#8B0000', fontWeight:900, letterSpacing:.2 }}>
+                  ข้อมูลลูกค้า / BILL TO
+                </div>
+                <div style={{ padding:'10px 12px', fontSize:12, lineHeight:1.9 }}>
+                  {[
+                    { l:'ชื่อ / บริษัท', v:cust.name||view.customers?.name||'—', bold:true },
+                    cust.phone   && { l:'โทรศัพท์', v:cust.phone },
+                    cust.address && { l:'ที่อยู่',   v:cust.address },
+                    cust.tax_id  && { l:'Tax ID',    v:cust.tax_id },
+                  ].filter(Boolean).map(r => (
+                    <div key={r.l} style={{ display:'grid', gridTemplateColumns:'80px 1fr', gap:8, margin:'2px 0' }}>
+                      <span style={{ color:'#6b7280' }}>{r.l}</span>
+                      <span style={{ fontWeight: r.bold ? 800 : 600, color:'#111' }}>{r.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              {/* Doc meta */}
+              <div style={{ border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden' }}>
+                <div style={{ padding:'7px 12px', background:'linear-gradient(90deg,#FEF2F2,#fff)', borderBottom:'1px solid #e5e7eb', fontSize:11, color:'#8B0000', fontWeight:900, letterSpacing:.2 }}>
+                  รายละเอียดเอกสาร / DOCUMENT
+                </div>
+                <div style={{ padding:'10px 12px', fontSize:12, lineHeight:1.9 }}>
+                  {[
+                    { l:'เลขที่ IV',   v:view.code,                                red:true },
+                    { l:'วันที่ออก',  v:fmtDate(view.document_date||view.created_at) },
+                    view.due_date && { l:'ครบกำหนด', v:fmtDate(view.due_date),     red:true },
+                    { l:'เงื่อนไข',  v:'มัดจำ 50% ก่อนผลิต' },
+                  ].filter(Boolean).map(r => (
+                    <div key={r.l} style={{ display:'grid', gridTemplateColumns:'80px 1fr', gap:8, margin:'2px 0' }}>
+                      <span style={{ color:'#6b7280' }}>{r.l}</span>
+                      <span style={{ fontWeight:700, textAlign:'right', color: r.red?'#B80F0B':'#111' }}>{r.v}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
-          </div>
 
-          <div style={{ background:'#F9FAFB', borderRadius:8, padding:'12px 16px', marginBottom:20 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#888', marginBottom:4 }}>ลูกค้า / BILL TO</div>
-            <div style={{ fontSize:14, fontWeight:700 }}>{cust.name||view.customers?.name}</div>
-            {cust.address && <div style={{ fontSize:12, color:'#666' }}>{cust.address}</div>}
-            {cust.tax_id  && <div style={{ fontSize:12, color:'#666' }}>เลขผู้เสียภาษี: {cust.tax_id}</div>}
-            {cust.phone   && <div style={{ fontSize:12, color:'#666' }}>Tel: {cust.phone}</div>}
-          </div>
-
-          <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:16 }}>
-            <thead>
-              <tr style={{ background:'var(--primary)', color:'#fff' }}>
-                <th style={{ padding:'8px 12px', textAlign:'left', fontSize:12 }}>รายการ</th>
-                <th style={{ padding:'8px 12px', textAlign:'center', fontSize:12, width:60 }}>จำนวน</th>
-                <th style={{ padding:'8px 12px', textAlign:'right', fontSize:12, width:100 }}>ราคา/หน่วย</th>
-                <th style={{ padding:'8px 12px', textAlign:'right', fontSize:12, width:110 }}>จำนวนเงิน</th>
-              </tr>
-            </thead>
-            <tbody>
-              {(view.items||[]).map((it,i) => (
-                <tr key={i} style={{ borderBottom:'1px solid #eee' }}>
-                  <td style={{ padding:'8px 12px', fontSize:13 }}>{it.desc}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'center', fontSize:13 }}>{it.qty}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'right', fontSize:13 }}>฿{(it.price||0).toLocaleString()}</td>
-                  <td style={{ padding:'8px 12px', textAlign:'right', fontSize:13, fontWeight:600 }}>฿{(it.amount||0).toLocaleString()}</td>
+            {/* ── ITEMS TABLE ── */}
+            <table style={{
+              width:'100%', borderCollapse:'separate', borderSpacing:0,
+              marginTop:14, fontSize:12,
+              border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden',
+            }}>
+              <thead>
+                <tr style={{ background:'#B80F0B', color:'#fff' }}>
+                  {[
+                    { h:'#',                            w:36,  a:'center' },
+                    { h:'รายการสินค้า / รายละเอียดงาน', w:null, a:'left'   },
+                    { h:'จำนวน',                        w:62,  a:'center' },
+                    { h:'ราคา/หน่วย',                   w:90,  a:'right'  },
+                    { h:'จำนวนเงิน',                    w:100, a:'right'  },
+                  ].map((c,i) => (
+                    <th key={i} style={{ padding:'8px 10px', fontWeight:900, fontSize:11.5,
+                      textAlign:c.a, width:c.w||undefined,
+                      borderRight: i<4 ? '1px solid rgba(255,255,255,.18)' : 'none',
+                    }}>{c.h}</th>
+                  ))}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody>
+                {(view.items||[]).map((it,i) => (
+                  <tr key={i} style={{ borderBottom:'1px solid #f0f0f0', background:i%2===1?'#fffafa':'#fff' }}>
+                    <td style={{ padding:'8px 10px', textAlign:'center', color:'#9ca3af', borderRight:'1px solid #f0f0f0' }}>{i+1}</td>
+                    <td style={{ padding:'8px 10px', fontWeight:600, borderRight:'1px solid #f0f0f0' }}>{it.desc}</td>
+                    <td style={{ padding:'8px 10px', textAlign:'center', borderRight:'1px solid #f0f0f0' }}>{it.qty}</td>
+                    <td style={{ padding:'8px 10px', textAlign:'right', fontFamily:'monospace', borderRight:'1px solid #f0f0f0' }}>
+                      {(it.price||0).toLocaleString(undefined,{minimumFractionDigits:2})}
+                    </td>
+                    <td style={{ padding:'8px 10px', textAlign:'right', fontWeight:700, fontFamily:'monospace' }}>
+                      {(it.amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}
+                    </td>
+                  </tr>
+                ))}
+                {Array.from({ length: Math.max(0, 6-(view.items||[]).length) }).map((_,i) => (
+                  <tr key={`f${i}`} style={{ borderBottom:'1px solid #f5eded', height:26 }}>
+                    <td style={{ borderRight:'1px solid #f0f0f0' }} />
+                    <td style={{ borderRight:'1px solid #f0f0f0' }} />
+                    <td style={{ borderRight:'1px solid #f0f0f0' }} />
+                    <td style={{ borderRight:'1px solid #f0f0f0' }} />
+                    <td />
+                  </tr>
+                ))}
+              </tbody>
+            </table>
 
-          <div style={{ display:'flex', justifyContent:'flex-end' }}>
-            <div style={{ minWidth:220 }}>
-              {[
-                { label:'ยอดรวม', val:`฿${(view.subtotal||0).toLocaleString()}` },
-                ...(view.discount>0   ?[{ label:'ส่วนลด',                      val:`-฿${(view.discount||0).toLocaleString()}` }]:[]),
-                ...(view.vat_pct>0    ?[{ label:`VAT ${view.vat_pct}%`,         val:`฿${(view.vat_amount||0).toLocaleString()}` }]:[]),
-                ...((view.wht_pct||0)>0?[{ label:`หัก ณ ที่จ่าย ${view.wht_pct}%`, val:`-฿${(view.wht_amount||0).toLocaleString()}` }]:[]),
-              ].map(r => (
-                <div key={r.label} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:13, borderBottom:'1px solid #eee' }}>
-                  <span>{r.label}</span><span>{r.val}</span>
+            {/* ── AMOUNT IN WORDS ── */}
+            <div style={{
+              marginTop:10, border:'1px solid rgba(184,15,11,.18)', background:'#FEF2F2',
+              borderRadius:12, padding:'9px 14px',
+              display:'grid', gridTemplateColumns:'120px 1fr', gap:10, alignItems:'center', fontSize:12,
+            }}>
+              <strong style={{ color:'#8B0000' }}>รวมจำนวนเงิน</strong>
+              <div style={{ color:'#5B0000', fontWeight:600 }}>{thaiAmountToWords(view.total||0)}</div>
+            </div>
+
+            {/* ── SUMMARY SECTION: Notes + Totals ── */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 290px', gap:14, marginTop:12, alignItems:'start' }}>
+              {/* Notes */}
+              <div style={{
+                border:'1px dashed #cbd5e1', borderRadius:12, padding:12,
+                background:'#fcfcfc', minHeight:148, fontSize:11.5, color:'#374151', lineHeight:1.85,
+              }}>
+                <div style={{ fontWeight:900, color:'#8B0000', marginBottom:6 }}>หมายเหตุ / เงื่อนไขการผลิต</div>
+                {view.notes
+                  ? <span>{view.notes}</span>
+                  : <>
+                      1) เริ่มผลิตหลังได้รับมัดจำและลูกค้ายืนยันแบบ Artwork เท่านั้น<br/>
+                      2) ระยะเวลาผลิตประมาณ 5–7 วันทำการ หลังยืนยันแบบ<br/>
+                      3) สีจริงอาจแตกต่างจากหน้าจอเล็กน้อย ขึ้นอยู่กับเนื้อผ้าและระบบพิมพ์<br/>
+                      4) งานสั่งผลิตเฉพาะ ไม่รับยกเลิกหลังเริ่มผลิต<br/>
+                      5) กรุณาตรวจสอบรายการและจำนวนก่อนชำระเงิน
+                    </>
+                }
+              </div>
+              {/* Totals */}
+              <div style={{ border:'1px solid #e5e7eb', borderRadius:12, overflow:'hidden', fontSize:12.5, boxShadow:'0 4px 12px rgba(17,24,39,.05)' }}>
+                {[
+                  { l:'ยอดก่อนส่วนลด', v:(view.subtotal||0).toLocaleString(undefined,{minimumFractionDigits:2}) },
+                  ...(view.discount>0      ? [{ l:'ส่วนลด',                 v:`-${(view.discount||0).toLocaleString(undefined,{minimumFractionDigits:2})}`, red:true }]:[]),
+                  ...(view.vat_pct>0      ? [{ l:`VAT ${view.vat_pct}%`,    v:(view.vat_amount||0).toLocaleString(undefined,{minimumFractionDigits:2}) }]:[]),
+                  ...((view.wht_pct||0)>0 ? [{ l:`หัก ณ ที่จ่าย ${view.wht_pct}%`, v:`-${(view.wht_amount||0).toLocaleString(undefined,{minimumFractionDigits:2})}`, red:true }]:[]),
+                ].map(r => (
+                  <div key={r.l} style={{ display:'flex', justifyContent:'space-between', gap:12, padding:'8px 12px', borderBottom:'1px solid #f0f0f0' }}>
+                    <span style={{ color:'#6b7280' }}>{r.l}</span>
+                    <strong style={{ fontFamily:'monospace', color: r.red?'#dc2626':'#111' }}>{r.v}</strong>
+                  </div>
+                ))}
+                {/* Grand total */}
+                <div style={{ display:'flex', justifyContent:'space-between', padding:'11px 12px', background:'linear-gradient(90deg,#B80F0B,#8B0000)', color:'#fff', fontSize:17, fontWeight:900 }}>
+                  <span>ยอดสุทธิ</span>
+                  <span style={{ fontFamily:'monospace' }}>{(view.total||0).toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+                </div>
+                <div style={{ padding:'4px 12px 6px', textAlign:'right', fontSize:10, color:'#9ca3af' }}>บาท (THB)</div>
+              </div>
+            </div>
+
+            {/* ── PAYMENT ── */}
+            <div style={{
+              marginTop:12, display:'grid', gridTemplateColumns:'1fr 132px', gap:14,
+              alignItems:'center', border:'1px solid rgba(184,15,11,.18)',
+              borderRadius:12, padding:13, background:'linear-gradient(135deg,#fff,#FEF2F2)',
+            }}>
+              <div>
+                <div style={{ fontSize:12, color:'#8B0000', fontWeight:900, marginBottom:7 }}>
+                  ช่องทางชำระเงิน / PAYMENT METHOD
+                </div>
+                <div style={{ fontSize:16, fontWeight:900, letterSpacing:.4, color:'#111', marginBottom:3 }}>
+                  {SHOP.bankAccount} ธนาคารกสิกรไทย
+                </div>
+                <div style={{ fontSize:12, color:'#374151', margin:'2px 0' }}>
+                  ชื่อบัญชี: {SHOP.bankName}
+                </div>
+                <div style={{ fontSize:10.5, color:'#555', marginTop:5 }}>
+                  หลังโอนเงิน กรุณาส่งสลิปพร้อมแจ้งเลขที่ใบแจ้งหนี้&nbsp;
+                  <strong>{view.code}</strong>&nbsp;ทาง LINE:&nbsp;<strong>{SHOP.line}</strong>
+                </div>
+              </div>
+              <div style={{
+                width:126, height:126, borderRadius:12,
+                border:'2px dashed rgba(184,15,11,.4)', background:'#fff',
+                overflow:'hidden', flexShrink:0,
+              }}>
+                <img src="/invoice-sample.jpg" alt="QR PromptPay"
+                  style={{ width:'100%', height:'100%', objectFit:'contain' }} />
+              </div>
+            </div>
+
+            {/* ── SIGNATURE ── */}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20, marginTop:14, fontSize:12 }}>
+              {['ผู้รับเอกสาร / ลูกค้า', 'ผู้ออกเอกสาร / C-SCREEN'].map(t => (
+                <div key={t} style={{ border:'1px solid #e5e7eb', borderRadius:12, padding:12, minHeight:88 }}>
+                  <div style={{ fontWeight:900, color:'#374151' }}>{t}</div>
+                  <div style={{ marginTop:44, borderTop:'1px solid #9ca3af', paddingTop:6, textAlign:'center', color:'#6b7280' }}>
+                    ลงชื่อ / วันที่
+                  </div>
                 </div>
               ))}
-              <div style={{ display:'flex', justifyContent:'space-between', padding:'8px 0', fontSize:16, fontWeight:800, color:'var(--primary)', borderTop:'2px solid var(--primary)', marginTop:4 }}>
-                <span>ยอดสุทธิ</span><span>฿{(view.total||0).toLocaleString()}</span>
-              </div>
             </div>
-          </div>
 
-          {view.notes && <div style={{ marginTop:16, padding:'10px 14px', background:'#FFFBEB', borderRadius:6, fontSize:12 }}>หมายเหตุ: {view.notes}</div>}
+            {/* ── PRINT HINT ── */}
+            <div style={{ marginTop:10, textAlign:'center', color:'#9ca3af', fontSize:10.5 }}>
+              เอกสารนี้จัดทำโดยระบบ C-SCREEN · ใช้สำหรับแจ้งยอดชำระค่าสินค้าและบริการ
+            </div>
+          </div>{/* /inner pad */}
         </div>
       </div>
     )
