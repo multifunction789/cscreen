@@ -12,8 +12,7 @@ const STATUS_BADGE = {
   'แพ็คพร้อมส่ง':'badge badge-green','ส่งงานแล้ว':'badge badge-green','เลยกำหนด':'badge badge-red',
 }
 const ALL_STATUS = Object.keys(STATUS_BADGE)
-const emptyItem = { desc:'', qty:1, price:0 }
-const emptyForm = () => ({ customer_id:'', invoice_id:'', note:'', due_date:'', document_date:todayStr(), status:'รอมัดจำ', items:[{...emptyItem}] })
+const emptyForm = () => ({ customer_id:'', invoice_id:'', note:'', due_date:'', document_date:todayStr(), status:'รอมัดจำ' })
 
 export default function JobOrderPage() {
   const [rows, setRows]         = useState([])
@@ -47,30 +46,18 @@ export default function JobOrderPage() {
     setForm(f=>({ ...f, invoice_id:invId, customer_id: inv ? inv.customer_id : f.customer_id }))
   }
 
-  function updateJobItem(idx, key, val) {
-    setForm(f => {
-      const items = [...f.items]
-      items[idx] = { ...items[idx], [key]: val }
-      return { ...f, items }
-    })
-  }
-  function addJobItem() { setForm(f => ({ ...f, items: [...f.items, { ...emptyItem }] })) }
-  function removeJobItem(i) { setForm(f => ({ ...f, items: f.items.filter((_,idx)=>idx!==i) })) }
-
   async function handleSave() {
     if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
     setSaving(true)
     const inv = invoices.find(i=>i.id===form.invoice_id)
-    // Use invoice items if linked, else use form items
-    const items = inv?.items?.length ? inv.items : form.items.filter(it=>it.desc.trim())
+    const items = inv?.items || []
     const item_desc = items.map(it=>it.desc).join(', ') || '—'
-    const total = items.reduce((s,it)=>s+((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)),0)
     // Upload image if any
     let image_url = null
     if (imgFile) image_url = await uploadFile(supabase, 'job-images', imgFile)
     const payload = {
       customer_id:form.customer_id, invoice_id:form.invoice_id||null,
-      item_desc, items, total, due_date:form.due_date||null, document_date:form.document_date||todayStr(),
+      item_desc, items, due_date:form.due_date||null, document_date:form.document_date||todayStr(),
       note:form.note, status:form.status,
       ...(image_url ? { image_url } : {}),
     }
@@ -78,12 +65,7 @@ export default function JobOrderPage() {
       await updateJobOrder(editId, payload)
       setEditId(null)
     } else {
-      const { data: allJo } = await getJobOrders()
-      const maxJoNum = (allJo || []).reduce((max, r) => {
-        const n = parseInt(r.code?.replace('JO-', '') || '0')
-        return n > max ? n : max
-      }, 0)
-      const code = 'JO-' + String(maxJoNum + 1).padStart(4, '0')
+      const code = 'JO-' + String((rows.length||0)+1).padStart(4,'0')
       await insertJobOrder({ ...payload, code })
     }
     setForm(emptyForm()); setImgFile(null); setImgPreview(null); setShowForm(false); setSaving(false)
@@ -98,7 +80,7 @@ export default function JobOrderPage() {
 
   function startEdit(j) {
     setEditId(j.id)
-    setForm({ customer_id:j.customer_id, invoice_id:j.invoice_id||'', note:j.note||'', due_date:j.due_date||'', document_date:j.document_date||todayStr(), status:j.status, items:j.items&&j.items.length?j.items:[{...emptyItem}] })
+    setForm({ customer_id:j.customer_id, invoice_id:j.invoice_id||'', note:j.note||'', due_date:j.due_date||'', document_date:j.document_date||todayStr(), status:j.status })
     setShowForm(true)
     window.scrollTo({top:0,behavior:'smooth'})
   }
@@ -290,56 +272,6 @@ export default function JobOrderPage() {
               {imgPreview && <img src={imgPreview} alt="preview" style={{ maxHeight:140, borderRadius:8, marginTop:6, objectFit:'contain', border:'1px solid var(--border)' }} />}
             </div>
           </div>
-
-          {/* Items table (ใช้เมื่อไม่มี Invoice หรือต้องการระบุเอง) */}
-          {!form.invoice_id && (
-            <div style={{ marginTop:14 }}>
-              <div style={{ fontSize:13, fontWeight:700, marginBottom:8 }}>รายการสินค้า / บริการ</div>
-              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:13 }}>
-                <thead>
-                  <tr style={{ background:'var(--bg)' }}>
-                    <th style={{ padding:'6px 10px', textAlign:'left' }}>รายละเอียด</th>
-                    <th style={{ padding:'6px 10px', textAlign:'center', width:80 }}>จำนวน</th>
-                    <th style={{ padding:'6px 10px', textAlign:'right', width:110 }}>ราคา/หน่วย (฿)</th>
-                    <th style={{ padding:'6px 10px', textAlign:'right', width:100 }}>รวม (฿)</th>
-                    <th style={{ width:36 }}></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {form.items.map((it,i)=>(
-                    <tr key={i} style={{ borderBottom:'1px solid var(--border)' }}>
-                      <td style={{ padding:'4px 6px' }}>
-                        <input type="text" placeholder="รายละเอียดสินค้า/งาน" value={it.desc}
-                          onChange={e=>updateJobItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
-                      </td>
-                      <td style={{ padding:'4px 6px' }}>
-                        <input type="number" min="1" value={it.qty}
-                          onChange={e=>updateJobItem(i,'qty',e.target.value)} style={{ width:'100%' }} />
-                      </td>
-                      <td style={{ padding:'4px 6px' }}>
-                        <input type="number" min="0" value={it.price}
-                          onChange={e=>updateJobItem(i,'price',e.target.value)} style={{ width:'100%', textAlign:'right' }} />
-                      </td>
-                      <td style={{ padding:'4px 10px', textAlign:'right', fontWeight:700 }}>
-                        {((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)).toLocaleString()}
-                      </td>
-                      <td style={{ padding:'4px 6px', textAlign:'center' }}>
-                        {form.items.length>1 && (
-                          <button onClick={()=>removeJobItem(i)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer', fontSize:16 }}>×</button>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8 }}>
-                <button className="btn btn-outline btn-sm" onClick={addJobItem}>+ เพิ่มรายการ</button>
-                <div style={{ fontSize:13, fontWeight:700, color:'var(--primary)' }}>
-                  รวม: ฿{form.items.reduce((s,it)=>s+((parseFloat(it.qty)||0)*(parseFloat(it.price)||0)),0).toLocaleString()}
-                </div>
-              </div>
-            </div>
-          )}
 
           {/* แสดงรายการจาก Invoice */}
           {form.invoice_id && (() => {
