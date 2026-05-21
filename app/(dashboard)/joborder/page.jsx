@@ -138,6 +138,7 @@ export default function JobOrderPage() {
 
   // ── Save ───────────────────────────────────────────────────────
   async function handleSave() {
+    if (!form.invoice_id) return alert('กรุณาเลือก Invoice — ใบงานต้องอ้างอิง Invoice เท่านั้น')
     if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
     setSaving(true)
     // Upload artwork / mockup if new files
