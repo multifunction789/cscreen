@@ -41,7 +41,13 @@ export default function CustomersPage() {
   async function handleSave() {
     if (!form.name.trim()) return setError('กรุณาระบุชื่อลูกค้า')
     setSaving(true); setError('')
-    const code = 'C-' + String((rows.length || 0) + 1).padStart(3, '0')
+    // ดึง max code จาก DB เพื่อป้องกัน duplicate
+    const { data: all } = await getCustomers()
+    const maxNum = (all || []).reduce((max, r) => {
+      const n = parseInt(r.code?.replace('C-', '') || '0')
+      return n > max ? n : max
+    }, 0)
+    const code = 'C-' + String(maxNum + 1).padStart(3, '0')
     const { error: err } = await insertCustomer({ ...form, code })
     if (err) { setError(err.message); setSaving(false); return }
     setForm(emptyForm); setShowForm(false); setSaving(false)
