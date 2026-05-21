@@ -286,7 +286,7 @@ export default function InvoicePage() {
     const remaining = (view.total || 0) - paidTotal
     const relatedJO = jobs.find(j => j.invoice_id === view.id)
     const relatedRC = receipts.find(r => r.invoice_id === view.id)
-    const tabs      = ['เอกสาร', 'ชำระเงิน', 'เอกสารที่เกี่ยวข้อง']
+    const tabs      = ['เอกสาร', 'ชำระเงิน']
 
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
@@ -312,6 +312,20 @@ export default function InvoicePage() {
         {/* Status Pipeline */}
         <div className="no-print">
           <StatusPipeline current={view.status} />
+          {relatedJO && (
+            <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, padding:'8px 14px', background:'#EFF6FF', borderRadius:8, fontSize:13 }}>
+              <span style={{ color:'#666' }}>ใบงาน:</span>
+              <span style={{ fontFamily:'monospace', fontWeight:700, color:'var(--primary)' }}>{relatedJO.code}</span>
+              <span className={relatedJO.status === 'ส่งงานแล้ว' ? 'badge badge-green' : 'badge badge-blue'}>{relatedJO.status}</span>
+              {relatedJO.due_date && <span style={{ fontSize:12, color:'#888' }}>กำหนดส่ง: {fmtDate(relatedJO.due_date)}</span>}
+            </div>
+          )}
+          {!relatedJO && !['ปิดงาน','ยกเลิก'].includes(view.status) && (
+            <div style={{ marginBottom:16, padding:'8px 14px', background:'#FFFBEB', borderRadius:8, fontSize:12, color:'#92400e', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+              <span>⚠️ ยังไม่มีใบงาน</span>
+              <button className="btn btn-outline btn-sm" onClick={() => handleConvertToJO(view)}>📝 สร้างใบงาน</button>
+            </div>
+          )}
         </div>
 
         {/* Tabs */}
@@ -496,51 +510,6 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* ── Tab: เอกสารที่เกี่ยวข้อง ── */}
-        {viewTab === 'เอกสารที่เกี่ยวข้อง' && (
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-            {/* Job Order card */}
-            <div className="card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>📝 ใบงานการผลิต</span>
-                {!view.jo_created && (
-                  <button className="btn btn-primary btn-sm" onClick={() => handleConvertToJO(view)}>+ สร้างใบงาน</button>
-                )}
-              </div>
-              {relatedJO ? (
-                <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700, marginBottom: 8 }}>{relatedJO.code}</div>
-                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 6 }}>{relatedJO.item_desc || '—'}</div>
-                  <span className={relatedJO.status === 'ส่งงานแล้ว' ? 'badge badge-green' : 'badge badge-blue'}>{relatedJO.status}</span>
-                  {relatedJO.due_date && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>กำหนดส่ง: {fmtDate(relatedJO.due_date)}</div>}
-                </div>
-              ) : (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                  ยังไม่มีใบงาน<br />
-                  <span style={{ fontSize: 11 }}>กด "+ สร้างใบงาน" เพื่อสร้าง</span>
-                </div>
-              )}
-            </div>
-
-            {/* Receipt card */}
-            <div className="card" style={{ padding: 20 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>🧾 ใบเสร็จรับเงิน</div>
-              {relatedRC ? (
-                <div style={{ background: 'var(--bg)', borderRadius: 8, padding: 14 }}>
-                  <div style={{ fontSize: 13, fontFamily: 'monospace', color: 'var(--primary)', fontWeight: 700, marginBottom: 8 }}>{relatedRC.code}</div>
-                  <div style={{ fontSize: 14, fontWeight: 700, color: 'var(--success)' }}>฿{(relatedRC.total || 0).toLocaleString()}</div>
-                  <span className="badge badge-green" style={{ marginTop: 8, display: 'inline-block' }}>ออกแล้ว</span>
-                  <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 6 }}>{fmtDate(relatedRC.created_at)}</div>
-                </div>
-              ) : (
-                <div style={{ padding: 24, textAlign: 'center', color: 'var(--text-muted)', fontSize: 13 }}>
-                  ยังไม่มีใบเสร็จ<br />
-                  <span style={{ fontSize: 11 }}>สร้างอัตโนมัติเมื่อชำระครบ</span>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
       </div>
     )
   }
@@ -712,7 +681,7 @@ export default function InvoicePage() {
               <table>
                 <thead>
                   <tr>
-                    <th>เลขที่</th><th>วันที่</th><th>ลูกค้า</th>
+                    <th>เลขที่</th><th>ใบงาน</th><th>วันที่</th><th>ลูกค้า</th>
                     <th>รายการ</th><th>ยอดรวม</th><th>ชำระแล้ว</th>
                     <th>ครบกำหนด</th><th>สถานะ</th><th></th>
                   </tr>
@@ -723,6 +692,9 @@ export default function InvoicePage() {
                     return (
                       <tr key={r.id} className="row-link">
                         <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{r.code}</td>
+                        <td style={{ fontSize: 12, fontFamily: 'monospace' }}>
+                          {(() => { const jo = jobs.find(j => j.invoice_id === r.id); return jo ? <span style={{ color:'var(--info)', fontWeight:600 }}>{jo.code}</span> : <span style={{ color:'var(--text-muted)' }}>—</span> })()}
+                        </td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(r.document_date || r.created_at)}</td>
                         <td style={{ fontWeight: 600 }}>{r.customers?.name || '—'}</td>
                         <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{(r.items || []).map(i => i.desc).join(', ').slice(0, 28) || '—'}</td>
@@ -746,7 +718,7 @@ export default function InvoicePage() {
                     )
                   })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={9} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
+                    <tr><td colSpan={10} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
                   )}
                 </tbody>
               </table>
