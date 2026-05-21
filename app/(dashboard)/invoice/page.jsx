@@ -3,18 +3,12 @@ import { useState, useEffect } from 'react'
 import {
   getInvoices, insertInvoice, updateInvoice, deleteInvoice,
   getCustomers, insertJobOrder, getJobOrders,
-  insertReceipt, getReceipts,
   getMaterials, deductMaterial,
 } from '@/lib/db'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-const STATUS_BADGE = {
-  'รอชำระ':  'badge badge-yellow',
-  'ชำระแล้ว':'badge badge-green',
-  'ยกเลิก':  'badge badge-red',
-}
 const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null }
 
 function calcItems(items) {
@@ -30,10 +24,8 @@ export default function InvoicePage() {
   const [customers, setCustomers] = useState([])
   const [jobs, setJobs]           = useState([])
   const [materials, setMaterials] = useState([])
-  const [receipts, setReceipts]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
-  const [filterStatus, setFilter] = useState('')
   const [showForm, setShowForm]   = useState(false)
   const [view, setView]           = useState(null)
   const [saving, setSaving]       = useState(false)
@@ -43,13 +35,12 @@ export default function InvoicePage() {
   useEffect(() => { load() }, [])
 
   async function load() {
-    const [invRes, cusRes, jobRes, rcRes, matRes] = await Promise.all([
-      getInvoices(), getCustomers(), getJobOrders(), getReceipts(), getMaterials(),
+    const [invRes, cusRes, jobRes, matRes] = await Promise.all([
+      getInvoices(), getCustomers(), getJobOrders(), getMaterials(),
     ])
     setRows(invRes.data    || [])
     setCustomers(cusRes.data  || [])
     setJobs(jobRes.data   || [])
-    setReceipts(rcRes.data    || [])
     setMaterials(matRes.data  || [])
     setLoading(false)
   }
@@ -82,11 +73,11 @@ export default function InvoicePage() {
       customer_id: form.customer_id, items, subtotal, discount: discAmt,
       vat_pct: parseFloat(form.vat_pct)||0, vat_amount: vatAmt,
       wht_pct: parseFloat(form.wht_pct)||0, wht_amount: whtAmt,
-      total, due_date: form.due_date||null, document_date: form.document_date||todayStr(),
-      notes: form.notes, status: 'รอชำระ',
+      total, due_date: form.due_date||null,
+      document_date: form.document_date||todayStr(), notes: form.notes,
     }
     if (editId) {
-      await updateInvoice(editId, { ...payload, status: undefined })
+      await updateInvoice(editId, payload)
       setEditId(null)
     } else {
       const maxNum = rows.reduce((max, r) => {
@@ -99,19 +90,6 @@ export default function InvoicePage() {
       }
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
-    load()
-  }
-
-  async function handleMarkPaid(inv) {
-    await updateInvoice(inv.id, { status: 'ชำระแล้ว' })
-    const maxRC = receipts.reduce((max, r) => {
-      const n = parseInt(r.code?.replace('RC-','')||'0'); return n > max ? n : max
-    }, 0)
-    await insertReceipt({
-      code: 'RC-' + String(maxRC + 1).padStart(4,'0'),
-      customer_id: inv.customer_id, invoice_id: inv.id,
-      total: inv.total, paid: true, payment_method: 'โอน',
-    })
     load()
   }
 
@@ -138,13 +116,19 @@ export default function InvoicePage() {
     const maxJO = jobs.reduce((max, j) => {
       const n = parseInt(j.code?.replace('JO-','')||'0'); return n > max ? n : max
     }, 0)
-    const code = 'JO-' + String(maxJO + 1).padStart(4,'0')
+    const code    = 'JO-' + String(maxJO + 1).padStart(4,'0')
     const defSizes = ['S','M','L','XL','XXL']
     await insertJobOrder({
       code, customer_id: inv.customer_id, invoice_id: inv.id,
       item_desc: (inv.items||[]).map(it => it.desc).join(', '),
-      status: 'รอออกแบบ', sizes: defSizes,
-      items: { type:'size_matrix', sizes:defSizes, rows: (inv.items||[]).map(it => ({ style:it.desc||'', qtys:Object.fromEntries(defSizes.map(s=>[s,''])) })) },
+      status: 'รอออกแบบ',
+      items: {
+        type: 'size_matrix', sizes: defSizes,
+        rows: (inv.items||[]).map(it => ({
+          style: it.desc||'',
+          qtys: Object.fromEntries(defSizes.map(s => [s,''])),
+        })),
+      },
     })
     await updateInvoice(inv.id, { jo_created: true })
     alert(`✅ สร้างใบงาน ${code} แล้ว`)
@@ -152,32 +136,24 @@ export default function InvoicePage() {
     setView(v => v ? { ...v, jo_created: true } : v)
   }
 
-  const filtered = rows.filter(r => {
-    const ms = r.code?.includes(search) || r.customers?.name?.includes(search)
-    return ms && (!filterStatus || r.status === filterStatus)
-  })
-  const totalAll  = rows.reduce((s,r) => s+(r.total||0), 0)
-  const totalPaid = rows.filter(r => r.status==='ชำระแล้ว').reduce((s,r) => s+(r.total||0), 0)
-  const totalWait = rows.filter(r => r.status==='รอชำระ').reduce((s,r) => s+(r.total||0), 0)
+  const filtered = rows.filter(r =>
+    r.code?.includes(search) || r.customers?.name?.includes(search)
+  )
+  const totalAmount = rows.reduce((s,r) => s+(r.total||0), 0)
+  const withJO      = rows.filter(r => jobs.some(j => j.invoice_id===r.id)).length
 
-  // ──── PRINT / DETAIL VIEW ────────────────────────────────────
+  // ──── DETAIL / PRINT VIEW ────────────────────────────────────
   if (view) {
     const cust  = customers.find(c => c.id===view.customer_id) || view.customers || {}
     const relJO = jobs.find(j => j.invoice_id===view.id)
 
     return (
       <div style={{ maxWidth:794, margin:'0 auto', padding:24 }}>
-        {/* Toolbar */}
         <div className="no-print" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, gap:8, flexWrap:'wrap' }}>
           <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            {view.status === 'รอชำระ' && (
-              <button className="btn btn-outline" onClick={() => { startEdit(view); setView(null) }}>✏️ แก้ไข</button>
-            )}
-            {view.status === 'รอชำระ' && (
-              <button className="btn btn-primary" onClick={() => { handleMarkPaid(view); setView(null) }}>✓ รับชำระ</button>
-            )}
-            {!view.jo_created && (
+            <button className="btn btn-outline" onClick={() => { startEdit(view); setView(null) }}>✏️ แก้ไข</button>
+            {!relJO && (
               <button className="btn btn-outline" onClick={() => handleConvertToJO(view)}>📝 สร้างใบงาน</button>
             )}
             <button className="btn btn-outline" onClick={() => shareDoc({
@@ -189,7 +165,6 @@ export default function InvoicePage() {
           </div>
         </div>
 
-        {/* JO info bar */}
         {relJO && (
           <div className="no-print" style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16, padding:'8px 14px', background:'#EFF6FF', borderRadius:8, fontSize:13 }}>
             <span style={{ color:'#666' }}>ใบงาน:</span>
@@ -199,9 +174,7 @@ export default function InvoicePage() {
           </div>
         )}
 
-        {/* Document */}
         <div id="print-area" style={{ background:'#fff', border:'1px solid var(--border)', borderRadius:8, padding:40 }}>
-          {/* Header */}
           <div style={{ display:'flex', justifyContent:'space-between', marginBottom:24 }}>
             <div>
               <div style={{ fontSize:22, fontWeight:900, color:'var(--primary)', letterSpacing:-1 }}>C-SCREEN</div>
@@ -218,7 +191,6 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {/* Customer */}
           <div style={{ background:'#F9FAFB', borderRadius:8, padding:'12px 16px', marginBottom:20 }}>
             <div style={{ fontSize:11, fontWeight:700, color:'#888', marginBottom:4 }}>ลูกค้า / BILL TO</div>
             <div style={{ fontSize:14, fontWeight:700 }}>{cust.name||view.customers?.name}</div>
@@ -227,7 +199,6 @@ export default function InvoicePage() {
             {cust.phone   && <div style={{ fontSize:12, color:'#666' }}>Tel: {cust.phone}</div>}
           </div>
 
-          {/* Items */}
           <table style={{ width:'100%', borderCollapse:'collapse', marginBottom:16 }}>
             <thead>
               <tr style={{ background:'var(--primary)', color:'#fff' }}>
@@ -249,14 +220,13 @@ export default function InvoicePage() {
             </tbody>
           </table>
 
-          {/* Summary */}
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <div style={{ minWidth:220 }}>
               {[
-                { label:'ยอดรวม',                           val:`฿${(view.subtotal||0).toLocaleString()}` },
-                ...(view.discount>0  ? [{ label:'ส่วนลด',                  val:`-฿${(view.discount||0).toLocaleString()}` }] : []),
-                ...(view.vat_pct>0   ? [{ label:`VAT ${view.vat_pct}%`,   val:`฿${(view.vat_amount||0).toLocaleString()}` }] : []),
-                ...((view.wht_pct||0)>0?[{ label:`หัก ณ ที่จ่าย ${view.wht_pct}%`, val:`-฿${(view.wht_amount||0).toLocaleString()}` }] : []),
+                { label:'ยอดรวม', val:`฿${(view.subtotal||0).toLocaleString()}` },
+                ...(view.discount>0   ?[{ label:'ส่วนลด',                      val:`-฿${(view.discount||0).toLocaleString()}` }]:[]),
+                ...(view.vat_pct>0    ?[{ label:`VAT ${view.vat_pct}%`,         val:`฿${(view.vat_amount||0).toLocaleString()}` }]:[]),
+                ...((view.wht_pct||0)>0?[{ label:`หัก ณ ที่จ่าย ${view.wht_pct}%`, val:`-฿${(view.wht_amount||0).toLocaleString()}` }]:[]),
               ].map(r => (
                 <div key={r.label} style={{ display:'flex', justifyContent:'space-between', padding:'4px 0', fontSize:13, borderBottom:'1px solid #eee' }}>
                   <span>{r.label}</span><span>{r.val}</span>
@@ -279,12 +249,11 @@ export default function InvoicePage() {
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
       {/* KPI */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
         {[
-          { label:'ใบแจ้งหนี้ทั้งหมด', value:rows.length+' ใบ',              accent:'var(--primary)', icon:'📄' },
-          { label:'มูลค่ารวม',          value:`฿${totalAll.toLocaleString()}`, accent:'var(--info)',    icon:'💰' },
-          { label:'ชำระแล้ว',           value:`฿${totalPaid.toLocaleString()}`,accent:'var(--success)', icon:'✅' },
-          { label:'รอชำระ',             value:`฿${totalWait.toLocaleString()}`,accent:'var(--warning)', icon:'⏳' },
+          { label:'ใบแจ้งหนี้ทั้งหมด', value:rows.length+' ใบ',               accent:'var(--primary)', icon:'📄' },
+          { label:'มูลค่ารวม',          value:`฿${totalAmount.toLocaleString()}`, accent:'var(--info)',    icon:'💰' },
+          { label:'มีใบงานแล้ว',        value:withJO+' ใบ',                    accent:'var(--success)', icon:'✅' },
         ].map(k => (
           <div key={k.label} style={{ background:'var(--card)', borderRadius:'var(--radius)', padding:'16px 18px', boxShadow:'var(--shadow)', border:'1px solid var(--border)', position:'relative', overflow:'hidden' }}>
             <div style={{ position:'absolute', top:0, left:0, width:4, height:'100%', background:k.accent, borderRadius:'10px 0 0 10px' }} />
@@ -297,25 +266,17 @@ export default function InvoicePage() {
 
       {/* Toolbar */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-          <div style={{ position:'relative' }}>
-            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }}>🔍</span>
-            <input type="text" placeholder="ค้นหา..." value={search}
-              onChange={e => setSearch(e.target.value)} style={{ paddingLeft:36, width:220 }} />
-          </div>
-          {['','รอชำระ','ชำระแล้ว','ยกเลิก'].map(s => (
-            <button key={s} onClick={() => setFilter(s)}
-              className={filterStatus===s?'btn btn-primary btn-sm':'btn btn-outline btn-sm'}>
-              {s||'ทั้งหมด'}
-            </button>
-          ))}
+        <div style={{ position:'relative' }}>
+          <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }}>🔍</span>
+          <input type="text" placeholder="ค้นหาใบแจ้งหนี้..." value={search}
+            onChange={e => setSearch(e.target.value)} style={{ paddingLeft:36, width:240 }} />
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? '✕ ปิด' : '+ สร้างใบแจ้งหนี้'}
         </button>
       </div>
 
-      {/* Create / Edit Form */}
+      {/* Form */}
       {showForm && (
         <div className="card" style={{ padding:20 }}>
           <div style={{ fontSize:14, fontWeight:700, marginBottom:16 }}>{editId ? '✏️ แก้ไขใบแจ้งหนี้' : '➕ ใบแจ้งหนี้ใหม่'}</div>
@@ -352,7 +313,6 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {/* Items */}
           <div style={{ marginBottom:12 }}>
             <div style={{ fontSize:13, fontWeight:700, marginBottom:8 }}>รายการสินค้า / บริการ</div>
             <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -373,16 +333,12 @@ export default function InvoicePage() {
                         onChange={e => updateItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
                     </td>
                     <td style={{ padding:'4px 6px' }}>
-                      <input type="number" min="1" value={it.qty}
-                        onChange={e => updateItem(i,'qty',e.target.value)} />
+                      <input type="number" min="1" value={it.qty} onChange={e => updateItem(i,'qty',e.target.value)} />
                     </td>
                     <td style={{ padding:'4px 6px' }}>
-                      <input type="number" min="0" value={it.price}
-                        onChange={e => updateItem(i,'price',e.target.value)} />
+                      <input type="number" min="0" value={it.price} onChange={e => updateItem(i,'price',e.target.value)} />
                     </td>
-                    <td style={{ padding:'4px 10px', textAlign:'right', fontWeight:700, fontSize:13 }}>
-                      ฿{(it.amount||0).toLocaleString()}
-                    </td>
+                    <td style={{ padding:'4px 10px', textAlign:'right', fontWeight:700, fontSize:13 }}>฿{(it.amount||0).toLocaleString()}</td>
                     <td style={{ padding:'4px 6px', textAlign:'center' }}>
                       {form.items.length > 1 && (
                         <button onClick={() => removeItem(i)} style={{ background:'none', border:'none', color:'var(--danger)', cursor:'pointer', fontSize:16 }}>×</button>
@@ -404,7 +360,6 @@ export default function InvoicePage() {
             </div>
           </div>
 
-          {/* Summary */}
           <div style={{ display:'flex', justifyContent:'flex-end', gap:20, alignItems:'flex-start' }}>
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <label style={{ fontSize:12 }}>ส่วนลด (฿)</label>
@@ -414,8 +369,8 @@ export default function InvoicePage() {
             <div style={{ minWidth:200, fontSize:13 }}>
               <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}><span>ยอดรวม</span><span>฿{subtotal.toLocaleString()}</span></div>
               {discAmt>0 && <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', color:'var(--danger)' }}><span>ส่วนลด</span><span>-฿{discAmt.toLocaleString()}</span></div>}
-              {vatAmt>0 && <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}><span>VAT {form.vat_pct}%</span><span>฿{vatAmt.toFixed(2)}</span></div>}
-              {whtAmt>0 && <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', color:'var(--danger)' }}><span>หัก ณ ที่จ่าย {form.wht_pct}%</span><span>-฿{whtAmt.toFixed(2)}</span></div>}
+              {vatAmt>0  && <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0' }}><span>VAT {form.vat_pct}%</span><span>฿{vatAmt.toFixed(2)}</span></div>}
+              {whtAmt>0  && <div style={{ display:'flex', justifyContent:'space-between', padding:'3px 0', color:'var(--danger)' }}><span>หัก ณ ที่จ่าย {form.wht_pct}%</span><span>-฿{whtAmt.toFixed(2)}</span></div>}
               <div style={{ display:'flex', justifyContent:'space-between', padding:'6px 0', fontWeight:800, fontSize:15, color:'var(--primary)', borderTop:'2px solid var(--primary)', marginTop:4 }}>
                 <span>ยอดสุทธิ</span><span>฿{total.toLocaleString()}</span>
               </div>
@@ -445,8 +400,8 @@ export default function InvoicePage() {
               <table>
                 <thead>
                   <tr>
-                    <th>เลขที่</th><th>ใบงาน</th><th>วันที่</th><th>ลูกค้า</th>
-                    <th>รายการ</th><th>ยอดรวม</th><th>ครบกำหนด</th><th>สถานะ</th><th></th>
+                    <th>เลขที่</th><th>ใบงาน</th><th>วันที่</th>
+                    <th>ลูกค้า</th><th>รายการ</th><th>ยอดรวม</th><th>ครบกำหนด</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -465,17 +420,13 @@ export default function InvoicePage() {
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{(r.items||[]).map(i=>i.desc).join(', ').slice(0,30)||'—'}</td>
                         <td style={{ fontWeight:800, color:'var(--primary)' }}>฿{(r.total||0).toLocaleString()}</td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDate(r.due_date)}</td>
-                        <td><span className={STATUS_BADGE[r.status]||'badge badge-gray'}>{r.status}</span></td>
                         <td style={{ display:'flex', gap:4 }}>
                           <button className="btn btn-outline btn-sm" onClick={() => setView(r)}>ดู</button>
-                          {r.status==='รอชำระ' && <>
-                            <button className="btn btn-outline btn-sm" onClick={() => startEdit(r)}>✏️</button>
-                            <button className="btn btn-primary btn-sm" onClick={() => handleMarkPaid(r)}>รับเงิน</button>
-                          </>}
+                          <button className="btn btn-outline btn-sm" onClick={() => startEdit(r)}>✏️</button>
                           {!relJO && (
                             <button className="btn btn-outline btn-sm" onClick={() => handleConvertToJO(r)}>→ JO</button>
                           )}
-                          {r.status==='รอชำระ' && !relJO && (
+                          {!relJO && (
                             <button className="btn btn-outline btn-sm" style={{ color:'var(--danger)' }} onClick={() => handleDelete(r)}>ลบ</button>
                           )}
                         </td>
@@ -483,7 +434,7 @@ export default function InvoicePage() {
                     )
                   })}
                   {filtered.length===0 && (
-                    <tr><td colSpan={9} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
+                    <tr><td colSpan={8} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
                   )}
                 </tbody>
               </table>
