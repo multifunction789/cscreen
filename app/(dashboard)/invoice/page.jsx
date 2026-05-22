@@ -63,6 +63,7 @@ export default function InvoicePage() {
   const [saving, setSaving]       = useState(false)
   const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(emptyForm())
+  const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
 
   useEffect(() => { load() }, [])
 
@@ -114,14 +115,16 @@ export default function InvoicePage() {
       deposit_pct: depositPct, deposit_amount: depositAmt,
     }
     if (editId) {
-      await updateInvoice(editId, payload)
+      const { error } = await updateInvoice(editId, payload)
+      if (error) { setSaving(false); return alert('❌ บันทึกไม่สำเร็จ: ' + error.message) }
       setEditId(null)
     } else {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('INV-','')||'0'); return n > max ? n : max
       }, 0)
       const code = 'INV-' + String(maxNum + 1).padStart(4,'0')
-      await insertInvoice({ ...payload, code })
+      const { error } = await insertInvoice({ ...payload, code })
+      if (error) { setSaving(false); return alert('❌ บันทึกไม่สำเร็จ: ' + error.message) }
       for (const it of items) {
         if (it.material_id && it.qty > 0) await deductMaterial(it.material_id, parseFloat(it.qty))
       }
@@ -196,9 +199,14 @@ export default function InvoicePage() {
     setView(v => v ? { ...v, receipt_created: true } : v)
   }
 
-  const filtered    = rows.filter(r => r.code?.includes(search) || r.customers?.name?.includes(search))
-  const totalAmount = rows.reduce((s,r) => s+(r.total||0), 0)
-  const withJO      = rows.filter(r => jobs.some(j => j.invoice_id===r.id)).length
+  const filtered    = rows.filter(r => {
+    const ms = r.code?.includes(search) || r.customers?.name?.includes(search)
+    const dm = !monthFilter || (r.document_date || r.created_at || '').startsWith(monthFilter)
+    return ms && dm
+  })
+  const totalAmount  = rows.reduce((s, r) => s + (r.total || 0), 0)
+  const monthTotal   = filtered.reduce((s, r) => s + (r.total || 0), 0)
+  const withJO       = rows.filter(r => jobs.some(j => j.invoice_id === r.id)).length
 
   // ──── DETAIL / PRINT VIEW ──────────────────────────────────
   if (view) {
@@ -518,10 +526,11 @@ export default function InvoicePage() {
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
       {/* KPI */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
         {[
           { label:'ใบแจ้งหนี้ทั้งหมด', value:rows.length+' ใบ',               accent:'var(--primary)', icon:'📄' },
-          { label:'มูลค่ารวม',          value:`฿${totalAmount.toLocaleString()}`, accent:'var(--info)',    icon:'💰' },
+          { label:'มูลค่ารวมทั้งหมด',  value:`฿${totalAmount.toLocaleString()}`, accent:'var(--info)',    icon:'💰' },
+          { label:`ยอดเดือน ${monthFilter}`, value:`฿${monthTotal.toLocaleString()}`, accent:'#7C3AED', icon:'📅' },
           { label:'มีใบงานแล้ว',        value:withJO+' ใบ',                    accent:'var(--success)', icon:'✅' },
         ].map(k => (
           <div key={k.label} style={{ background:'var(--card)', borderRadius:'var(--radius)', padding:'14px 16px', boxShadow:'var(--shadow)', border:'1px solid var(--border)', position:'relative', overflow:'hidden' }}>
@@ -535,10 +544,21 @@ export default function InvoicePage() {
 
       {/* Toolbar */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:10, flexWrap:'wrap' }}>
-        <div style={{ position:'relative' }}>
-          <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }}>🔍</span>
-          <input type="text" placeholder="ค้นหาใบแจ้งหนี้..." value={search}
-            onChange={e => setSearch(e.target.value)} style={{ paddingLeft:36, width:240 }} />
+        <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap' }}>
+          <div style={{ position:'relative' }}>
+            <span style={{ position:'absolute', left:11, top:'50%', transform:'translateY(-50%)', color:'var(--text-muted)' }}>🔍</span>
+            <input type="text" placeholder="ค้นหาใบแจ้งหนี้..." value={search}
+              onChange={e => setSearch(e.target.value)} style={{ paddingLeft:36, width:200 }} />
+          </div>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ fontSize:12, color:'var(--text-muted)' }}>📅 เดือน</span>
+            <input type="month" value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              style={{ fontSize:13, padding:'5px 8px', borderRadius:6, border:'1px solid var(--border)' }} />
+            {monthFilter && (
+              <button className="btn btn-outline btn-sm" onClick={() => setMonthFilter('')}>ทั้งหมด</button>
+            )}
+          </div>
         </div>
         <button className="btn btn-primary" onClick={() => setShowForm(!showForm)}>
           {showForm ? '✕ ปิด' : '+ สร้างใบแจ้งหนี้'}

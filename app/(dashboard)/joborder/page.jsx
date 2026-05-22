@@ -7,9 +7,14 @@ import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docU
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const STATUS_BADGE = {
-  'รอมัดจำ':'badge badge-gray','รอออกแบบ':'badge badge-cyan','รอทำไฟล์':'badge badge-purple',
-  'สั่งของ':'badge badge-yellow','กำลังสกรีน':'badge badge-blue','สั่งผลิต':'badge badge-cyan',
-  'แพ็คพร้อมส่ง':'badge badge-green','ส่งงานแล้ว':'badge badge-green','เลยกำหนด':'badge badge-red',
+  'รอมัดจำ'      : 'badge badge-gray',
+  'รอออกแบบ'     : 'badge badge-cyan',
+  'รอทำไฟล์'     : 'badge badge-purple',
+  'สั่งของ'       : 'badge badge-yellow',
+  'กำลังสกรีน'   : 'badge badge-blue',
+  'แพ็คพร้อมส่ง' : 'badge badge-green',
+  'ส่งงานแล้ว'   : 'badge badge-green',
+  'เลยกำหนด'     : 'badge badge-red',
 }
 const ALL_STATUS = Object.keys(STATUS_BADGE)
 const DEFAULT_SIZES = ['S', 'M', 'L', 'XL', 'XXL']
@@ -72,6 +77,7 @@ export default function JobOrderPage() {
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
   const [view, setView]           = useState(null)
+  const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
   const [artworkFile, setArtworkFile]   = useState(null)
   const [artworkPreview, setArtworkPreview] = useState(null)
   const [mockupFile, setMockupFile]     = useState(null)
@@ -222,9 +228,12 @@ export default function JobOrderPage() {
 
   const filtered = rows.filter(j => {
     const ms = j.code?.includes(search) || j.customers?.name?.includes(search) || j.item_desc?.includes(search)
-    return ms && (!filterStatus || j.status === filterStatus)
+    const dm = !monthFilter || (j.document_date || j.created_at || '').startsWith(monthFilter)
+    return ms && (!filterStatus || j.status === filterStatus) && dm
   })
   const isOverdue = j => j.due_date && new Date(j.due_date) < new Date() && j.status !== 'ส่งงานแล้ว'
+  const monthCount = filtered.length
+  const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
   // ──── PRINT VIEW ─────────────────────────────────────────────
   if (view) {
@@ -379,18 +388,18 @@ export default function JobOrderPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* KPI */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 16 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {[
-          { label: 'ใบงานทั้งหมด',   value: rows.length + ' ใบ',                                   accent: 'var(--primary)', icon: '📝' },
-          { label: 'กำลังดำเนินการ', value: rows.filter(j => j.status !== 'ส่งงานแล้ว').length + ' ใบ', accent: 'var(--info)',    icon: '⚙️' },
-          { label: 'ส่งงานแล้ว',     value: rows.filter(j => j.status === 'ส่งงานแล้ว').length + ' ใบ', accent: 'var(--success)', icon: '✅' },
-          { label: 'เลยกำหนด',       value: rows.filter(j => isOverdue(j)).length + ' ใบ',          accent: 'var(--danger)',  icon: '⏰' },
+          { label: 'ใบงานทั้งหมด',              value: rows.length + ' ใบ',                                        accent: 'var(--primary)', icon: '📝' },
+          { label: `ใบงานเดือน ${monthFilter}`,  value: `${monthCount} ใบ · ${monthQty} ตัว`,                       accent: '#7C3AED',        icon: '📅' },
+          { label: 'ส่งงานแล้ว',                 value: rows.filter(j => j.status === 'ส่งงานแล้ว').length + ' ใบ', accent: 'var(--success)', icon: '✅' },
+          { label: 'เลยกำหนด',                   value: rows.filter(j => isOverdue(j)).length + ' ใบ',               accent: 'var(--danger)',  icon: '⏰' },
         ].map(k => (
-          <div key={k.label} style={{ background: 'var(--card)', borderRadius: 'var(--radius)', padding: '16px 18px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
+          <div key={k.label} style={{ background: 'var(--card)', borderRadius: 'var(--radius)', padding: '14px 16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: k.accent, borderRadius: '10px 0 0 10px' }} />
-            <div style={{ position: 'absolute', right: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 28, opacity: .1 }}>{k.icon}</div>
+            <div style={{ position: 'absolute', right: 12, top: '50%', transform: 'translateY(-50%)', fontSize: 26, opacity: .1 }}>{k.icon}</div>
             <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase' }}>{k.label}</div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: k.accent, marginTop: 4 }}>{k.value}</div>
+            <div style={{ fontSize: 20, fontWeight: 800, color: k.accent, marginTop: 3 }}>{k.value}</div>
           </div>
         ))}
       </div>
@@ -401,7 +410,16 @@ export default function JobOrderPage() {
           <div style={{ position: 'relative' }}>
             <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>🔍</span>
             <input type="text" placeholder="ค้นหาใบงาน..." value={search}
-              onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36, width: 240 }} />
+              onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36, width: 200 }} />
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📅</span>
+            <input type="month" value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              style={{ fontSize: 13, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)' }} />
+            {monthFilter && (
+              <button className="btn btn-outline btn-sm" onClick={() => setMonthFilter('')}>ทั้งหมด</button>
+            )}
           </div>
           {ALL_STATUS.map(s => {
             const count = rows.filter(j => j.status === s).length

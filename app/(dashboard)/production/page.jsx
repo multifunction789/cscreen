@@ -10,7 +10,6 @@ const columns = [
   { id:'รอทำไฟล์',     label:'รอทำไฟล์',     color:'#8B5CF6', bg:'#EDE9FE' },
   { id:'สั่งของ',       label:'สั่งของ',       color:'#F59E0B', bg:'#FEF3C7' },
   { id:'กำลังสกรีน',   label:'กำลังสกรีน',   color:'#3B82F6', bg:'#DBEAFE' },
-  { id:'สั่งผลิต',      label:'สั่งผลิต',      color:'#0891B2', bg:'#CFFAFE' },
   { id:'แพ็คพร้อมส่ง', label:'แพ็คพร้อมส่ง', color:'#10B981', bg:'#D1FAE5' },
   { id:'ส่งงานแล้ว',   label:'ส่งงานแล้ว',   color:'#6B7280', bg:'#F9FAFB' },
 ]
