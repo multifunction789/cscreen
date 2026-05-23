@@ -262,7 +262,14 @@ export default function ReceiptPage() {
                 {(inv.items || []).length > 0 ? inv.items.map((it, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 1 ? '#f0fdf4' : '#fff' }}>
                     <td style={{ padding: '6px 9px', textAlign: 'center', color: '#9ca3af', borderRight: '1px solid #f0f0f0' }}>{i + 1}</td>
-                    <td style={{ padding: '6px 9px', fontWeight: 600, borderRight: '1px solid #f0f0f0' }}>{it.desc}</td>
+                    <td style={{ padding: '6px 9px', fontWeight: 600, borderRight: '1px solid #f0f0f0' }}>
+                      {it.desc}
+                      {it.sizes && Object.values(it.sizes).some(v => parseInt(v) > 0) && (
+                        <div style={{ fontSize:9.5, color:'#6b7280', fontWeight:400, marginTop:2, letterSpacing:.3 }}>
+                          {Object.entries(it.sizes).filter(([,v])=>parseInt(v)>0).map(([s,v])=>`${s}:${v}`).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '6px 9px', textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>{it.qty}</td>
                     <td style={{ padding: '6px 9px', textAlign: 'right', fontFamily: 'monospace', borderRight: '1px solid #f0f0f0' }}>
                       {(it.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}

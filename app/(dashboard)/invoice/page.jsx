@@ -10,7 +10,7 @@ import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null }
+const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
 /* ── Thai Baht → Words ─────────────────────────────────── */
 function thaiAmountToWords(amount) {
@@ -82,14 +82,19 @@ export default function InvoicePage() {
   function updateItem(idx, key, val) {
     setForm(f => {
       const items = [...f.items]
-      items[idx] = { ...items[idx], [key]: val }
+      if (key === 'sizes') {
+        const sizeTotal = Object.values(val).reduce((s, v) => s + (parseInt(v) || 0), 0)
+        items[idx] = { ...items[idx], sizes: val, ...(sizeTotal > 0 ? { qty: sizeTotal } : {}) }
+      } else {
+        items[idx] = { ...items[idx], [key]: val }
+      }
       return { ...f, items: calcItems(items) }
     })
   }
   const addItem    = () => setForm(f => ({ ...f, items: [...f.items, { ...emptyItem }] }))
   const removeItem = i  => setForm(f => ({ ...f, items: f.items.filter((_, idx) => idx !== i) }))
   function addItemFromStock(mat) {
-    setForm(f => ({ ...f, items: calcItems([...f.items, { desc:mat.name, qty:1, price:0, amount:0, material_id:mat.id }]) }))
+    setForm(f => ({ ...f, items: calcItems([...f.items, { desc:mat.name, qty:1, price:0, amount:0, material_id:mat.id, sizes:{} }]) }))
   }
 
   const subtotal   = form.items.reduce((s, it) => s + (it.amount||0), 0)
@@ -145,7 +150,7 @@ export default function InvoicePage() {
       document_date: inv.document_date||todayStr(), notes: inv.notes||'',
       vat_pct: inv.vat_pct||0, discount: inv.discount||0, wht_pct: inv.wht_pct||0,
       deposit_pct: inv.deposit_pct ?? 50,
-      items: inv.items||[{...emptyItem}],
+      items: (inv.items||[{...emptyItem}]).map(it => ({ ...it, sizes: it.sizes || {} })),
     })
     setShowForm(true)
     window.scrollTo({ top:0, behavior:'smooth' })
@@ -157,17 +162,25 @@ export default function InvoicePage() {
     const maxJO = jobs.reduce((max, j) => {
       const n = parseInt(j.code?.replace('JO-','')||'0'); return n > max ? n : max
     }, 0)
-    const code     = 'JO-' + String(maxJO + 1).padStart(4,'0')
+    const code = 'JO-' + String(maxJO + 1).padStart(4,'0')
+    // Build size columns — use sizes that have qtys in the invoice items, fall back to defaults
     const defSizes = ['S','M','L','XL','XXL']
+    const usedSizesSet = new Set()
+    ;(inv.items||[]).forEach(it => {
+      Object.entries(it.sizes||{}).forEach(([s,v]) => { if (parseInt(v) > 0) usedSizesSet.add(s) })
+    })
+    const joSizes = usedSizesSet.size > 0
+      ? [...defSizes.filter(s => usedSizesSet.has(s)), ...[...usedSizesSet].filter(s => !defSizes.includes(s))]
+      : defSizes
     await insertJobOrder({
       code, customer_id: inv.customer_id, invoice_id: inv.id,
       item_desc: (inv.items||[]).map(it => it.desc).join(', '),
       status: 'รอออกแบบ',
       items: {
-        type: 'size_matrix', sizes: defSizes,
+        type: 'size_matrix', sizes: joSizes,
         rows: (inv.items||[]).map(it => ({
           style: it.desc||'',
-          qtys: Object.fromEntries(defSizes.map(s => [s,''])),
+          qtys: Object.fromEntries(joSizes.map(s => [s, it.sizes?.[s] ? String(it.sizes[s]) : ''])),
         })),
       },
     })
@@ -393,7 +406,14 @@ export default function InvoicePage() {
                 {(view.items||[]).map((it,i) => (
                   <tr key={i} style={{ borderBottom:'1px solid #f0f0f0', background:i%2===1?'#fffafa':'#fff' }}>
                     <td style={{ padding:'6px 9px', textAlign:'center', color:'#9ca3af', borderRight:'1px solid #f0f0f0' }}>{i+1}</td>
-                    <td style={{ padding:'6px 9px', fontWeight:600, borderRight:'1px solid #f0f0f0' }}>{it.desc}</td>
+                    <td style={{ padding:'6px 9px', fontWeight:600, borderRight:'1px solid #f0f0f0' }}>
+                      {it.desc}
+                      {it.sizes && Object.values(it.sizes).some(v => parseInt(v) > 0) && (
+                        <div style={{ fontSize:9.5, color:'#6b7280', fontWeight:400, marginTop:2, letterSpacing:.3 }}>
+                          {Object.entries(it.sizes).filter(([,v])=>parseInt(v)>0).map(([s,v])=>`${s}:${v}`).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding:'6px 9px', textAlign:'center', borderRight:'1px solid #f0f0f0' }}>{it.qty}</td>
                     <td style={{ padding:'6px 9px', textAlign:'right', fontFamily:'monospace', borderRight:'1px solid #f0f0f0' }}>
                       {(it.price||0).toLocaleString(undefined,{minimumFractionDigits:2})}
@@ -642,6 +662,23 @@ export default function InvoicePage() {
                     <td style={{ padding:'3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
+                      <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
+                        <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
+                        {['S','M','L','XL','XXL'].map(s => (
+                          <label key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
+                            <span style={{ fontSize:9, color:'var(--text-muted)', fontWeight:600 }}>{s}</span>
+                            <input type="number" min="0" placeholder="0"
+                              value={it.sizes?.[s] || ''}
+                              onChange={e => updateItem(i,'sizes',{ ...(it.sizes||{}), [s]:e.target.value })}
+                              style={{ width:38, textAlign:'center', fontSize:11, padding:'2px 3px' }} />
+                          </label>
+                        ))}
+                        {Object.values(it.sizes||{}).some(v => parseInt(v)>0) && (
+                          <span style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>
+                            = {Object.values(it.sizes||{}).reduce((s,v)=>s+(parseInt(v)||0),0)} ตัว
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding:'3px 5px' }}>
                       <input type="number" min="1" value={it.qty} onChange={e => updateItem(i,'qty',e.target.value)} />

@@ -51,7 +51,7 @@ function thaiAmountToWords(amount) {
   return result + 'ถ้วน'
 }
 
-const emptyItem = { desc: '', qty: 1, price: 0, amount: 0 }
+const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, sizes: {} }
 function calcItems(items) {
   return items.map(it => ({ ...it, amount: (parseFloat(it.qty) || 0) * (parseFloat(it.price) || 0) }))
 }
@@ -87,7 +87,12 @@ export default function QuotationPage() {
   function updateItem(idx, key, val) {
     setForm(f => {
       const items = [...f.items]
-      items[idx] = { ...items[idx], [key]: val }
+      if (key === 'sizes') {
+        const sizeTotal = Object.values(val).reduce((s, v) => s + (parseInt(v) || 0), 0)
+        items[idx] = { ...items[idx], sizes: val, ...(sizeTotal > 0 ? { qty: sizeTotal } : {}) }
+      } else {
+        items[idx] = { ...items[idx], [key]: val }
+      }
       return { ...f, items: calcItems(items) }
     })
   }
@@ -133,7 +138,7 @@ export default function QuotationPage() {
       customer_id: qt.customer_id, valid_until: qt.valid_until || '',
       document_date: qt.document_date || todayStr(),
       notes: qt.notes || '', vat_pct: qt.vat_pct || 0, discount: qt.discount || 0,
-      items: qt.items && qt.items.length ? qt.items : [{ desc: qt.item_desc || '', qty: 1, price: qt.total, amount: qt.total }],
+      items: (qt.items && qt.items.length ? qt.items : [{ desc: qt.item_desc || '', qty: 1, price: qt.total, amount: qt.total }]).map(it => ({ ...it, sizes: it.sizes || {} })),
     })
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -323,7 +328,14 @@ export default function QuotationPage() {
                 {(view.items || []).map((it, i) => (
                   <tr key={i} style={{ borderBottom: '1px solid #f0f0f0', background: i % 2 === 1 ? '#f5f8ff' : '#fff' }}>
                     <td style={{ padding: '6px 9px', textAlign: 'center', color: '#9ca3af', borderRight: '1px solid #f0f0f0' }}>{i + 1}</td>
-                    <td style={{ padding: '6px 9px', fontWeight: 600, borderRight: '1px solid #f0f0f0' }}>{it.desc}</td>
+                    <td style={{ padding: '6px 9px', fontWeight: 600, borderRight: '1px solid #f0f0f0' }}>
+                      {it.desc}
+                      {it.sizes && Object.values(it.sizes).some(v => parseInt(v) > 0) && (
+                        <div style={{ fontSize:9.5, color:'#6b7280', fontWeight:400, marginTop:2, letterSpacing:.3 }}>
+                          {Object.entries(it.sizes).filter(([,v])=>parseInt(v)>0).map(([s,v])=>`${s}:${v}`).join(' · ')}
+                        </div>
+                      )}
+                    </td>
                     <td style={{ padding: '6px 9px', textAlign: 'center', borderRight: '1px solid #f0f0f0' }}>{it.qty}</td>
                     <td style={{ padding: '6px 9px', textAlign: 'right', fontFamily: 'monospace', borderRight: '1px solid #f0f0f0' }}>
                       {(it.price || 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
@@ -531,6 +543,23 @@ export default function QuotationPage() {
                     <td style={{ padding: '3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i, 'desc', e.target.value)} style={{ width: '100%' }} />
+                      <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
+                        <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
+                        {['S','M','L','XL','XXL'].map(s => (
+                          <label key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
+                            <span style={{ fontSize:9, color:'var(--text-muted)', fontWeight:600 }}>{s}</span>
+                            <input type="number" min="0" placeholder="0"
+                              value={it.sizes?.[s] || ''}
+                              onChange={e => updateItem(i,'sizes',{ ...(it.sizes||{}), [s]:e.target.value })}
+                              style={{ width:38, textAlign:'center', fontSize:11, padding:'2px 3px' }} />
+                          </label>
+                        ))}
+                        {Object.values(it.sizes||{}).some(v => parseInt(v)>0) && (
+                          <span style={{ fontSize:10, color:C.primary, fontWeight:700 }}>
+                            = {Object.values(it.sizes||{}).reduce((s,v)=>s+(parseInt(v)||0),0)} ตัว
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td style={{ padding: '3px 5px' }}>
                       <input type="number" min="1" value={it.qty} onChange={e => updateItem(i, 'qty', e.target.value)} />
