@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getDashboardStats, getJobOrders, getTransactions, getCustomers, getInvoices } from '@/lib/db'
+import { getDashboardStats, getJobOrders, getTransactions, getCustomers } from '@/lib/db'
 import dynamic from 'next/dynamic'
 
 const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
@@ -25,21 +25,19 @@ const todayTH = (() => {
 })()
 
 export default function DashboardPage() {
-  const [stats, setStats]       = useState({ totalIn: 0, totalOut: 0, profit: 0, activeJobs: 0, overdue: 0 })
-  const [jobs, setJobs]         = useState([])
-  const [txs, setTxs]           = useState([])
-  const [customers, setCusts]   = useState([])
-  const [invoices, setInvoices] = useState([])
-  const [loaded, setLoaded]     = useState(false)
+  const [stats, setStats]     = useState({ totalIn: 0, totalOut: 0, profit: 0, activeJobs: 0, overdue: 0 })
+  const [jobs, setJobs]       = useState([])
+  const [txs, setTxs]         = useState([])
+  const [customers, setCusts] = useState([])
+  const [loaded, setLoaded]   = useState(false)
 
   useEffect(() => {
-    Promise.all([getDashboardStats(), getJobOrders(), getTransactions(), getCustomers(), getInvoices()])
-      .then(([s, jRes, tRes, cRes, iRes]) => {
+    Promise.all([getDashboardStats(), getJobOrders(), getTransactions(), getCustomers()])
+      .then(([s, jRes, tRes, cRes]) => {
         setStats(s)
         setJobs(jRes.data || [])
         setTxs(tRes.data || [])
         setCusts(cRes.data || [])
-        setInvoices(iRes.data || [])
         setLoaded(true)
       })
   }, [])
@@ -63,28 +61,27 @@ export default function DashboardPage() {
     })
   })()
 
-  // Top items from invoice data
+  // Top income categories from transactions (exclude ถุงผ้า)
+  const EXCLUDED_CATS = ['ถุงผ้า']
+  const CAT_ICONS = { 'เสื้อยืด':'👕', 'เสื้อโปโล':'🏌️', 'เสื้อคนงาน':'🦺', 'งานสกรีน':'🖨️', 'เสื้อพิมพ์ลาย':'🎨', 'อื่น ๆ':'📦' }
+
   const bestSellersFromDB = (() => {
-    if (!loaded || invoices.length === 0) return [
-      { icon: '🖨️', name: 'ยังไม่มีข้อมูล', count: '—', val: '฿0', pct: 100 },
-    ]
-    const itemMap = {}
-    invoices.forEach(inv => {
-      const items = Array.isArray(inv.items) ? inv.items : []
-      items.forEach(it => {
-        const name = it.desc || it.description || ''
-        if (!name) return
-        if (!itemMap[name]) itemMap[name] = { total: 0, qty: 0 }
-        itemMap[name].total += Number(it.amount) || (Number(it.qty) * Number(it.price)) || 0
-        itemMap[name].qty   += Number(it.qty) || 1
-      })
+    if (!loaded) return [{ icon: '⏳', name: 'กำลังโหลด...', count: '—', val: '—', pct: 100 }]
+    const incTxs = txs.filter(t => t.type === 'รายรับ' && t.category && !EXCLUDED_CATS.includes(t.category))
+    if (incTxs.length === 0) return [{ icon: '🖨️', name: 'ยังไม่มีข้อมูล', count: '—', val: '฿0', pct: 100 }]
+    const catMap = {}
+    incTxs.forEach(t => {
+      const cat = t.category || 'อื่น ๆ'
+      if (!catMap[cat]) catMap[cat] = { total: 0, count: 0 }
+      catMap[cat].total += Number(t.amount) || 0
+      catMap[cat].count += 1
     })
-    const sorted = Object.entries(itemMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5)
-    if (sorted.length === 0) return [{ icon: '🖨️', name: 'ยังไม่มีข้อมูล', count: '—', val: '฿0', pct: 100 }]
+    const sorted = Object.entries(catMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5)
     const maxVal = sorted[0][1].total || 1
     return sorted.map(([name, d]) => ({
-      icon: '🖨️', name,
-      count: `${d.qty} ชิ้น`,
+      icon:  CAT_ICONS[name] || '🖨️',
+      name,
+      count: `${d.count} รายการ`,
       val:   `฿${d.total.toLocaleString()}`,
       pct:   Math.round((d.total / maxVal) * 100),
     }))
