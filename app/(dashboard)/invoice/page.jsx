@@ -673,15 +673,16 @@ export default function InvoicePage() {
                               style={{ width:38, textAlign:'center', fontSize:11, padding:'2px 3px' }} />
                           </label>
                         ))}
-                        {Object.values(it.sizes||{}).some(v => parseInt(v)>0) && (
-                          <span style={{ fontSize:10, color:'var(--primary)', fontWeight:700 }}>
-                            = {Object.values(it.sizes||{}).reduce((s,v)=>s+(parseInt(v)||0),0)} ตัว
-                          </span>
-                        )}
                       </div>
                     </td>
                     <td style={{ padding:'3px 5px' }}>
-                      <input type="number" min="1" value={it.qty} onChange={e => updateItem(i,'qty',e.target.value)} />
+                      {Object.values(it.sizes||{}).some(v => parseInt(v)>0) ? (
+                        <div style={{ textAlign:'center', fontWeight:800, color:'var(--primary)', padding:'6px 2px', fontSize:14 }}>
+                          {Object.values(it.sizes||{}).reduce((s,v)=>s+(parseInt(v)||0),0)}
+                        </div>
+                      ) : (
+                        <input type="number" min="1" value={it.qty} onChange={e => updateItem(i,'qty',e.target.value)} />
+                      )}
                     </td>
                     <td style={{ padding:'3px 5px' }}>
                       <input type="number" min="0" value={it.price} onChange={e => updateItem(i,'price',e.target.value)} />
