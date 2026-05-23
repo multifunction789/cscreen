@@ -1,48 +1,56 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getDashboardStats, getJobOrders, getTransactions, getCustomers } from '@/lib/db'
+import { getDashboardStats, getJobOrders, getTransactions, getCustomers, getInvoices } from '@/lib/db'
 import dynamic from 'next/dynamic'
 
 const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
 const CustomerCharts = dynamic(() => import('@/components/charts/CustomerCharts'), { ssr: false, loading: () => <div style={{height:150}} /> })
 
+const statusBadge = {
+  'กำลังสกรีน'   : 'badge badge-blue',
+  'สั่งของ'       : 'badge badge-yellow',
+  'แพ็คพร้อมส่ง' : 'badge badge-green',
+  'เลยกำหนด'     : 'badge badge-red',
+  'ส่งงานแล้ว'   : 'badge badge-green',
+  'รอมัดจำ'      : 'badge badge-gray',
+  'รอออกแบบ'     : 'badge badge-cyan',
+  'รอทำไฟล์'     : 'badge badge-purple',
+}
 
-const bestSellers = [
-  { icon: '👕', name: 'เสื้อยืด', count: '142 ตัว', val: '฿28,400', pct: 100 },
-  { icon: '🏌️', name: 'เสื้อโปโล', count: '98 ตัว', val: '฿22,540', pct: 69 },
-  { icon: '🦺', name: 'เสื้อคนงาน', count: '74 ตัว', val: '฿18,500', pct: 65 },
-  { icon: '🖨️', name: 'งานสกรีน', count: '85 งาน', val: '฿17,000', pct: 60 },
-  { icon: '🎨', name: 'เสื้อพิมพ์ลาย', count: '61 ตัว', val: '฿12,200', pct: 43 },
-]
-
-
-const statusBadge = { 'กำลังสกรีน':'badge badge-blue','สั่งของ':'badge badge-yellow','แพ็คพร้อมส่ง':'badge badge-green','เลยกำหนด':'badge badge-red','ส่งงานแล้ว':'badge badge-green','รอมัดจำ':'badge badge-gray','รอออกแบบ':'badge badge-cyan','รอทำไฟล์':'badge badge-purple','สั่งผลิต':'badge badge-cyan' }
+// Dynamic Thai date
+const thMonthsFull = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+const todayTH = (() => {
+  const d = new Date()
+  return `${d.getDate()} ${thMonthsFull[d.getMonth()]} ${d.getFullYear() + 543}`
+})()
 
 export default function DashboardPage() {
-  const [stats, setStats]   = useState({ totalIn: 0, totalOut: 0, profit: 0, activeJobs: 0, overdue: 0 })
-  const [jobs, setJobs]     = useState([])
-  const [txs, setTxs]       = useState([])
-  const [customers, setCusts] = useState([])
-  const [loaded, setLoaded] = useState(false)
+  const [stats, setStats]       = useState({ totalIn: 0, totalOut: 0, profit: 0, activeJobs: 0, overdue: 0 })
+  const [jobs, setJobs]         = useState([])
+  const [txs, setTxs]           = useState([])
+  const [customers, setCusts]   = useState([])
+  const [invoices, setInvoices] = useState([])
+  const [loaded, setLoaded]     = useState(false)
 
   useEffect(() => {
-    Promise.all([getDashboardStats(), getJobOrders(), getTransactions(), getCustomers()]).then(([s, jRes, tRes, cRes]) => {
-      setStats(s)
-      setJobs(jRes.data || [])
-      setTxs(tRes.data || [])
-      setCusts(cRes.data || [])
-      setLoaded(true)
-    })
+    Promise.all([getDashboardStats(), getJobOrders(), getTransactions(), getCustomers(), getInvoices()])
+      .then(([s, jRes, tRes, cRes, iRes]) => {
+        setStats(s)
+        setJobs(jRes.data || [])
+        setTxs(tRes.data || [])
+        setCusts(cRes.data || [])
+        setInvoices(iRes.data || [])
+        setLoaded(true)
+      })
   }, [])
 
   // สร้าง chart data — รายรับ/รายจ่ายรายเดือน 6 เดือนล่าสุด
   const monthlyData = (() => {
-    const thMonths = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
     const now = new Date()
     const months = []
     for (let i = 5; i >= 0; i--) {
       const d = new Date(now.getFullYear(), now.getMonth() - i, 1)
-      months.push({ year: d.getFullYear(), month: d.getMonth(), label: thMonths[d.getMonth()] })
+      months.push({ year: d.getFullYear(), month: d.getMonth(), label: thMonthsFull[d.getMonth()] })
     }
     return months.map(m => {
       const monthTx = txs.filter(t => {
@@ -55,14 +63,41 @@ export default function DashboardPage() {
     })
   })()
 
+  // Top items from invoice data
+  const bestSellersFromDB = (() => {
+    if (!loaded || invoices.length === 0) return [
+      { icon: '🖨️', name: 'ยังไม่มีข้อมูล', count: '—', val: '฿0', pct: 100 },
+    ]
+    const itemMap = {}
+    invoices.forEach(inv => {
+      const items = Array.isArray(inv.items) ? inv.items : []
+      items.forEach(it => {
+        const name = it.desc || it.description || ''
+        if (!name) return
+        if (!itemMap[name]) itemMap[name] = { total: 0, qty: 0 }
+        itemMap[name].total += Number(it.amount) || (Number(it.qty) * Number(it.price)) || 0
+        itemMap[name].qty   += Number(it.qty) || 1
+      })
+    })
+    const sorted = Object.entries(itemMap).sort((a, b) => b[1].total - a[1].total).slice(0, 5)
+    if (sorted.length === 0) return [{ icon: '🖨️', name: 'ยังไม่มีข้อมูล', count: '—', val: '฿0', pct: 100 }]
+    const maxVal = sorted[0][1].total || 1
+    return sorted.map(([name, d]) => ({
+      icon: '🖨️', name,
+      count: `${d.qty} ชิ้น`,
+      val:   `฿${d.total.toLocaleString()}`,
+      pct:   Math.round((d.total / maxVal) * 100),
+    }))
+  })()
+
   const urgentFromDB = jobs
     .filter(j => j.status !== 'ส่งงานแล้ว')
     .filter(j => j.due_date)
     .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
     .slice(0, 3)
 
-  const recentJobsFromDB  = jobs.slice(0, 4)
-  const recentTxFromDB    = txs.slice(0, 4)
+  const recentJobsFromDB = jobs.slice(0, 4)
+  const recentTxFromDB   = txs.slice(0, 4)
 
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit' }) : '—'
   const daysLeft = (d) => {
@@ -81,10 +116,10 @@ export default function DashboardPage() {
       <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
         <div>
           <h1 style={{ fontSize: 20, fontWeight: 800, color: 'var(--text)' }}>📊 Dashboard</h1>
-          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>ภาพรวมธุรกิจ — วันนี้ 20 พ.ค. 2569</p>
+          <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>ภาพรวมธุรกิจ — วันนี้ {todayTH}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <button className="btn btn-outline btn-sm">📅 เดือนนี้ ▾</button>
+          <a href="/report" className="btn btn-outline btn-sm">📈 รายงาน</a>
           <a href="/joborder" className="btn btn-primary btn-sm">+ สร้างงาน</a>
         </div>
       </div>
@@ -113,7 +148,6 @@ export default function DashboardPage() {
 
       {/* Chart + งานใกล้ส่ง */}
       <div style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', gap: 20 }}>
-        {/* Chart placeholder */}
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📈 ยอดขายรายเดือน (6 เดือนล่าสุด)</h2>
@@ -153,17 +187,14 @@ export default function DashboardPage() {
       {/* Customer Charts */}
       {loaded && customers.length > 0 && <CustomerCharts customers={customers} />}
 
-      {/* Best Sellers */}
+      {/* Best Sellers — derived from invoice items */}
       <div className="card">
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>🏆 สินค้าขายดี / Best Sellers</h2>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            <select style={{ width: 'auto', padding: '4px 10px', fontSize: 12 }}><option>เดือนนี้</option><option>ไตรมาสนี้</option><option>ปีนี้</option></select>
-            <button className="btn btn-outline btn-sm">ดูรายงาน →</button>
-          </div>
+          <a href="/report" className="btn btn-outline btn-sm">ดูรายงาน →</a>
         </div>
         <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
-          {bestSellers.map(b => (
+          {bestSellersFromDB.map(b => (
             <div key={b.name} style={{
               background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
               padding: '14px 12px', textAlign: 'center', boxShadow: 'var(--shadow)',
@@ -173,7 +204,7 @@ export default function DashboardPage() {
               onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.transform = 'none' }}
             >
               <div style={{ fontSize: 26, marginBottom: 6 }}>{b.icon}</div>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)' }}>{b.name}</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text)', overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis' }}>{b.name}</div>
               <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{b.count}</div>
               <div style={{ height: 4, borderRadius: 4, background: 'var(--primary)', margin: '6px 0 2px', width: `${b.pct}%`, opacity: .7 }} />
               <div style={{ fontSize: 13, fontWeight: 800, color: 'var(--primary)' }}>{b.val}</div>

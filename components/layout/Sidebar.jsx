@@ -27,8 +27,9 @@ const navItems = [
     { href: '/taxdocs',  icon: '📑', label: 'เอกสารภาษี / Tax Docs' },
   ]},
   { group: 'เครื่องมือ / Tools', items: [
-    { href: '/cost',  icon: '🧮', label: 'เปรียบเทียบต้นทุน' },
-    { href: '/excel', icon: '📊', label: 'ดึงรายงาน Excel' },
+    { href: '/report', icon: '📈', label: 'รายงานรายเดือน' },
+    { href: '/cost',   icon: '🧮', label: 'เปรียบเทียบต้นทุน' },
+    { href: '/excel',  icon: '📊', label: 'ดึงรายงาน Excel' },
   ]},
 ]
 

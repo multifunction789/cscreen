@@ -65,6 +65,101 @@ function SectionHeader({ icon, title }) {
   )
 }
 
+// ── Calendar View Component ──────────────────────────────────────
+function CalendarView({ jobs, month, onMonthChange, onView }) {
+  const [year, m] = month.split('-').map(Number)
+  const firstDay  = new Date(year, m - 1, 1)
+  const lastDay   = new Date(year, m, 0)
+  const thM = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+
+  // Build cells (Mon-first grid)
+  const cells = []
+  const startDow = firstDay.getDay()
+  const offset   = startDow === 0 ? 6 : startDow - 1
+  for (let i = 0; i < offset; i++) cells.push(null)
+  for (let d = 1; d <= lastDay.getDate(); d++) cells.push(d)
+  while (cells.length % 7 !== 0) cells.push(null)
+  const weeks = []
+  for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7))
+
+  // Group jobs by due date day
+  const jobsByDay = {}
+  jobs.forEach(j => {
+    if (!j.due_date) return
+    const d = new Date(j.due_date)
+    if (d.getFullYear() === year && d.getMonth() === m - 1) {
+      const day = d.getDate()
+      if (!jobsByDay[day]) jobsByDay[day] = []
+      jobsByDay[day].push(j)
+    }
+  })
+
+  const today  = new Date()
+  const prevMo = () => { const d = new Date(year, m - 2, 1); onMonthChange(d.toISOString().slice(0, 7)) }
+  const nextMo = () => { const d = new Date(year, m, 1);     onMonthChange(d.toISOString().slice(0, 7)) }
+
+  return (
+    <div className="card" style={{ overflow: 'hidden' }}>
+      {/* Header */}
+      <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+        <button className="btn btn-outline btn-sm" onClick={prevMo}>◀ ก่อนหน้า</button>
+        <span style={{ fontWeight: 700, fontSize: 15 }}>{thM[m - 1]} {year + 543}</span>
+        <button className="btn btn-outline btn-sm" onClick={nextMo}>ถัดไป ▶</button>
+      </div>
+      {/* Day labels */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
+        {['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'].map((d, i) => (
+          <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: i >= 5 ? 'var(--danger)' : 'var(--text-muted)' }}>{d}</div>
+        ))}
+      </div>
+      {/* Weeks */}
+      {weeks.map((week, wi) => (
+        <div key={wi} style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', borderBottom: '1px solid var(--border)' }}>
+          {week.map((day, di) => {
+            if (!day) return <div key={di} style={{ minHeight: 90, background: 'var(--bg)', opacity: .4, borderLeft: di > 0 ? '1px solid var(--border)' : 'none' }} />
+            const isToday = today.getDate() === day && today.getMonth() === m - 1 && today.getFullYear() === year
+            const dayJobs = jobsByDay[day] || []
+            const dateObj = new Date(year, m - 1, day)
+            return (
+              <div key={di} style={{ minHeight: 90, padding: '4px 6px', borderLeft: di > 0 ? '1px solid var(--border)' : 'none', background: isToday ? 'rgba(184,15,11,0.05)' : 'transparent' }}>
+                <div style={{
+                  fontSize: 12, fontWeight: isToday ? 900 : 400, marginBottom: 3,
+                  width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+                  borderRadius: '50%', background: isToday ? 'var(--primary)' : 'transparent',
+                  color: isToday ? '#fff' : 'var(--text-muted)',
+                }}>{day}</div>
+                {dayJobs.map(j => {
+                  const overdue = dateObj < today && j.status !== 'ส่งงานแล้ว'
+                  const done    = j.status === 'ส่งงานแล้ว'
+                  return (
+                    <div key={j.id} onClick={() => onView(j)} style={{
+                      fontSize: 10, padding: '2px 5px', borderRadius: 4, marginBottom: 2, cursor: 'pointer',
+                      background: done ? '#D1FAE5' : overdue ? '#FEE2E2' : '#EFF6FF',
+                      color:      done ? '#065f46' : overdue ? '#991B1B' : '#1E40AF',
+                      border: `1px solid ${done ? '#A7F3D0' : overdue ? '#FECACA' : '#BFDBFE'}`,
+                      fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
+                    }}>
+                      {j.code} {j.customers?.name || ''}
+                    </div>
+                  )
+                })}
+              </div>
+            )
+          })}
+        </div>
+      ))}
+      {/* Legend */}
+      <div style={{ padding: '8px 16px', display: 'flex', gap: 14, fontSize: 11, color: 'var(--text-muted)' }}>
+        {[['#EFF6FF','#BFDBFE','ปกติ'],['#FEE2E2','#FECACA','เลยกำหนด'],['#D1FAE5','#A7F3D0','ส่งแล้ว']].map(([bg, border, label]) => (
+          <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+            <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, border: `1px solid ${border}`, display: 'inline-block' }} />{label}
+          </span>
+        ))}
+      </div>
+    </div>
+  )
+}
+
 export default function JobOrderPage() {
   const [rows, setRows]           = useState([])
   const [customers, setCustomers] = useState([])
@@ -78,6 +173,8 @@ export default function JobOrderPage() {
   const [saving, setSaving]       = useState(false)
   const [view, setView]           = useState(null)
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
+  const [viewMode, setViewMode]       = useState('table')
+  const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
   const [artworkFile, setArtworkFile]   = useState(null)
   const [artworkPreview, setArtworkPreview] = useState(null)
   const [mockupFile, setMockupFile]     = useState(null)
@@ -431,10 +528,17 @@ export default function JobOrderPage() {
           })}
           {filterStatus && <span className="badge badge-gray" style={{ cursor: 'pointer' }} onClick={() => setFilter('')}>✕ ล้าง</span>}
         </div>
-        <button className="btn btn-primary" onClick={() => {
-          setShowForm(!showForm)
-          if (showForm) { setEditId(null); setForm(emptyForm()) }
-        }}>{showForm ? '✕ ปิด' : '+ สร้างใบงาน'}</button>
+        <div style={{ display: 'flex', gap: 8 }}>
+          <button
+            className={`btn ${viewMode === 'calendar' ? 'btn-primary' : 'btn-outline'} btn-sm`}
+            onClick={() => setViewMode(v => v === 'table' ? 'calendar' : 'table')}>
+            {viewMode === 'calendar' ? '📋 รายการ' : '📅 ตารางงาน'}
+          </button>
+          <button className="btn btn-primary" onClick={() => {
+            setShowForm(!showForm)
+            if (showForm) { setEditId(null); setForm(emptyForm()) }
+          }}>{showForm ? '✕ ปิด' : '+ สร้างใบงาน'}</button>
+        </div>
       </div>
 
       {/* ──── FORM ──────────────────────────────────────────── */}
@@ -615,8 +719,18 @@ export default function JobOrderPage() {
         </div>
       )}
 
+      {/* ──── CALENDAR VIEW ─────────────────────────────────── */}
+      {viewMode === 'calendar' && (
+        <CalendarView
+          jobs={filtered}
+          month={calMonth}
+          onMonthChange={setCalMonth}
+          onView={setView}
+        />
+      )}
+
       {/* ──── TABLE ──────────────────────────────────────────── */}
-      <div className="card" style={{ overflow: 'hidden' }}>
+      {viewMode === 'table' && <div className="card" style={{ overflow: 'hidden' }}>
         {loading ? <LoadingSpinner /> : (
           <>
             <div style={{ overflowX: 'auto' }}>
@@ -648,6 +762,14 @@ export default function JobOrderPage() {
                         <td style={{ display: 'flex', gap: 4 }}>
                           <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
                           <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
+                          <button className="btn btn-outline btn-sm"
+                            style={{ color: '#06C755', borderColor: '#06C755', fontSize: 11, padding: '3px 7px' }}
+                            title="แจ้งสถานะผ่าน LINE"
+                            onClick={() => {
+                              const cust = j.customers || {}
+                              const msg = `📋 C-Screen แจ้งสถานะงาน\n━━━━━━━━━━━━━━\nเลขที่: ${j.code}\nลูกค้า: ${cust.name || ''}\nสถานะ: ${j.status}\nรายการ: ${j.item_desc || ''}\nกำหนดส่ง: ${j.due_date ? new Date(j.due_date).toLocaleDateString('th-TH') : '-'}\n━━━━━━━━━━━━━━\n📞 ${SHOP.tel} | Line: ${SHOP.line}`
+                              window.open('https://line.me/R/msg/text/?' + encodeURIComponent(msg), '_blank')
+                            }}>📱 LINE</button>
                           {j.status !== 'ส่งงานแล้ว' && (
                             <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
                           )}
@@ -673,7 +795,7 @@ export default function JobOrderPage() {
             </div>
           </>
         )}
-      </div>
+      </div>}
     </div>
   )
 }
