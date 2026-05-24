@@ -164,7 +164,7 @@ export default function InvoicePage() {
     }, 0)
     const code = 'JO-' + String(maxJO + 1).padStart(4,'0')
     // Build size columns — use sizes that have qtys in the invoice items, fall back to defaults
-    const defSizes = ['SS','S','M','L','XL','XXL','2XL','3XL','4XL','5XL','6XL']
+    const defSizes = ['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']
     const usedSizesSet = new Set()
     ;(inv.items||[]).forEach(it => {
       Object.entries(it.sizes||{}).forEach(([s,v]) => { if (parseInt(v) > 0) usedSizesSet.add(s) })
@@ -664,7 +664,7 @@ export default function InvoicePage() {
                         onChange={e => updateItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
-                        {['SS','S','M','L','XL','XXL','2XL','3XL','4XL','5XL','6XL'].map(s => (
+                        {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (
                           <label key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
                             <span style={{ fontSize:9, color:'var(--text-muted)', fontWeight:600 }}>{s}</span>
                             <input type="number" min="0" placeholder="0"

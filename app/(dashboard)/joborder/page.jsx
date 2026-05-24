@@ -17,7 +17,7 @@ const STATUS_BADGE = {
   'เลยกำหนด'     : 'badge badge-red',
 }
 const ALL_STATUS = Object.keys(STATUS_BADGE)
-const DEFAULT_SIZES = ['SS','S','M','L','XL','XXL','2XL','3XL','4XL','5XL','6XL']
+const DEFAULT_SIZES = ['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']
 
 // ── helpers ──────────────────────────────────────────────────────
 function makeRow(sizes, style = '') {
