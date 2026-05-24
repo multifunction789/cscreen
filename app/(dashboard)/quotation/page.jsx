@@ -121,7 +121,7 @@ export default function QuotationPage() {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('QT-', '') || '0'); return n > max ? n : max
       }, 0)
-      const code = 'QT-' + String(maxNum + 1).padStart(4, '0')
+      const code = 'QT-' + String(Math.max(maxNum + 1, 10)).padStart(4, '0')
       await insertQuotation({ ...payload, code })
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
@@ -151,7 +151,7 @@ export default function QuotationPage() {
     const maxNum = invoices.reduce((max, r) => {
       const n = parseInt(r.code?.replace('INV-', '') || '0'); return n > max ? n : max
     }, 0)
-    const code  = 'INV-' + String(maxNum + 1).padStart(4, '0')
+    const code  = 'INV-' + String(Math.max(maxNum + 1, 10)).padStart(4, '0')
     const items = qt.items && qt.items.length ? qt.items
       : [{ desc: qt.item_desc || '', qty: 1, price: qt.total || 0, amount: qt.total || 0 }]
     const sub = items.reduce((s, it) => s + (it.amount || 0), 0)

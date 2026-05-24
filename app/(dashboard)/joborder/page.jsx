@@ -290,7 +290,7 @@ export default function JobOrderPage() {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('JO-', '') || '0'); return n > max ? n : max
       }, 0)
-      await insertJobOrder({ ...payload, code: 'JO-' + String(maxNum + 1).padStart(4, '0') })
+      await insertJobOrder({ ...payload, code: 'JO-' + String(Math.max(maxNum + 1, 10)).padStart(4, '0') })
     }
 
     setForm(emptyForm())
