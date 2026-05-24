@@ -128,7 +128,7 @@ export default function InvoicePage() {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('INV-','')||'0'); return n > max ? n : max
       }, 0)
-      const code = 'INV-' + String(Math.max(maxNum + 1, 10)).padStart(4,'0')
+      const code = 'INV-' + String(Math.max(maxNum + 1, 1001)).padStart(4,'0')
       const { error } = await insertInvoice({ ...payload, code })
       if (error) { setSaving(false); return alert('❌ บันทึกไม่สำเร็จ: ' + error.message) }
       for (const it of items) {
@@ -163,7 +163,7 @@ export default function InvoicePage() {
     const maxJO = jobs.reduce((max, j) => {
       const n = parseInt(j.code?.replace('JO-','')||'0'); return n > max ? n : max
     }, 0)
-    const code = 'JO-' + String(Math.max(maxJO + 1, 10)).padStart(4,'0')
+    const code = 'JO-' + String(Math.max(maxJO + 1, 1001)).padStart(4,'0')
     // Build size columns — use sizes that have qtys in the invoice items, fall back to defaults
     const defSizes = ['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']
     const usedSizesSet = new Set()
@@ -198,7 +198,7 @@ export default function InvoicePage() {
     const maxRec = receipts.reduce((max, r) => {
       const n = parseInt(r.code?.replace('REC-','')||'0'); return n > max ? n : max
     }, 0)
-    const code = 'REC-' + String(Math.max(maxRec + 1, 10)).padStart(4,'0')
+    const code = 'REC-' + String(Math.max(maxRec + 1, 1001)).padStart(4,'0')
     const { data, error } = await insertReceipt({
       code,
       invoice_id:   inv.id,

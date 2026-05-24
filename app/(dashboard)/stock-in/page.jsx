@@ -68,7 +68,7 @@ export default function StockInPage() {
   async function handleSave() {
     if (!form.item_name || !form.qty || !form.cost_per_unit) return alert('กรุณากรอก รายการ / จำนวน / ต้นทุนต่อหน่วย')
     setSaving(true)
-    const code      = 'SI-' + String(Math.max((rows.length || 0) + 1, 10)).padStart(4, '0')
+    const code      = 'SI-' + String(Math.max((rows.length || 0) + 1, 1001)).padStart(4, '0')
     const subtotal  = parseFloat(form.qty) * parseFloat(form.cost_per_unit)
     const vatAmt    = subtotal * (parseFloat(form.vat_pct) || 0) / 100
     const total     = subtotal + vatAmt
