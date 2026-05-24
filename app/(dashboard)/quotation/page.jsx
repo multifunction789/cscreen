@@ -88,8 +88,9 @@ export default function QuotationPage() {
     setForm(f => {
       const items = [...f.items]
       if (key === 'sizes') {
-        const sizeTotal = Object.values(val).reduce((s, v) => s + (parseInt(v) || 0), 0)
-        items[idx] = { ...items[idx], sizes: val, ...(sizeTotal > 0 ? { qty: sizeTotal } : {}) }
+        const clean = Object.fromEntries(Object.entries(val).filter(([s]) => s !== 'XXL'))
+        const sizeTotal = Object.values(clean).reduce((s, v) => s + (parseInt(v) || 0), 0)
+        items[idx] = { ...items[idx], sizes: clean, ...(sizeTotal > 0 ? { qty: sizeTotal } : {}) }
       } else {
         items[idx] = { ...items[idx], [key]: val }
       }
@@ -330,9 +331,9 @@ export default function QuotationPage() {
                     <td style={{ padding: '6px 9px', textAlign: 'center', color: '#9ca3af', borderRight: '1px solid #f0f0f0' }}>{i + 1}</td>
                     <td style={{ padding: '6px 9px', fontWeight: 600, borderRight: '1px solid #f0f0f0' }}>
                       {it.desc}
-                      {it.sizes && Object.values(it.sizes).some(v => parseInt(v) > 0) && (
+                      {it.sizes && Object.entries(it.sizes).some(([s,v]) => s !== 'XXL' && parseInt(v) > 0) && (
                         <div style={{ fontSize:9.5, color:'#6b7280', fontWeight:400, marginTop:2, letterSpacing:.3 }}>
-                          {Object.entries(it.sizes).filter(([,v])=>parseInt(v)>0).map(([s,v])=>`${s}:${v}`).join(' · ')}
+                          {Object.entries(it.sizes).filter(([s,v]) => s !== 'XXL' && parseInt(v)>0).map(([s,v])=>`${s}:${v}`).join(' · ')}
                         </div>
                       )}
                     </td>
@@ -557,9 +558,9 @@ export default function QuotationPage() {
                       </div>
                     </td>
                     <td style={{ padding: '3px 5px' }}>
-                      {Object.values(it.sizes||{}).some(v => parseInt(v)>0) ? (
+                      {Object.entries(it.sizes||{}).some(([s,v]) => s !== 'XXL' && parseInt(v)>0) ? (
                         <div style={{ textAlign:'center', fontWeight:800, color:C.primary, padding:'6px 2px', fontSize:14 }}>
-                          {Object.values(it.sizes||{}).reduce((s,v)=>s+(parseInt(v)||0),0)}
+                          {Object.entries(it.sizes||{}).filter(([s])=>s!=='XXL').reduce((sum,[,v])=>sum+(parseInt(v)||0),0)}
                         </div>
                       ) : (
                         <input type="number" min="1" value={it.qty} onChange={e => updateItem(i, 'qty', e.target.value)} />

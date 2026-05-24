@@ -34,7 +34,7 @@ function grandTotal(rows) {
 function readMatrix(j) {
   if (j.items && j.items.type === 'size_matrix') {
     return {
-      sizes:           j.items.sizes           || [...DEFAULT_SIZES],
+      sizes:           (j.items.sizes || [...DEFAULT_SIZES]).filter(s => s !== 'XXL'),
       prod_items:      j.items.rows            || [],
       fabric_type:     j.items.fabric_type     || '',
       shirt_color:     j.items.shirt_color     || '',
