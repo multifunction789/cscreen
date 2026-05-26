@@ -205,7 +205,7 @@ export default function QuotationPage() {
               title: `ใบเสนอราคา ${view.code}`,
               text: `ลูกค้า: ${cust.name || ''}\nยอดรวม: ฿${(view.total || 0).toLocaleString()}\nใช้ได้ถึง: ${view.valid_until ? fmtDate(view.valid_until) : '-'}\n— C-Screen ${SHOP.tel}`,
             })}>🔗 แชร์</button>
-            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `QT-${view.code}`)}>📷 JPEG</button>
+            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
             <button className="btn btn-primary" onClick={() => printDoc()}>🖨️ พิมพ์</button>
           </div>
         </div>
