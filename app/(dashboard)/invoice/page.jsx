@@ -631,22 +631,35 @@ export default function InvoicePage() {
                 <option value={5}>5%</option>
               </select>
             </div>
-            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-              <label>มัดจำ (฿)</label>
-              <input type="number" min="0" placeholder="ระบุยอดมัดจำ (฿)"
+            <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+              <label>💰 มัดจำ (฿)</label>
+              <input type="number" min="0" placeholder="0"
                 value={form.deposit_amount}
-                onChange={e => setForm({...form, deposit_amount: e.target.value})} />
-              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:1 }}>
-                <button type="button" className="btn btn-outline btn-sm"
-                  style={{ fontSize:10, padding:'1px 6px' }}
-                  onClick={() => setForm(f => ({ ...f, deposit_amount: '' }))}>ล้าง</button>
+                onChange={e => setForm({...form, deposit_amount: e.target.value})}
+                style={{ fontSize:15, fontWeight:700 }} />
+              {/* live balance preview */}
+              {depositAmt > 0 && (
+                <div style={{ fontSize:11, color:'#065f46', background:'#d1fae5', borderRadius:6, padding:'4px 8px', display:'flex', gap:6, flexWrap:'wrap' }}>
+                  <span>ยอด <strong>{total.toLocaleString()}</strong></span>
+                  <span>−</span>
+                  <span>มัดจำ <strong>{depositAmt.toLocaleString()}</strong></span>
+                  <span>=</span>
+                  <span>คงเหลือ <strong style={{ color:'#B80F0B' }}>{balance.toLocaleString()}</strong> ฿</span>
+                </div>
+              )}
+              {/* % quick-fill */}
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap' }}>
+                <span style={{ fontSize:10, color:'var(--text-muted)', alignSelf:'center' }}>ลัด:</span>
                 {[30,50,70,100].map(pct => (
                   <button key={pct} type="button" className="btn btn-outline btn-sm"
-                    style={{ fontSize:10, padding:'1px 6px' }}
+                    style={{ fontSize:10, padding:'1px 7px' }}
                     onClick={() => setForm(f => ({ ...f, deposit_amount: Math.round(total * pct / 100) }))}>
                     {pct}%
                   </button>
                 ))}
+                <button type="button" className="btn btn-outline btn-sm"
+                  style={{ fontSize:10, padding:'1px 7px', color:'var(--danger)' }}
+                  onClick={() => setForm(f => ({ ...f, deposit_amount: '' }))}>ล้าง</button>
               </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
