@@ -76,6 +76,15 @@ export default function QuotationPage() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    if (!view) return
+    const custName = (view.customers?.name || customers.find(c => c.id === view.customer_id)?.name || '')
+      .replace(/\s+/g, '_').replace(/[\/\\:*?"<>|]/g, '')
+    const prev = document.title
+    document.title = `${custName}_${view.code}`
+    return () => { document.title = prev }
+  }, [view])
+
   async function load() {
     const [qtRes, cusRes, invRes] = await Promise.all([getQuotations(), getCustomers(), getInvoices()])
     setRows(qtRes.data    || [])

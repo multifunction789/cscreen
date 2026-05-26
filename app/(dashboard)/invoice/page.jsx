@@ -67,6 +67,16 @@ export default function InvoicePage() {
 
   useEffect(() => { load() }, [])
 
+  // ตั้งชื่อหน้า = ชื่อลูกค้า_เลขที่ → browser ใช้เป็น default filename ตอนปริ้น PDF
+  useEffect(() => {
+    if (!view) return
+    const custName = (view.customers?.name || customers.find(c => c.id === view.customer_id)?.name || '')
+      .replace(/\s+/g, '_').replace(/[\/\\:*?"<>|]/g, '')
+    const prev = document.title
+    document.title = `${custName}_${view.code}`
+    return () => { document.title = prev }
+  }, [view])
+
   async function load() {
     const [invRes, cusRes, jobRes, matRes, recRes] = await Promise.all([
       getInvoices(), getCustomers(), getJobOrders(), getMaterials(), getReceipts(),

@@ -54,6 +54,15 @@ export default function ReceiptPage() {
 
   useEffect(() => { load() }, [])
 
+  useEffect(() => {
+    if (!view) return
+    const custName = (view.customers?.name || '')
+      .replace(/\s+/g, '_').replace(/[\/\\:*?"<>|]/g, '')
+    const prev = document.title
+    document.title = `${custName}_${view.code}`
+    return () => { document.title = prev }
+  }, [view])
+
   async function load() {
     const { data } = await getReceipts()
     setRows(data || [])
