@@ -46,7 +46,7 @@ function calcItems(items) {
 const emptyForm = () => ({
   customer_id:'', due_date:'', document_date:todayStr(),
   notes:'', vat_pct:0, discount:0, wht_pct:0,
-  deposit_pct: 50,
+  deposit_amount: '',
   items:[{ ...emptyItem }],
 })
 
@@ -103,8 +103,8 @@ export default function InvoicePage() {
   const vatAmt     = ((subtotal - discAmt) * (parseFloat(form.vat_pct)||0)) / 100
   const whtAmt     = ((subtotal - discAmt) * (parseFloat(form.wht_pct)||0)) / 100
   const total      = subtotal - discAmt + vatAmt - whtAmt
-  const depositPct = parseFloat(form.deposit_pct) || 0
-  const depositAmt = total * depositPct / 100
+  const depositAmt = parseFloat(form.deposit_amount) || 0
+  const depositPct = total > 0 && depositAmt > 0 ? Math.round(depositAmt / total * 1000) / 10 : 0
   const balance    = total - depositAmt
 
   async function handleSave() {
@@ -150,7 +150,9 @@ export default function InvoicePage() {
       customer_id: inv.customer_id, due_date: inv.due_date||'',
       document_date: inv.document_date||todayStr(), notes: inv.notes||'',
       vat_pct: inv.vat_pct||0, discount: inv.discount||0, wht_pct: inv.wht_pct||0,
-      deposit_pct: inv.deposit_pct ?? 50,
+      deposit_amount: inv.deposit_amount != null && inv.deposit_amount > 0
+        ? inv.deposit_amount
+        : (inv.deposit_pct > 0 ? Math.round((inv.total||0) * (inv.deposit_pct||0) / 100) : ''),
       items: (inv.items||[{...emptyItem}]).map(it => ({ ...it, sizes: it.sizes || {} })),
     })
     setShowForm(true)
@@ -227,8 +229,10 @@ export default function InvoicePage() {
     const cust   = customers.find(c => c.id===view.customer_id) || view.customers || {}
     const relJO  = jobs.find(j => j.invoice_id===view.id)
     const relRec = receipts.find(r => r.invoice_id===view.id)
-    const vDepPct = view.deposit_pct ?? 50
-    const vDepAmt = (view.deposit_amount != null) ? view.deposit_amount : (view.total||0) * vDepPct / 100
+    const vDepAmt = view.deposit_amount != null && view.deposit_amount > 0
+      ? view.deposit_amount
+      : (view.total||0) * (view.deposit_pct || 0) / 100
+    const vDepPct = view.deposit_pct || 0
     const vBalance = (view.total||0) - vDepAmt
 
     return (
@@ -270,7 +274,7 @@ export default function InvoicePage() {
 
             <button className="btn btn-outline" onClick={() => shareDoc({
               title:`ใบแจ้งหนี้ ${view.code}`,
-              text:`ลูกค้า: ${cust.name||''}\nยอดสุทธิ: ฿${(view.total||0).toLocaleString()}\nมัดจำ ${vDepPct}%: ฿${vDepAmt.toLocaleString()}\nยอดคงเหลือ: ฿${vBalance.toLocaleString()}\nครบกำหนด: ${view.due_date?fmtDate(view.due_date):'-'}\n— C-Screen ${SHOP.tel}`
+              text:`ลูกค้า: ${cust.name||''}\nยอดสุทธิ: ฿${(view.total||0).toLocaleString()}\nมัดจำ: ฿${vDepAmt.toLocaleString()}\nยอดคงเหลือ: ฿${vBalance.toLocaleString()}\nครบกำหนด: ${view.due_date?fmtDate(view.due_date):'-'}\n— C-Screen ${SHOP.tel}`
             })}>🔗 แชร์</button>
             <button className="btn btn-outline" onClick={() => exportJpeg('print-area',`INV-${view.code}`)}>📷 JPEG</button>
             <button className="btn btn-primary" onClick={() => printDoc()}>🖨️ พิมพ์</button>
@@ -481,7 +485,7 @@ export default function InvoicePage() {
                 </div>
                 {/* Deposit row */}
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'6px 11px', borderTop:'1px solid #f0f0f0', background:'#FFF7ED' }}>
-                  <span style={{ color:'#92400E', fontSize:11.5 }}>มัดจำ {vDepPct}%</span>
+                  <span style={{ color:'#92400E', fontSize:11.5 }}>มัดจำ{Number.isInteger(vDepPct) && vDepPct > 0 ? ` ${vDepPct}%` : ''}</span>
                   <strong style={{ fontFamily:'monospace', color:'#B45309' }}>
                     {vDepAmt.toLocaleString(undefined,{minimumFractionDigits:2})}
                   </strong>
@@ -628,14 +632,22 @@ export default function InvoicePage() {
               </select>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-              <label>มัดจำ (%)</label>
-              <select value={form.deposit_pct} onChange={e => setForm({...form, deposit_pct:e.target.value})}>
-                <option value={0}>ไม่มีมัดจำ</option>
-                <option value={30}>30%</option>
-                <option value={50}>50%</option>
-                <option value={70}>70%</option>
-                <option value={100}>100% (เต็มจำนวน)</option>
-              </select>
+              <label>มัดจำ (฿)</label>
+              <input type="number" min="0" placeholder="ระบุยอดมัดจำ (฿)"
+                value={form.deposit_amount}
+                onChange={e => setForm({...form, deposit_amount: e.target.value})} />
+              <div style={{ display:'flex', gap:3, flexWrap:'wrap', marginTop:1 }}>
+                <button type="button" className="btn btn-outline btn-sm"
+                  style={{ fontSize:10, padding:'1px 6px' }}
+                  onClick={() => setForm(f => ({ ...f, deposit_amount: '' }))}>ล้าง</button>
+                {[30,50,70,100].map(pct => (
+                  <button key={pct} type="button" className="btn btn-outline btn-sm"
+                    style={{ fontSize:10, padding:'1px 6px' }}
+                    onClick={() => setForm(f => ({ ...f, deposit_amount: Math.round(total * pct / 100) }))}>
+                    {pct}%
+                  </button>
+                ))}
+              </div>
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
               <label>ส่วนลด (฿)</label>
@@ -726,9 +738,10 @@ export default function InvoicePage() {
               <div style={{ display:'flex', justifyContent:'space-between', padding:'7px 10px', fontWeight:800, fontSize:14, background:'#d1fae5', color:'#065f46' }}>
                 <span>ยอดสุทธิ</span><span>฿{total.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
               </div>
-              {depositPct > 0 && <>
+              {depositAmt > 0 && <>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 10px', background:'#FFF7ED', color:'#92400E', fontSize:12 }}>
-                  <span>มัดจำ {depositPct}%</span><span>฿{depositAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
+                  <span>มัดจำ{depositPct > 0 ? ` (${depositPct}%)` : ''}</span>
+                  <span>฿{depositAmt.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
                 </div>
                 <div style={{ display:'flex', justifyContent:'space-between', padding:'5px 10px', background:'#FEF2F2', color:'#B80F0B', fontWeight:700, fontSize:12 }}>
                   <span>ยอดคงเหลือ</span><span>฿{balance.toLocaleString(undefined,{minimumFractionDigits:2})}</span>
@@ -769,8 +782,9 @@ export default function InvoicePage() {
                   {filtered.map(r => {
                     const relJO  = jobs.find(j => j.invoice_id===r.id)
                     const relRec = receipts.find(rec => rec.invoice_id===r.id)
-                    const dPct   = r.deposit_pct ?? 50
-                    const dAmt   = r.deposit_amount != null ? r.deposit_amount : (r.total||0)*dPct/100
+                    const dAmt   = r.deposit_amount != null && r.deposit_amount > 0
+                      ? r.deposit_amount
+                      : (r.total||0) * (r.deposit_pct || 0) / 100
                     return (
                       <tr key={r.id} className="row-link">
                         <td style={{ color:'var(--primary)', fontFamily:'monospace', fontWeight:700 }}>{r.code}</td>
@@ -787,7 +801,7 @@ export default function InvoicePage() {
                         <td style={{ fontWeight:600 }}>{r.customers?.name||'—'}</td>
                         <td style={{ fontWeight:800, color:'var(--primary)' }}>฿{(r.total||0).toLocaleString()}</td>
                         <td style={{ fontSize:12, color:'#B45309' }}>
-                          {dPct > 0 ? `${dPct}% = ฿${dAmt.toLocaleString(undefined,{minimumFractionDigits:0})}` : '—'}
+                          {dAmt > 0 ? `฿${dAmt.toLocaleString(undefined,{minimumFractionDigits:0})}` : '—'}
                         </td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDate(r.due_date)}</td>
                         <td style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
