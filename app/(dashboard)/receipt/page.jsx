@@ -133,7 +133,7 @@ export default function ReceiptPage() {
               text: `ลูกค้า: ${cust.name || ''}\nยอดชำระ: ฿${(view.total || 0).toLocaleString()}\nสถานะ: ${view.paid ? 'ชำระแล้ว' : 'รอชำระ'}\n— C-Screen ${SHOP.tel}`,
             })}>🔗 แชร์</button>
             <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
-            <button className="btn btn-primary" style={{ background: C.primary, borderColor: C.primary }} onClick={() => printDoc()}>🖨️ พิมพ์</button>
+            <button className="btn btn-primary" style={{ background: C.primary, borderColor: C.primary }} onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
 

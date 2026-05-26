@@ -349,7 +349,7 @@ export default function JobOrderPage() {
               text:  `ลูกค้า: ${cust.name || ''}\nรายการ: ${(view.item_desc||'').slice(0,80)}\nกำหนดส่ง: ${view.due_date ? fmtDate(view.due_date) : '-'}\n— C-Screen ${SHOP.tel}`
             })}>🔗 แชร์</button>
             <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
-            <button className="btn btn-outline" onClick={() => printDoc()}>🖨️ พิมพ์</button>
+            <button className="btn btn-outline" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
 
