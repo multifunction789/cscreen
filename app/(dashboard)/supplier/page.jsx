@@ -1,14 +1,11 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getSuppliers, insertSupplier, getSetting, upsertSetting } from '@/lib/db'
+import { getSuppliers, insertSupplier, updateSupplier, getTransactions, getSetting, upsertSetting } from '@/lib/db'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_CATS = ['เสื้อผ้า','หมึก / สี','อุปกรณ์','ถุงผ้า','อื่น ๆ']
 const emptyForm = { name:'', category:'เสื้อผ้า', contact:'', phone:'', email:'', address:'', tax_id:'', notes:'' }
 
-function Stars({ n }) {
-  return <span style={{ color:'#F59E0B', letterSpacing:1 }}>{'★'.repeat(n)}{'☆'.repeat(5-n)}</span>
-}
 
 export default function SupplierPage() {
   const [rows, setRows]         = useState([])
@@ -19,23 +16,56 @@ export default function SupplierPage() {
   const [form, setForm]         = useState(emptyForm)
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
+  const [editId, setEditId]     = useState(null)
   const [showCatEditor, setShowCatEditor] = useState(false)
+  const [spendMap, setSpendMap] = useState({}) // supplier_id → total spend
 
   useEffect(()=>{ load() },[])
 
   async function load() {
-    const [{ data }, catRes] = await Promise.all([getSuppliers(), getSetting('supplier_categories')])
+    const [{ data }, catRes, txRes] = await Promise.all([
+      getSuppliers(),
+      getSetting('supplier_categories'),
+      getTransactions(),
+    ])
     setRows(data||[])
     if (catRes.data?.value) setCats(catRes.data.value)
+    // aggregate spend per supplier from รายจ่าย transactions
+    const map = {}
+    for (const t of (txRes.data||[])) {
+      if (t.type === 'รายจ่าย' && t.supplier_id) {
+        map[t.supplier_id] = (map[t.supplier_id] || 0) + (t.amount || 0)
+      }
+    }
+    setSpendMap(map)
     setLoading(false)
+  }
+
+  function startEdit(s) {
+    setEditId(s.id)
+    setForm({ name:s.name||'', category:s.category||'เสื้อผ้า', contact:s.contact||'', phone:s.phone||'', email:s.email||'', address:s.address||'', tax_id:s.tax_id||'', notes:s.notes||'' })
+    setError('')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  function cancelEdit() {
+    setEditId(null)
+    setForm(emptyForm)
+    setError('')
   }
 
   async function handleSave() {
     if (!form.name.trim()) return setError('กรุณาระบุชื่อบริษัท')
     setSaving(true); setError('')
-    const code = 'SUP-'+String((rows.length||0)+1).padStart(3,'0')
-    const { error:err } = await insertSupplier({ ...form, code, rating:3 })
-    if (err) { setError(err.message); setSaving(false); return }
+    if (editId) {
+      const { error:err } = await updateSupplier(editId, { ...form })
+      if (err) { setError(err.message); setSaving(false); return }
+      setEditId(null)
+    } else {
+      const code = 'SUP-'+String((rows.length||0)+1).padStart(3,'0')
+      const { error:err } = await insertSupplier({ ...form, code, rating:3 })
+      if (err) { setError(err.message); setSaving(false); return }
+    }
     setForm(emptyForm); setSaving(false)
     load()
   }
@@ -63,7 +93,7 @@ export default function SupplierPage() {
         {[
           { label:'ซัพพลายเออร์ทั้งหมด', value:rows.length+' ราย', accent:'var(--primary)', icon:'🏢' },
           { label:'หมวดหมู่', value:cats.length+' หมวด', accent:'var(--info)', icon:'🗂️' },
-          { label:'คะแนนเฉลี่ย', value:rows.length?(rows.reduce((s,r)=>s+(r.rating||0),0)/rows.length).toFixed(1)+' ★':'—', accent:'var(--warning)', icon:'⭐' },
+          { label:'ยอดรายจ่ายรวม', value: Object.values(spendMap).length ? '฿'+Object.values(spendMap).reduce((a,b)=>a+b,0).toLocaleString() : '฿0', accent:'var(--warning)', icon:'💸' },
         ].map(k=>(
           <div key={k.label} style={{ background:'var(--card)', borderRadius:'var(--radius)', padding:'16px 18px', boxShadow:'var(--shadow)', border:'1px solid var(--border)', position:'relative', overflow:'hidden' }}>
             <div style={{ position:'absolute', top:0, left:0, width:4, height:'100%', background:k.accent, borderRadius:'10px 0 0 10px' }} />
@@ -77,7 +107,15 @@ export default function SupplierPage() {
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
         {/* Add form */}
         <div className="card" style={{ padding:20 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>➕ เพิ่มซัพพลายเออร์ใหม่</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14, display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+            <span>{editId ? '✏️ แก้ไขซัพพลายเออร์' : '➕ เพิ่มซัพพลายเออร์ใหม่'}</span>
+            {editId && (
+              <button onClick={cancelEdit}
+                style={{ background:'none', border:'none', fontSize:12, color:'var(--text-muted)', cursor:'pointer', fontWeight:600 }}>
+                ✕ ยกเลิก
+              </button>
+            )}
+          </div>
           {error && <div style={{ color:'var(--danger)', fontSize:13, marginBottom:10 }}>⚠️ {error}</div>}
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
@@ -133,27 +171,46 @@ export default function SupplierPage() {
 
             <button className="btn btn-primary" style={{ marginTop:4, justifyContent:'center' }}
               onClick={handleSave} disabled={saving}>
-              {saving?'กำลังบันทึก...':'💾 บันทึกซัพพลายเออร์'}
+              {saving ? 'กำลังบันทึก...' : editId ? '💾 บันทึกการแก้ไข' : '💾 บันทึกซัพพลายเออร์'}
             </button>
           </div>
         </div>
 
-        {/* Top list */}
+        {/* Spend bar chart */}
         <div className="card">
           <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)' }}>
-            <h2 style={{ fontSize:14, fontWeight:700 }}>🏆 รายชื่อซัพพลายเออร์</h2>
+            <h2 style={{ fontSize:14, fontWeight:700 }}>📊 ยอดซื้อสูงสุด (รายจ่ายจริง)</h2>
           </div>
-          <div style={{ padding:14, display:'flex', flexDirection:'column', gap:10 }}>
-            {loading ? <LoadingSpinner /> : rows.slice(0,6).map((s,i)=>(
-              <div key={s.id} style={{ display:'flex', alignItems:'center', gap:10 }}>
-                <div style={{ width:24, height:24, borderRadius:'50%', flexShrink:0, background:i===0?'#F59E0B':i===1?'#9CA3AF':i===2?'#B45309':'var(--bg)', color:i<3?'#fff':'var(--text-muted)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:800 }}>{i+1}</div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700 }}>{s.name}</div>
-                  <div style={{ fontSize:11, color:'var(--text-muted)' }}>{s.category}</div>
+          <div style={{ padding:'14px 18px', display:'flex', flexDirection:'column', gap:12 }}>
+            {loading ? <LoadingSpinner /> : (() => {
+              const ranked = rows
+                .map(s => ({ ...s, spend: spendMap[s.id] || 0 }))
+                .filter(s => s.spend > 0)
+                .sort((a,b) => b.spend - a.spend)
+                .slice(0, 6)
+              const maxSpend = ranked[0]?.spend || 1
+              const BAR_COLORS = ['#6366F1','#8B5CF6','#EC4899','#F59E0B','#10B981','#3B82F6']
+              if (ranked.length === 0) return (
+                <div style={{ textAlign:'center', padding:'24px 0', color:'var(--text-muted)', fontSize:13 }}>
+                  ยังไม่มีข้อมูลรายจ่ายที่ระบุซัพพลายเออร์
                 </div>
-                <Stars n={s.rating||3} />
-              </div>
-            ))}
+              )
+              return ranked.map((s, i) => (
+                <div key={s.id}>
+                  <div style={{ display:'flex', justifyContent:'space-between', marginBottom:4 }}>
+                    <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+                      <div style={{ width:18, height:18, borderRadius:'50%', background:BAR_COLORS[i]||'#94A3B8', color:'#fff', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, flexShrink:0 }}>{i+1}</div>
+                      <span style={{ fontSize:12, fontWeight:700 }}>{s.name}</span>
+                      <span style={{ fontSize:10, color:'var(--text-muted)' }}>{s.category}</span>
+                    </div>
+                    <span style={{ fontSize:12, fontWeight:800, color:BAR_COLORS[i]||'#94A3B8' }}>฿{s.spend.toLocaleString()}</span>
+                  </div>
+                  <div style={{ height:8, borderRadius:99, background:'var(--border)', overflow:'hidden' }}>
+                    <div style={{ height:'100%', width:`${(s.spend/maxSpend)*100}%`, background:BAR_COLORS[i]||'#94A3B8', borderRadius:99, transition:'width .5s ease' }} />
+                  </div>
+                </div>
+              ))
+            })()}
           </div>
         </div>
       </div>
@@ -172,22 +229,29 @@ export default function SupplierPage() {
           <div style={{ overflowX:'auto' }}>
             <table>
               <thead>
-                <tr><th>รหัส</th><th>ชื่อบริษัท</th><th>หมวดหมู่</th><th>ผู้ติดต่อ</th><th>เบอร์โทร</th><th>เลขภาษี</th><th>คะแนน</th></tr>
+                <tr><th>รหัส</th><th>ชื่อบริษัท</th><th>หมวดหมู่</th><th>ผู้ติดต่อ</th><th>เบอร์โทร</th><th>เลขภาษี</th><th>ยอดซื้อ (฿)</th><th></th></tr>
               </thead>
               <tbody>
                 {filtered.map(s=>(
-                  <tr key={s.id} className="row-link">
+                  <tr key={s.id} style={{ background: editId===s.id ? 'var(--primary-light, #eff6ff)' : undefined }}>
                     <td style={{ color:'var(--primary)', fontFamily:'monospace', fontWeight:700 }}>{s.code}</td>
                     <td style={{ fontWeight:700 }}>{s.name}</td>
                     <td><span className="badge badge-gray">{s.category}</span></td>
                     <td style={{ color:'var(--text-muted)' }}>{s.contact||'—'}</td>
                     <td style={{ fontFamily:'monospace', fontSize:12 }}>{s.phone||'—'}</td>
                     <td style={{ fontFamily:'monospace', fontSize:11, color:'var(--text-muted)' }}>{s.tax_id||'—'}</td>
-                    <td><Stars n={s.rating||3} /></td>
+                    <td style={{ fontFamily:'monospace', fontSize:12, fontWeight:700, color: spendMap[s.id] ? 'var(--primary)' : 'var(--text-muted)' }}>
+                      {spendMap[s.id] ? '฿'+spendMap[s.id].toLocaleString() : '—'}
+                    </td>
+                    <td>
+                      <button onClick={()=>startEdit(s)}
+                        style={{ background:'none', border:'none', cursor:'pointer', fontSize:14, padding:'2px 6px', color:'var(--primary)', borderRadius:4 }}
+                        title="แก้ไข">✏️</button>
+                    </td>
                   </tr>
                 ))}
                 {filtered.length===0 && (
-                  <tr><td colSpan={7} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
+                  <tr><td colSpan={8} style={{ textAlign:'center', padding:40, color:'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
                 )}
               </tbody>
             </table>
