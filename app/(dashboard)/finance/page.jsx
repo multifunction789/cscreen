@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getTransactions, insertTransaction, getInvoices, getSuppliers, getSetting, upsertSetting } from '@/lib/db'
+import { getTransactions, insertTransaction, updateTransaction, deleteTransaction, getInvoices, getSuppliers, getSetting, upsertSetting } from '@/lib/db'
 import { fmtDate } from '@/lib/shop'
 import { todayStr, exportJpeg, uploadFile } from '@/lib/docUtils'
 import { supabase } from '@/lib/supabase'
@@ -23,6 +23,7 @@ export default function FinancePage() {
   const [showForm, setShowForm] = useState(false)
   const [form, setForm]         = useState(emptyForm)
   const [saving, setSaving]     = useState(false)
+  const [editId, setEditId]     = useState(null)
   // WHT tab
   const [whtFile, setWhtFile]   = useState({}) // {invId: File}
   const [whtUploading, setWhtUploading] = useState(null)
@@ -39,22 +40,48 @@ export default function FinancePage() {
   }
 
   async function handleSave() {
-    if (!form.description||!form.amount) return
+    if (!form.description || !form.amount) return
     setSaving(true)
-    const code = 'TX-' + Date.now()
-    const { error } = await insertTransaction({
-      code,
-      description: form.description,
-      type:        form.type,
-      category:    form.category || null,
-      amount:      parseFloat(form.amount),
+    const payload = {
+      description:      form.description,
+      type:             form.type,
+      category:         form.category      || null,
+      amount:           parseFloat(form.amount),
       transaction_date: form.transaction_date,
-      invoice_id:  form.invoice_id  || null,
-      supplier_id: form.supplier_id || null,
-      note:        form.note        || null,
-    })
-    if (error) console.error('insertTransaction error:', error)
+      invoice_id:       form.invoice_id    || null,
+      supplier_id:      form.supplier_id   || null,
+      note:             form.note          || null,
+    }
+    if (editId) {
+      await updateTransaction(editId, payload)
+      setEditId(null)
+    } else {
+      const { error } = await insertTransaction({ ...payload, code: 'TX-' + Date.now() })
+      if (error) console.error('insertTransaction error:', error)
+    }
     setForm(emptyForm); setShowForm(false); setSaving(false)
+    load()
+  }
+
+  function startEdit(t) {
+    setEditId(t.id)
+    setForm({
+      description:      t.description      || '',
+      type:             t.type             || 'รายรับ',
+      category:         t.category         || '',
+      amount:           t.amount           || '',
+      transaction_date: t.transaction_date || todayStr(),
+      invoice_id:       t.invoice_id       || '',
+      supplier_id:      t.supplier_id      || '',
+      note:             t.note             || '',
+    })
+    setShowForm(true)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  async function handleDelete(t) {
+    if (!confirm(`ลบรายการ "${t.description}" ใช่ไหม?`)) return
+    await deleteTransaction(t.id)
     load()
   }
 
@@ -133,8 +160,8 @@ export default function FinancePage() {
           ))}
         </div>
         {['all','income','expense'].includes(tab) && (
-          <button className="btn btn-primary" onClick={()=>setShowForm(!showForm)}>
-            {showForm?'✕ ปิด':'+ เพิ่มรายการ'}
+          <button className="btn btn-primary" onClick={()=>{ setShowForm(!showForm); if (showForm) { setEditId(null); setForm(emptyForm) } }}>
+            {showForm ? '✕ ปิด' : '+ เพิ่มรายการ'}
           </button>
         )}
       </div>
@@ -142,7 +169,7 @@ export default function FinancePage() {
       {/* Add form */}
       {showForm && ['all','income','expense'].includes(tab) && (
         <div className="card" style={{ padding:20 }}>
-          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>➕ เพิ่มรายการ</div>
+          <div style={{ fontSize:14, fontWeight:700, marginBottom:14 }}>{editId ? '✏️ แก้ไขรายการ' : '➕ เพิ่มรายการ'}</div>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
             <div style={{ display:'flex', flexDirection:'column', gap:4, gridColumn:'1 / -1' }}>
               <label>รายการ *</label>
@@ -211,9 +238,9 @@ export default function FinancePage() {
           </div>
           <div style={{ display:'flex', gap:8, marginTop:14 }}>
             <button className="btn btn-primary btn-sm" onClick={handleSave} disabled={saving}>
-              {saving?'กำลังบันทึก...':'💾 บันทึก'}
+              {saving ? 'กำลังบันทึก...' : editId ? '💾 บันทึกการแก้ไข' : '💾 บันทึก'}
             </button>
-            <button className="btn btn-outline btn-sm" onClick={()=>setShowForm(false)}>ยกเลิก</button>
+            <button className="btn btn-outline btn-sm" onClick={()=>{ setShowForm(false); setEditId(null); setForm(emptyForm) }}>ยกเลิก</button>
           </div>
         </div>
       )}
@@ -298,7 +325,7 @@ export default function FinancePage() {
               <div style={{ overflowX:'auto' }}>
                 <table>
                   <thead>
-                    <tr><th>วันที่</th><th>รายการ</th><th>หมวด</th><th>ประเภท</th><th>จำนวน</th><th>Invoice</th><th>Supplier</th><th>หมายเหตุ</th></tr>
+                    <tr><th>วันที่</th><th>รายการ</th><th>หมวด</th><th>ประเภท</th><th>จำนวน</th><th>Invoice</th><th>Supplier</th><th>หมายเหตุ</th><th></th></tr>
                   </thead>
                   <tbody>
                     {filtered.map(t=>(
@@ -313,6 +340,12 @@ export default function FinancePage() {
                         <td style={{ fontSize:12, color:'var(--info)' }}>{t.invoices?.code||'—'}</td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{t.suppliers?.name||'—'}</td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{t.note||'—'}</td>
+                        <td style={{ whiteSpace:'nowrap' }}>
+                          <button className="btn btn-outline btn-sm" style={{ marginRight:4 }}
+                            onClick={()=>startEdit(t)}>✏️</button>
+                          <button className="btn btn-outline btn-sm" style={{ color:'var(--danger)', borderColor:'var(--danger)' }}
+                            onClick={()=>handleDelete(t)}>ลบ</button>
+                        </td>
                       </tr>
                     ))}
                     {filtered.length===0 && (
