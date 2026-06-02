@@ -8,7 +8,7 @@ import dynamic from 'next/dynamic'
 const ExpenseChart = dynamic(() => import('@/components/charts/ExpenseChart'), { ssr: false, loading: () => <div style={{height:280}} /> })
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
-const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
+const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าผ้า','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
 const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','งานสกรีน','เสื้อพิมพ์ลาย','อื่น ๆ']
 const emptyForm = { description:'', type:'รายรับ', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', supplier_id:'', note:'' }
 
