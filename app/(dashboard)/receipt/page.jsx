@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getReceipts, updateReceipt, insertTransaction } from '@/lib/db'
+import { getReceipts, updateReceipt, deleteReceipt, insertTransaction } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -88,6 +88,13 @@ export default function ReceiptPage() {
     load()
   }
 
+  async function handleDelete(r) {
+    if (!confirm(`ลบใบเสร็จ ${r.code} ใช่ไหม?\n\nใบแจ้งหนี้ที่เชื่อมอยู่จะสามารถออกใบเสร็จใหม่ได้`)) return
+    await deleteReceipt(r.id)
+    if (view?.id === r.id) setView(null)
+    load()
+  }
+
   const filtered = rows.filter(r => {
     const ms = r.code?.includes(search) || r.customers?.name?.includes(search) || r.invoices?.code?.includes(search)
     const mf = filterPaid === '' || (filterPaid === 'paid' ? r.paid : !r.paid)
@@ -113,6 +120,8 @@ export default function ReceiptPage() {
         {/* ── TOOLBAR ── */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
           <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+            <button className="btn btn-outline" style={{ color:'var(--danger)', borderColor:'var(--danger)' }}
+              onClick={() => handleDelete(view)}>🗑️ ลบใบเสร็จ</button>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
             {!view.paid && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
@@ -486,6 +495,9 @@ export default function ReceiptPage() {
                             style={{ background: C.primary, borderColor: C.primary }}
                             onClick={() => setView(r)}>รับชำระ</button>
                         )}
+                        <button className="btn btn-outline btn-sm"
+                          style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
+                          onClick={() => handleDelete(r)}>ลบ</button>
                       </td>
                     </tr>
                   ))}
