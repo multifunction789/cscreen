@@ -10,7 +10,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าผ้า','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
 const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','ผ้ากีฬา','งานสกรีน','เสื้อพิมพ์ลาย','อื่น ๆ']
-const emptyForm = { description:'', type:'รายรับ', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', supplier_id:'', note:'' }
+const emptyForm = { description:'', type:'', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', supplier_id:'', note:'' }
 
 export default function FinancePage() {
   const [txs, setTxs]               = useState([])
@@ -40,7 +40,7 @@ export default function FinancePage() {
   }
 
   async function handleSave() {
-    if (!form.description || !form.amount) return
+    if (!form.description || !form.amount || !form.type) return
     setSaving(true)
     const payload = {
       description:      form.description,
@@ -67,7 +67,7 @@ export default function FinancePage() {
     setEditId(t.id)
     setForm({
       description:      t.description      || '',
-      type:             t.type             || 'รายรับ',
+      type:             t.type             || '',
       category:         t.category         || '',
       amount:           t.amount           || '',
       transaction_date: t.transaction_date || todayStr(),
@@ -178,8 +178,10 @@ export default function FinancePage() {
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <label>ประเภท</label>
-              <select value={form.type} onChange={e=>setForm({...form,type:e.target.value})}>
-                <option>รายรับ</option><option>รายจ่าย</option>
+              <select value={form.type} onChange={e=>setForm({...form,type:e.target.value,category:''})}>
+                <option value="">— เลือกประเภท —</option>
+                <option>รายรับ</option>
+                <option>รายจ่าย</option>
               </select>
             </div>
             {form.type==='รายรับ' && (
