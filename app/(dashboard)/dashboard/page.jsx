@@ -63,7 +63,7 @@ export default function DashboardPage() {
 
   // Top income categories from transactions (exclude ถุงผ้า)
   const EXCLUDED_CATS = ['ถุงผ้า']
-  const CAT_ICONS = { 'เสื้อยืด':'👕', 'เสื้อโปโล':'🏌️', 'เสื้อคนงาน':'🦺', 'งานสกรีน':'🖨️', 'เสื้อพิมพ์ลาย':'🎨', 'อื่น ๆ':'📦' }
+  const CAT_ICONS = { 'เสื้อยืด':'👕', 'เสื้อโปโล':'🏌️', 'เสื้อคนงาน':'🦺', 'ผ้ากีฬา':'🏃', 'งานสกรีน':'🖨️', 'เสื้อพิมพ์ลาย':'🎨', 'อื่น ๆ':'📦' }
 
   const bestSellersFromDB = (() => {
     if (!loaded) return [{ icon: '⏳', name: 'กำลังโหลด...', count: '—', val: '—', pct: 100 }]
