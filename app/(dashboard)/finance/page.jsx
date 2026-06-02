@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getTransactions, insertTransaction, getInvoices, getSetting, upsertSetting } from '@/lib/db'
+import { getTransactions, insertTransaction, getInvoices, getSuppliers, getSetting, upsertSetting } from '@/lib/db'
 import { fmtDate } from '@/lib/shop'
 import { todayStr, exportJpeg, uploadFile } from '@/lib/docUtils'
 import { supabase } from '@/lib/supabase'
@@ -10,12 +10,13 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
 const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','งานสกรีน','เสื้อพิมพ์ลาย','อื่น ๆ']
-const emptyForm = { description:'', type:'รายรับ', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', note:'' }
+const emptyForm = { description:'', type:'รายรับ', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', supplier_id:'', note:'' }
 
 export default function FinancePage() {
-  const [txs, setTxs]           = useState([])
-  const [invoices, setInvoices] = useState([])
-  const [expTypes, setExpTypes] = useState(DEFAULT_EXP_TYPES)
+  const [txs, setTxs]               = useState([])
+  const [invoices, setInvoices]     = useState([])
+  const [suppliers, setSuppliers]   = useState([])
+  const [expTypes, setExpTypes]     = useState(DEFAULT_EXP_TYPES)
   const [newType, setNewType]   = useState('')
   const [loading, setLoading]   = useState(true)
   const [tab, setTab]           = useState('all')
@@ -29,9 +30,10 @@ export default function FinancePage() {
   useEffect(()=>{ load() },[])
 
   async function load() {
-    const [tRes, iRes, etRes] = await Promise.all([getTransactions(), getInvoices(), getSetting('expense_types')])
+    const [tRes, iRes, sRes, etRes] = await Promise.all([getTransactions(), getInvoices(), getSuppliers(), getSetting('expense_types')])
     setTxs(tRes.data||[])
     setInvoices(iRes.data||[])
+    setSuppliers(sRes.data||[])
     if (etRes.data?.value) setExpTypes(etRes.data.value)
     setLoading(false)
   }
@@ -47,8 +49,9 @@ export default function FinancePage() {
       category:    form.category || null,
       amount:      parseFloat(form.amount),
       transaction_date: form.transaction_date,
-      invoice_id:  form.invoice_id || null,
-      note:        form.note || null,
+      invoice_id:  form.invoice_id  || null,
+      supplier_id: form.supplier_id || null,
+      note:        form.note        || null,
     })
     if (error) console.error('insertTransaction error:', error)
     setForm(emptyForm); setShowForm(false); setSaving(false)
@@ -184,6 +187,15 @@ export default function FinancePage() {
               <input type="date" value={form.transaction_date}
                 onChange={e=>setForm({...form,transaction_date:e.target.value})} />
             </div>
+            {form.type==='รายจ่าย' && (
+              <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
+                <label>Supplier (ถ้ามี)</label>
+                <select value={form.supplier_id} onChange={e=>setForm({...form,supplier_id:e.target.value})}>
+                  <option value="">— ไม่ระบุ —</option>
+                  {suppliers.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}
+                </select>
+              </div>
+            )}
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <label>ผูก Invoice (ถ้ามี)</label>
               <select value={form.invoice_id} onChange={e=>setForm({...form,invoice_id:e.target.value})}>
@@ -286,7 +298,7 @@ export default function FinancePage() {
               <div style={{ overflowX:'auto' }}>
                 <table>
                   <thead>
-                    <tr><th>วันที่</th><th>รายการ</th><th>หมวด</th><th>ประเภท</th><th>จำนวน</th><th>Invoice</th><th>หมายเหตุ</th></tr>
+                    <tr><th>วันที่</th><th>รายการ</th><th>หมวด</th><th>ประเภท</th><th>จำนวน</th><th>Invoice</th><th>Supplier</th><th>หมายเหตุ</th></tr>
                   </thead>
                   <tbody>
                     {filtered.map(t=>(
@@ -299,6 +311,7 @@ export default function FinancePage() {
                           {t.type==='รายรับ'?'+':'-'}฿{(t.amount||0).toLocaleString()}
                         </td>
                         <td style={{ fontSize:12, color:'var(--info)' }}>{t.invoices?.code||'—'}</td>
+                        <td style={{ fontSize:12, color:'var(--text-muted)' }}>{t.suppliers?.name||'—'}</td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{t.note||'—'}</td>
                       </tr>
                     ))}
