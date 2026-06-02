@@ -9,7 +9,7 @@ const ExpenseChart = dynamic(() => import('@/components/charts/ExpenseChart'), {
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าผ้า','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
-const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','ผ้ากีฬา','งานสกรีน','เสื้อพิมพ์ลาย','อื่น ๆ']
+const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','ผ้ากีฬา','งานสกรีน','เสื้อพิมพ์ลาย','ปัก','อื่น ๆ']
 const emptyForm = { description:'', type:'', category:'', amount:'', transaction_date:todayStr(), invoice_id:'', supplier_id:'', note:'' }
 
 export default function FinancePage() {
