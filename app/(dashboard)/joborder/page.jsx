@@ -353,10 +353,6 @@ export default function JobOrderPage() {
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-outline" onClick={() => shareDoc({
-              title: `ใบงาน ${view.code}`,
-              text:  `ลูกค้า: ${cust.name || ''}\nรายการ: ${(view.item_desc||'').slice(0,80)}\nกำหนดส่ง: ${view.due_date ? fmtDate(view.due_date) : '-'}\n— C-Screen ${SHOP.tel}`
-            })}>🔗 แชร์</button>
             <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
             <button className="btn btn-outline" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
@@ -772,14 +768,6 @@ export default function JobOrderPage() {
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
                             <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
-                            <button className="btn btn-outline btn-sm"
-                              style={{ color: '#06C755', borderColor: '#06C755', fontSize: 11, padding: '3px 7px' }}
-                              title="แจ้งสถานะผ่าน LINE"
-                              onClick={() => {
-                                const cust = j.customers || {}
-                                const msg = `📋 C-Screen แจ้งสถานะงาน\n━━━━━━━━━━━━━━\nเลขที่: ${j.code}\nลูกค้า: ${cust.name || ''}\nสถานะ: ${j.status}\nรายการ: ${j.item_desc || ''}\nกำหนดส่ง: ${j.due_date ? new Date(j.due_date).toLocaleDateString('th-TH') : '-'}\n━━━━━━━━━━━━━━\n📞 ${SHOP.tel} | Line: ${SHOP.line}`
-                                window.open('https://line.me/R/msg/text/?' + encodeURIComponent(msg), '_blank')
-                              }}>LINE</button>
                             {j.status !== 'ส่งงานแล้ว' && (
                               <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
                             )}
