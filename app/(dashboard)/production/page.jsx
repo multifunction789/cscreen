@@ -13,6 +13,7 @@ const columns = [
   { id:'แพ็คพร้อมส่ง', label:'แพ็คพร้อมส่ง', color:'#10B981', bg:'#D1FAE5' },
   { id:'ส่งงานแล้ว',   label:'ส่งงานแล้ว',   color:'#6B7280', bg:'#F9FAFB' },
 ]
+const KANBAN_COLUMNS = columns.filter(c => c.id !== 'ส่งงานแล้ว')
 
 export default function ProductionPage() {
   const [jobs, setJobs]       = useState([])
@@ -85,7 +86,7 @@ export default function ProductionPage() {
       {/* KANBAN */}
       {view==='kanban' && (
         <div style={{ display:'flex', gap:12, overflowX:'auto', paddingBottom:8 }}>
-          {columns.map(col=>{
+          {KANBAN_COLUMNS.map(col=>{
             const colJobs = jobs.filter(j=>j.status===col.id)
             const isOver  = dragOver===col.id
             return (
@@ -134,7 +135,12 @@ export default function ProductionPage() {
                             {j.due_date ? fmtShort(j.due_date) : '—'}
                             {overdue && ' ⚠️'}
                           </span>
-                          <span style={{ fontSize:11, fontWeight:700, color:'var(--success)' }}>฿{(j.total||0).toLocaleString()}</span>
+                          <button
+                            title="ส่งงานแล้ว"
+                            onMouseDown={e => { e.stopPropagation(); moveJob(j.id, 'ส่งงานแล้ว') }}
+                            style={{ background:'none', border:'1px solid #10B981', borderRadius:6, color:'#10B981', fontSize:11, padding:'2px 7px', cursor:'pointer', fontWeight:700 }}>
+                            ✅ ส่งแล้ว
+                          </button>
                         </div>
                       </div>
                     )
