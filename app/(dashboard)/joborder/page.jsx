@@ -768,27 +768,30 @@ export default function JobOrderPage() {
                           {fmtDate(j.due_date)}
                         </td>
                         <td><span className={STATUS_BADGE[j.status] || 'badge badge-gray'}>{j.status}</span></td>
-                        <td style={{ display: 'flex', gap: 4 }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
-                          <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
-                          <button className="btn btn-outline btn-sm"
-                            style={{ color: '#06C755', borderColor: '#06C755', fontSize: 11, padding: '3px 7px' }}
-                            title="แจ้งสถานะผ่าน LINE"
-                            onClick={() => {
-                              const cust = j.customers || {}
-                              const msg = `📋 C-Screen แจ้งสถานะงาน\n━━━━━━━━━━━━━━\nเลขที่: ${j.code}\nลูกค้า: ${cust.name || ''}\nสถานะ: ${j.status}\nรายการ: ${j.item_desc || ''}\nกำหนดส่ง: ${j.due_date ? new Date(j.due_date).toLocaleDateString('th-TH') : '-'}\n━━━━━━━━━━━━━━\n📞 ${SHOP.tel} | Line: ${SHOP.line}`
-                              window.open('https://line.me/R/msg/text/?' + encodeURIComponent(msg), '_blank')
-                            }}>📱 LINE</button>
-                          {j.status !== 'ส่งงานแล้ว' && (
-                            <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
-                          )}
-                          {j.status !== 'ส่งงานแล้ว' && (() => {
-                            const idx = ALL_STATUS.indexOf(j.status)
-                            const next = ALL_STATUS[idx + 1]
-                            return next ? (
-                              <button className="btn btn-primary btn-sm" onClick={() => updateJobStatus(j.id, next).then(() => load())}>▶ {next}</button>
-                            ) : null
-                          })()}
+                        <td>
+                          <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                            <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
+                            <button className="btn btn-outline btn-sm"
+                              style={{ color: '#06C755', borderColor: '#06C755', fontSize: 11, padding: '3px 7px' }}
+                              title="แจ้งสถานะผ่าน LINE"
+                              onClick={() => {
+                                const cust = j.customers || {}
+                                const msg = `📋 C-Screen แจ้งสถานะงาน\n━━━━━━━━━━━━━━\nเลขที่: ${j.code}\nลูกค้า: ${cust.name || ''}\nสถานะ: ${j.status}\nรายการ: ${j.item_desc || ''}\nกำหนดส่ง: ${j.due_date ? new Date(j.due_date).toLocaleDateString('th-TH') : '-'}\n━━━━━━━━━━━━━━\n📞 ${SHOP.tel} | Line: ${SHOP.line}`
+                                window.open('https://line.me/R/msg/text/?' + encodeURIComponent(msg), '_blank')
+                              }}>LINE</button>
+                            {j.status !== 'ส่งงานแล้ว' && (
+                              <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
+                            )}
+                            {j.status !== 'ส่งงานแล้ว' && (() => {
+                              const idx = ALL_STATUS.indexOf(j.status)
+                              const next = ALL_STATUS[idx + 1]
+                              return next ? (
+                                <button className="btn btn-primary btn-sm" title={next}
+                                  onClick={() => updateJobStatus(j.id, next).then(() => load())}>▶</button>
+                              ) : null
+                            })()}
+                          </div>
                         </td>
                       </tr>
                     )
