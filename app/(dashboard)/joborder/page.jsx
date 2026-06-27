@@ -44,11 +44,12 @@ function readMatrix(j) {
       production_note: j.items.production_note || '',
       mockup_url:      j.items.mockup_url      || '',
       finish_photos:   j.items.finish_photos   || {},
+      drive_folders:   j.items.drive_folders   || null,
     }
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{} }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{}, drive_folders: null }
 }
 
 const emptyForm = () => ({
@@ -275,14 +276,19 @@ export default function JobOrderPage() {
     const custName   = customers.find(c => c.id === form.customer_id)?.name || 'unknown'
 
     // สร้าง / หา Drive folders
+    let jobFolderId     = null
     let artworkFolderId = null
     let mockupFolderId  = null
+    let finishFolderId  = null
     try {
       const folders = await createJobFoldersClient(jobCode, custName)
+      jobFolderId     = folders.jobFolderId
       artworkFolderId = folders.artworkFolderId
       mockupFolderId  = folders.mockupFolderId
+      finishFolderId  = folders.finishFolderId
     } catch (e) {
-      console.warn('Drive folder error (ข้ามได้):', e.message)
+      console.error('Drive folder error:', e.message)
+      alert('⚠️ สร้าง Folder ใน Drive ไม่สำเร็จ: ' + e.message)
     }
 
     // Upload artwork → Drive (ถ้ามี folder) หรือ Supabase (fallback)
@@ -328,7 +334,7 @@ export default function JobOrderPage() {
       production_note: form.production_note || null,
       mockup_url:      mockup_url           || null,
       finish_photos:   form.finish_photos   || null,
-      drive_folders:   artworkFolderId ? { artworkFolderId, mockupFolderId } : null,
+      drive_folders:   jobFolderId ? { jobFolderId, artworkFolderId, mockupFolderId, finishFolderId } : null,
     }
 
     const payload = {
@@ -367,7 +373,9 @@ export default function JobOrderPage() {
     // หา / สร้าง finish folder ใน Drive
     let savedPhotos = { ...photos }
     try {
-      const { finishFolderId } = await createJobFoldersClient(cameraJob.code, custName)
+      const { finishFolderId } = m.drive_folders?.finishFolderId
+        ? { finishFolderId: m.drive_folders.finishFolderId }
+        : await createJobFoldersClient(cameraJob.code, custName)
       const LABELS = { front: 'มุมตรง', back: 'มุมหลัง', side: 'มุมข้าง', group: 'รูปรวม' }
 
       // อัปโหลดทีละรูปที่ยังเป็น dataURL (ยังไม่เคยอัปขึ้น Drive)
@@ -476,8 +484,8 @@ export default function JobOrderPage() {
               <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>ใบงานการผลิต</div>
               <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, display:'flex', alignItems:'center', gap:8, justifyContent:'flex-end' }}>
                 {view.code}
-                {m.drive_folders?.artworkFolderId && (
-                  <a href={`https://drive.google.com/drive/folders/${m.drive_folders.artworkFolderId}`}
+                {m.drive_folders?.jobFolderId && (
+                  <a href={`https://drive.google.com/drive/folders/${m.drive_folders.jobFolderId}`}
                     target="_blank" rel="noreferrer"
                     title="เปิด Drive folder"
                     style={{ fontSize:12, textDecoration:'none', color:'#1a73e8', fontFamily:'sans-serif' }}>
