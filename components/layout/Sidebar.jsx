@@ -60,7 +60,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {} }
 
       {/* Logo */}
       <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #2A2A2A', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        <div style={{ width: 36, height: 36, background: 'var(--primary)', borderRadius: 8, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16, fontWeight: 900, color: '#fff', flexShrink: 0, letterSpacing: -1 }}>CS</div>
+        <img src="/cscreen-logo.png" alt="C-Screen" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
         {!collapsed && (
           <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 17, letterSpacing: .5 }}>CSCREEN</div>
