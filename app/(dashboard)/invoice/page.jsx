@@ -64,6 +64,8 @@ export default function InvoicePage() {
   const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(emptyForm())
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
+  const [custSearch, setCustSearch]   = useState('')
+  const [custOpen, setCustOpen]       = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -165,6 +167,7 @@ export default function InvoicePage() {
         : (inv.deposit_pct > 0 ? Math.round((inv.total||0) * (inv.deposit_pct||0) / 100) : ''),
       items: (inv.items||[{...emptyItem}]).map(it => ({ ...it, sizes: it.sizes || {} })),
     })
+    setCustSearch('')
     setShowForm(true)
     window.scrollTo({ top:0, behavior:'smooth' })
   }
@@ -607,12 +610,32 @@ export default function InvoicePage() {
 
           {/* Row 1 */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:10, marginBottom:10 }}>
-            <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:3, position:'relative' }}>
               <label>ลูกค้า *</label>
-              <select value={form.customer_id} onChange={e => setForm({...form, customer_id:e.target.value})}>
-                <option value="">— เลือกลูกค้า —</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <input
+                type="text"
+                placeholder="พิมพ์เพื่อค้นหาลูกค้า..."
+                value={custSearch || customers.find(c => c.id === form.customer_id)?.name || ''}
+                onFocus={() => { setCustSearch(''); setCustOpen(true) }}
+                onChange={e => { setCustSearch(e.target.value); setCustOpen(true); if (!e.target.value) setForm(f => ({...f, customer_id:''})) }}
+                onBlur={() => setTimeout(() => setCustOpen(false), 150)}
+                autoComplete="off"
+              />
+              {custOpen && (
+                <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#fff', border:'1px solid var(--border)', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,.12)', maxHeight:220, overflowY:'auto', marginTop:2 }}>
+                  {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).length === 0
+                    ? <div style={{ padding:'10px 12px', color:'var(--text-muted)', fontSize:13 }}>ไม่พบลูกค้า</div>
+                    : customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => { setForm(f => ({...f, customer_id:c.id})); setCustSearch(''); setCustOpen(false) }}
+                          style={{ padding:'8px 12px', cursor:'pointer', fontSize:13, borderBottom:'1px solid var(--border)', background: form.customer_id===c.id ? 'var(--bg)' : '#fff' }}
+                          onMouseEnter={e => e.currentTarget.style.background='var(--bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background= form.customer_id===c.id ? 'var(--bg)' : '#fff'}
+                        >{c.name}{c.phone ? <span style={{ color:'var(--text-muted)', marginLeft:8, fontSize:11 }}>{c.phone}</span> : null}</div>
+                      ))
+                  }
+                </div>
+              )}
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
               <label>วันที่เอกสาร</label>
@@ -784,7 +807,7 @@ export default function InvoicePage() {
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'กำลังบันทึก...' : '💾 บันทึกใบแจ้งหนี้'}
             </button>
-            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()) }}>ยกเลิก</button>
+            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); setCustSearch('') }}>ยกเลิก</button>
           </div>
         </div>
       )}

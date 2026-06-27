@@ -73,6 +73,8 @@ export default function QuotationPage() {
   const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
+  const [custSearch, setCustSearch] = useState('')
+  const [custOpen, setCustOpen]     = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -124,14 +126,16 @@ export default function QuotationPage() {
       total, notes: form.notes, status: 'รออนุมัติ',
     }
     if (editId) {
-      await updateQuotation(editId, payload)
+      const { error } = await updateQuotation(editId, payload)
+      if (error) { alert('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
       setEditId(null)
     } else {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('QT-', '') || '0'); return n > max ? n : max
       }, 0)
       const code = 'QT-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
-      await insertQuotation({ ...payload, code })
+      const { error } = await insertQuotation({ ...payload, code })
+      if (error) { alert('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
     load()
@@ -150,6 +154,7 @@ export default function QuotationPage() {
       notes: qt.notes || '', vat_pct: qt.vat_pct || 0, discount: qt.discount || 0,
       items: (qt.items && qt.items.length ? qt.items : [{ desc: qt.item_desc || '', qty: 1, price: qt.total, amount: qt.total }]).map(it => ({ ...it, sizes: it.sizes || {} })),
     })
+    setCustSearch('')
     setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -502,12 +507,32 @@ export default function QuotationPage() {
 
           {/* Row 1 */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 10, marginBottom: 10 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 3, position: 'relative' }}>
               <label>ลูกค้า *</label>
-              <select value={form.customer_id} onChange={e => setForm({ ...form, customer_id: e.target.value })}>
-                <option value="">— เลือกลูกค้า —</option>
-                {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-              </select>
+              <input
+                type="text"
+                placeholder="พิมพ์เพื่อค้นหาลูกค้า..."
+                value={custSearch || customers.find(c => c.id === form.customer_id)?.name || ''}
+                onFocus={() => { setCustSearch(''); setCustOpen(true) }}
+                onChange={e => { setCustSearch(e.target.value); setCustOpen(true); if (!e.target.value) setForm(f => ({...f, customer_id:''})) }}
+                onBlur={() => setTimeout(() => setCustOpen(false), 150)}
+                autoComplete="off"
+              />
+              {custOpen && (
+                <div style={{ position:'absolute', top:'100%', left:0, right:0, zIndex:100, background:'#fff', border:'1px solid var(--border)', borderRadius:8, boxShadow:'0 4px 16px rgba(0,0,0,.12)', maxHeight:220, overflowY:'auto', marginTop:2 }}>
+                  {customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).length === 0
+                    ? <div style={{ padding:'10px 12px', color:'var(--text-muted)', fontSize:13 }}>ไม่พบลูกค้า</div>
+                    : customers.filter(c => !custSearch || c.name.toLowerCase().includes(custSearch.toLowerCase())).map(c => (
+                        <div key={c.id}
+                          onMouseDown={() => { setForm(f => ({...f, customer_id:c.id})); setCustSearch(''); setCustOpen(false) }}
+                          style={{ padding:'8px 12px', cursor:'pointer', fontSize:13, borderBottom:'1px solid var(--border)', background: form.customer_id===c.id ? 'var(--bg)' : '#fff' }}
+                          onMouseEnter={e => e.currentTarget.style.background='var(--bg)'}
+                          onMouseLeave={e => e.currentTarget.style.background= form.customer_id===c.id ? 'var(--bg)' : '#fff'}
+                        >{c.name}{c.phone ? <span style={{ color:'var(--text-muted)', marginLeft:8, fontSize:11 }}>{c.phone}</span> : null}</div>
+                      ))
+                  }
+                </div>
+              )}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <label>วันที่เอกสาร</label>
@@ -622,7 +647,7 @@ export default function QuotationPage() {
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
               {saving ? 'กำลังบันทึก...' : '💾 บันทึกใบเสนอราคา'}
             </button>
-            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()) }}>ยกเลิก</button>
+            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()); setCustSearch('') }}>ยกเลิก</button>
           </div>
         </div>
       )}
