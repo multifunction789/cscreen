@@ -85,7 +85,7 @@ export default function ProductionPage() {
 
       {/* KANBAN */}
       {view==='kanban' && (
-        <div style={{ display:'flex', gap:12, overflowX:'auto', paddingBottom:8 }}>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(6,1fr)', gap:10, minWidth:0 }}>
           {KANBAN_COLUMNS.map(col=>{
             const colJobs = jobs.filter(j=>j.status===col.id)
             const isOver  = dragOver===col.id
@@ -95,22 +95,22 @@ export default function ProductionPage() {
                 onDrop={e=>onDrop(e,col.id)}
                 onDragLeave={()=>setDragOver(null)}
                 style={{
-                  minWidth:190, flex:'0 0 190px', display:'flex', flexDirection:'column',
+                  minWidth:0, display:'flex', flexDirection:'column',
                   borderRadius:'var(--radius)', border:`2px solid ${isOver?col.color:'var(--border)'}`,
                   background: isOver?col.bg:'var(--card)', boxShadow:'var(--shadow)',
                   transition:'border-color .15s, background .15s',
                 }}>
                 {/* Column header */}
-                <div style={{ padding:'10px 12px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <div style={{ display:'flex', alignItems:'center', gap:6 }}>
-                    <div style={{ width:8, height:8, borderRadius:'50%', background:col.color, flexShrink:0 }} />
-                    <span style={{ fontSize:12, fontWeight:700, color:col.color }}>{col.label}</span>
+                <div style={{ padding:'9px 10px', borderBottom:`2px solid ${col.color}30`, display:'flex', alignItems:'center', justifyContent:'space-between', background:col.bg }}>
+                  <div style={{ display:'flex', alignItems:'center', gap:5 }}>
+                    <div style={{ width:7, height:7, borderRadius:'50%', background:col.color, flexShrink:0 }} />
+                    <span style={{ fontSize:11, fontWeight:800, color:col.color }}>{col.label}</span>
                   </div>
-                  <span style={{ fontSize:11, fontWeight:700, background:col.bg, color:col.color, padding:'1px 7px', borderRadius:20 }}>{colJobs.length}</span>
+                  <span style={{ fontSize:11, fontWeight:800, background:'#fff', color:col.color, padding:'1px 6px', borderRadius:20, border:`1px solid ${col.color}40` }}>{colJobs.length}</span>
                 </div>
 
                 {/* Cards */}
-                <div style={{ padding:8, display:'flex', flexDirection:'column', gap:6, flex:1, minHeight:60 }}>
+                <div style={{ padding:7, display:'flex', flexDirection:'column', gap:5, flex:1, minHeight:80 }}>
                   {colJobs.map(j=>{
                     const overdue = j.due_date && new Date(j.due_date)<new Date()
                     return (
@@ -119,34 +119,36 @@ export default function ProductionPage() {
                         onDragStart={e=>onDragStart(e,j.id)}
                         onDragEnd={onDragEnd}
                         style={{
-                          padding:'10px 10px 8px',
-                          background:'#fff', borderRadius:8,
-                          border:`1px solid ${overdue?'var(--danger)':'var(--border)'}`,
-                          boxShadow:'0 1px 3px rgba(0,0,0,.06)',
+                          padding:'8px 9px',
+                          background:'#fff', borderRadius:7,
+                          border:`1px solid ${overdue?'#FECACA':'var(--border)'}`,
+                          borderLeft:`3px solid ${overdue?'var(--danger)':col.color}`,
+                          boxShadow:'0 1px 3px rgba(0,0,0,.05)',
                           cursor:'grab', userSelect:'none',
-                          opacity: dragId===j.id ? .5 : 1,
+                          opacity: dragId===j.id ? .4 : 1,
                           transition:'opacity .15s',
                         }}>
-                        <div style={{ fontSize:11, fontWeight:700, color:'var(--primary)', fontFamily:'monospace' }}>{j.code}</div>
-                        <div style={{ fontSize:12, fontWeight:600, color:'var(--text)', margin:'2px 0' }}>{j.customers?.name||'—'}</div>
-                        <div style={{ fontSize:11, color:'var(--text-muted)', marginBottom:6, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{j.item_desc}</div>
-                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                          <span style={{ fontSize:11, fontWeight:700, color: overdue?'var(--danger)':'var(--text-muted)' }}>
-                            {j.due_date ? fmtShort(j.due_date) : '—'}
-                            {overdue && ' ⚠️'}
+                        <div style={{ fontSize:10, fontWeight:700, color:'var(--primary)', fontFamily:'monospace', marginBottom:2 }}>{j.code}</div>
+                        <div style={{ fontSize:12, fontWeight:700, color:'var(--text)', lineHeight:1.3, marginBottom:3 }}>{j.customers?.name||'—'}</div>
+                        {j.item_desc && (
+                          <div style={{ fontSize:10, color:'var(--text-muted)', marginBottom:5, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{j.item_desc}</div>
+                        )}
+                        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:4 }}>
+                          <span style={{ fontSize:10, fontWeight:600, color: overdue?'var(--danger)':'var(--text-muted)' }}>
+                            {j.due_date ? fmtShort(j.due_date) : '—'}{overdue && ' ⚠️'}
                           </span>
                           <button
                             title="ส่งงานแล้ว"
                             onMouseDown={e => { e.stopPropagation(); moveJob(j.id, 'ส่งงานแล้ว') }}
-                            style={{ background:'none', border:'1px solid #10B981', borderRadius:6, color:'#10B981', fontSize:11, padding:'2px 7px', cursor:'pointer', fontWeight:700 }}>
-                            ✅ ส่งแล้ว
+                            style={{ background:'#D1FAE5', border:'none', borderRadius:5, color:'#065F46', fontSize:10, padding:'2px 6px', cursor:'pointer', fontWeight:700, flexShrink:0 }}>
+                            ✅
                           </button>
                         </div>
                       </div>
                     )
                   })}
                   {colJobs.length===0 && (
-                    <div style={{ textAlign:'center', padding:'16px 0', color:'var(--text-muted)', fontSize:11 }}>ว่าง</div>
+                    <div style={{ textAlign:'center', padding:'20px 0', color:'var(--text-muted)', fontSize:11, opacity:.5 }}>ว่าง</div>
                   )}
                 </div>
               </div>
