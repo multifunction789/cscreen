@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import CameraCapture from '@/components/ui/CameraCapture'
+import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 
 const STATUS_BADGE = {
   'รอมัดจำ'      : 'badge badge-gray',
@@ -41,11 +43,12 @@ function readMatrix(j) {
       screen_color:    j.items.screen_color    || '',
       production_note: j.items.production_note || '',
       mockup_url:      j.items.mockup_url      || '',
+      finish_photos:   j.items.finish_photos   || {},
     }
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'' }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{} }
 }
 
 const emptyForm = () => ({
@@ -54,6 +57,7 @@ const emptyForm = () => ({
   artwork_url: '', mockup_url: '',
   sizes: [...DEFAULT_SIZES],
   prod_items: [makeRow(DEFAULT_SIZES)],
+  finish_photos: {},
 })
 
 function SectionHeader({ icon, title }) {
@@ -177,9 +181,12 @@ export default function JobOrderPage() {
   const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
   const [artworkFile, setArtworkFile]   = useState(null)
   const [artworkPreview, setArtworkPreview] = useState(null)
-  const [mockupFile, setMockupFile]     = useState(null)
+  const [mockupFile, setMockupFile]         = useState(null)
   const [mockupPreview, setMockupPreview]   = useState(null)
+  const [artworkSourceFile, setArtworkSourceFile] = useState(null)  // .ai / .psd
+  const [mockupSourceFile,  setMockupSourceFile]  = useState(null)  // .ai / .psd
   const [newSizeInput, setNewSizeInput] = useState('')
+  const [cameraJob,   setCameraJob]   = useState(null)  // job ที่กำลังถ่ายรูปงานเสร็จ
   const printRef = useRef(null)
 
   useEffect(() => { load() }, [])
@@ -258,17 +265,59 @@ export default function JobOrderPage() {
     if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
     setSaving(true)
 
-    // Upload artwork / mockup
+    // คำนวณ job code ก่อน (ต้องใช้ก่อนสร้าง folder)
+    const maxNum = rows.reduce((max, r) => {
+      const n = parseInt(r.code?.replace('JO-', '') || '0'); return n > max ? n : max
+    }, 0)
+    const jobCode    = editId
+      ? (rows.find(r => r.id === editId)?.code || 'JO-EDIT')
+      : 'JO-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
+    const custName   = customers.find(c => c.id === form.customer_id)?.name || 'unknown'
+
+    // สร้าง / หา Drive folders
+    let artworkFolderId = null
+    let mockupFolderId  = null
+    try {
+      const folders = await createJobFoldersClient(jobCode, custName)
+      artworkFolderId = folders.artworkFolderId
+      mockupFolderId  = folders.mockupFolderId
+    } catch (e) {
+      console.warn('Drive folder error (ข้ามได้):', e.message)
+    }
+
+    // Upload artwork → Drive (ถ้ามี folder) หรือ Supabase (fallback)
     let artwork_url = form.artwork_url || null
     let mockup_url  = form.mockup_url  || null
-    if (artworkFile) artwork_url = await uploadFile(supabase, 'job-images', artworkFile)
-    if (mockupFile)  mockup_url  = await uploadFile(supabase, 'job-images', mockupFile)
+    try {
+      if (artworkFile && artworkFolderId) {
+        const r = await uploadFileClient(artworkFile, artworkFolderId, `artwork_${Date.now()}.${artworkFile.name.split('.').pop()}`)
+        artwork_url = r.directUrl
+      } else if (artworkFile) {
+        artwork_url = await uploadFile(supabase, 'job-images', artworkFile)
+      }
+
+      if (mockupFile && mockupFolderId) {
+        const r = await uploadFileClient(mockupFile, mockupFolderId, `mockup_${Date.now()}.${mockupFile.name.split('.').pop()}`)
+        mockup_url = r.directUrl
+      } else if (mockupFile) {
+        mockup_url = await uploadFile(supabase, 'job-images', mockupFile)
+      }
+
+      // อัปโหลดไฟล์ต้นฉบับ .ai / .psd → Drive (ไม่มี fallback เพราะ Supabase ไม่เหมาะกับไฟล์ใหญ่)
+      if (artworkSourceFile && artworkFolderId) {
+        await uploadFileClient(artworkSourceFile, artworkFolderId, artworkSourceFile.name)
+      }
+      if (mockupSourceFile && mockupFolderId) {
+        await uploadFileClient(mockupSourceFile, mockupFolderId, mockupSourceFile.name)
+      }
+    } catch (e) {
+      console.warn('Upload error:', e.message)
+    }
 
     // Summary for list view
     const validRows = form.prod_items.filter(r => r.style)
     const item_desc = validRows.map(r => r.style).join(', ') || '—'
 
-    // Store everything inside items jsonb (no new DB columns needed)
     const itemsPayload = {
       type:            'size_matrix',
       sizes:           form.sizes,
@@ -278,6 +327,8 @@ export default function JobOrderPage() {
       screen_color:    form.screen_color    || null,
       production_note: form.production_note || null,
       mockup_url:      mockup_url           || null,
+      finish_photos:   form.finish_photos   || null,
+      drive_folders:   artworkFolderId ? { artworkFolderId, mockupFolderId } : null,
     }
 
     const payload = {
@@ -296,17 +347,63 @@ export default function JobOrderPage() {
       await updateJobOrder(editId, payload)
       setEditId(null)
     } else {
-      const maxNum = rows.reduce((max, r) => {
-        const n = parseInt(r.code?.replace('JO-', '') || '0'); return n > max ? n : max
-      }, 0)
-      await insertJobOrder({ ...payload, code: 'JO-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0') })
+      await insertJobOrder({ ...payload, code: jobCode })
     }
 
     setForm(emptyForm())
-    setArtworkFile(null); setArtworkPreview(null)
-    setMockupFile(null);  setMockupPreview(null)
+    setArtworkFile(null);       setArtworkPreview(null)
+    setMockupFile(null);        setMockupPreview(null)
+    setArtworkSourceFile(null); setMockupSourceFile(null)
     setShowForm(false); setSaving(false)
     load()
+  }
+
+  // ── บันทึกรูปงานเสร็จจาก camera modal ─────────────────────────
+  async function handleCameraSave(photos) {
+    if (!cameraJob) return
+    const m        = readMatrix(cameraJob)
+    const custName = customers.find(c => c.id === cameraJob.customer_id)?.name || 'unknown'
+
+    // หา / สร้าง finish folder ใน Drive
+    let savedPhotos = { ...photos }
+    try {
+      const { finishFolderId } = await createJobFoldersClient(cameraJob.code, custName)
+      const LABELS = { front: 'มุมตรง', back: 'มุมหลัง', side: 'มุมข้าง', group: 'รูปรวม' }
+
+      // อัปโหลดทีละรูปที่ยังเป็น dataURL (ยังไม่เคยอัปขึ้น Drive)
+      for (const [key, val] of Object.entries(photos)) {
+        if (val && val.startsWith('data:')) {
+          const result = await uploadDataUrlClient(
+            val,
+            finishFolderId,
+            `${cameraJob.code}_${LABELS[key] || key}_${Date.now()}.jpg`
+          )
+          savedPhotos[key] = result.directUrl
+        }
+      }
+    } catch (e) {
+      console.warn('Drive upload error (เก็บ dataURL แทน):', e.message)
+    }
+
+    const itemsPayload = {
+      type:            'size_matrix',
+      sizes:           m.sizes,
+      rows:            m.prod_items,
+      fabric_type:     m.fabric_type     || null,
+      shirt_color:     m.shirt_color     || null,
+      screen_color:    m.screen_color    || null,
+      production_note: m.production_note || null,
+      mockup_url:      m.mockup_url      || null,
+      finish_photos:   savedPhotos,
+      drive_folders:   m.drive_folders   || null,
+    }
+    await updateJobOrder(cameraJob.id, { items: itemsPayload })
+    setCameraJob(null)
+    load()
+    // อัปเดต view ถ้ากำลังดูอยู่
+    if (view && view.id === cameraJob.id) {
+      setView(v => ({ ...v, items: itemsPayload }))
+    }
   }
 
   async function handleDelete(j) {
@@ -325,6 +422,7 @@ export default function JobOrderPage() {
       status:          j.status,
       artwork_url:     j.image_url   || '',
       ...m,
+      finish_photos:   m.finish_photos || {},
     })
     setArtworkFile(null); setArtworkPreview(null)
     setMockupFile(null);  setMockupPreview(null)
@@ -346,14 +444,21 @@ export default function JobOrderPage() {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
     const inv  = invoices.find(i => i.id === view.invoice_id)
     const m    = readMatrix(view)
-    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url } = m
+    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos } = m
+    const FINISH_SLOTS = [
+      { key: 'front', label: 'มุมตรง' },
+      { key: 'back',  label: 'มุมหลัง' },
+      { key: 'side',  label: 'มุมข้าง' },
+      { key: 'group', label: 'รูปรวม' },
+    ]
 
     return (
       <div style={{ maxWidth: 900, margin: '0 auto', padding: 24 }}>
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
           <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
           <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
+            <button className="btn btn-outline" onClick={() => setCameraJob(view)}>📷 ถ่ายรูปงาน</button>
+            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖼️ JPEG</button>
             <button className="btn btn-outline" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
@@ -369,7 +474,17 @@ export default function JobOrderPage() {
             </div>
             <div style={{ textAlign: 'right' }}>
               <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>ใบงานการผลิต</div>
-              <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{view.code}</div>
+              <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, display:'flex', alignItems:'center', gap:8, justifyContent:'flex-end' }}>
+                {view.code}
+                {m.drive_folders?.artworkFolderId && (
+                  <a href={`https://drive.google.com/drive/folders/${m.drive_folders.artworkFolderId}`}
+                    target="_blank" rel="noreferrer"
+                    title="เปิด Drive folder"
+                    style={{ fontSize:12, textDecoration:'none', color:'#1a73e8', fontFamily:'sans-serif' }}>
+                    📁 Drive
+                  </a>
+                )}
+              </div>
               {inv && <div style={{ fontSize: 11, color: '#888' }}>อ้างอิง: {inv.code}</div>}
               <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>วันที่: {fmtDate(view.document_date || view.created_at)}</div>
               {view.due_date && <div style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 700 }}>กำหนดส่ง: {fmtDate(view.due_date)}</div>}
@@ -382,6 +497,26 @@ export default function JobOrderPage() {
             <div style={{ fontSize: 14, fontWeight: 700 }}>{cust.name || view.customers?.name || '—'}</div>
             {cust.phone && <div style={{ fontSize: 12, color: '#666' }}>Tel: {cust.phone}</div>}
           </div>
+
+          {/* Artwork + Mockup — แสดงก่อน size matrix */}
+          {(view.image_url || mockup_url) && (
+            <div style={{ display: 'grid', gridTemplateColumns: view.image_url && mockup_url ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
+              {view.image_url && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#374151', padding: '4px 10px', letterSpacing: .5 }}>ARTWORK</div>
+                  <img src={view.image_url} alt="artwork" crossOrigin="anonymous"
+                    style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+                </div>
+              )}
+              {mockup_url && (
+                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#374151', padding: '4px 10px', letterSpacing: .5 }}>MOCKUP</div>
+                  <img src={mockup_url} alt="mockup" crossOrigin="anonymous"
+                    style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Production Info badges */}
           {(fabric_type || shirt_color || screen_color) && (
@@ -440,23 +575,6 @@ export default function JobOrderPage() {
             </table>
           </div>
 
-          {/* Artwork / Mockup */}
-          {(view.image_url || mockup_url) && (
-            <div style={{ display: 'flex', gap: 16, marginBottom: 16, flexWrap: 'wrap' }}>
-              {view.image_url && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>ARTWORK</div>
-                  <img src={view.image_url} alt="artwork" style={{ maxHeight: 160, maxWidth: 220, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'contain' }} />
-                </div>
-              )}
-              {mockup_url && (
-                <div>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 6 }}>MOCKUP</div>
-                  <img src={mockup_url} alt="mockup" style={{ maxHeight: 160, maxWidth: 220, borderRadius: 6, border: '1px solid var(--border)', objectFit: 'contain' }} />
-                </div>
-              )}
-            </div>
-          )}
 
           {/* Notes */}
           {(production_note || view.note) && (
@@ -471,6 +589,22 @@ export default function JobOrderPage() {
                   <span style={{ fontWeight: 700 }}>หมายเหตุ: </span>{view.note}
                 </div>
               )}
+            </div>
+          )}
+
+          {/* รูปงานเสร็จ */}
+          {finish_photos && Object.keys(finish_photos).length > 0 && (
+            <div style={{ marginTop: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .5 }}>รูปงานเสร็จ</div>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
+                {FINISH_SLOTS.map(s => finish_photos[s.key] && (
+                  <div key={s.key} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                    <img src={finish_photos[s.key]} alt={s.label}
+                      style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                    <div style={{ fontSize: 10, textAlign: 'center', padding: '3px 0', color: '#888', background: '#f9f9f9' }}>{s.label}</div>
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
@@ -697,22 +831,61 @@ export default function JobOrderPage() {
 
           {/* Artwork + Mockup */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 8 }}>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>🖼️ Artwork</label>
-              <input type="file" accept="image/*" onChange={e => handleFileChange(e, setArtworkFile, setArtworkPreview)} />
-              {(artworkPreview || form.artwork_url) && (
-                <img src={artworkPreview || form.artwork_url} alt="artwork"
-                  style={{ maxHeight: 140, borderRadius: 8, objectFit: 'contain', border: '1px solid var(--border)' }} />
-              )}
+
+            {/* Artwork column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>🖼️ Artwork</div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</label>
+                <input type="file" accept="image/*" onChange={e => handleFileChange(e, setArtworkFile, setArtworkPreview)} />
+                {(artworkPreview || form.artwork_url) && (
+                  <img src={artworkPreview || form.artwork_url} alt="artwork"
+                    style={{ maxHeight: 120, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--border)' }} />
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</label>
+                <input type="file" accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
+                  onChange={e => setArtworkSourceFile(e.target.files?.[0] || null)} />
+                {artworkSourceFile && (
+                  <div style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📄</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artworkSourceFile.name}</span>
+                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>({(artworkSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </div>
+                )}
+              </div>
             </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-              <label style={{ fontSize: 13, fontWeight: 600 }}>👕 Mockup</label>
-              <input type="file" accept="image/*" onChange={e => handleFileChange(e, setMockupFile, setMockupPreview)} />
-              {(mockupPreview || form.mockup_url) && (
-                <img src={mockupPreview || form.mockup_url} alt="mockup"
-                  style={{ maxHeight: 140, borderRadius: 8, objectFit: 'contain', border: '1px solid var(--border)' }} />
-              )}
+
+            {/* Mockup column */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>👕 Mockup</div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</label>
+                <input type="file" accept="image/*" onChange={e => handleFileChange(e, setMockupFile, setMockupPreview)} />
+                {(mockupPreview || form.mockup_url) && (
+                  <img src={mockupPreview || form.mockup_url} alt="mockup"
+                    style={{ maxHeight: 120, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--border)' }} />
+                )}
+              </div>
+
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</label>
+                <input type="file" accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
+                  onChange={e => setMockupSourceFile(e.target.files?.[0] || null)} />
+                {mockupSourceFile && (
+                  <div style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
+                    <span>📄</span>
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mockupSourceFile.name}</span>
+                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>({(mockupSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
+                  </div>
+                )}
+              </div>
             </div>
+
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
@@ -768,6 +941,7 @@ export default function JobOrderPage() {
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
                             <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
+                            <button className="btn btn-outline btn-sm" title="ถ่ายรูปงาน" onClick={() => setCameraJob(j)}>📷</button>
                             {j.status !== 'ส่งงานแล้ว' && (
                               <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
                             )}
@@ -796,6 +970,15 @@ export default function JobOrderPage() {
           </>
         )}
       </div>}
+
+      {/* ──── CAMERA MODAL ────────────────────────────────────── */}
+      {cameraJob && (
+        <CameraCapture
+          initialPhotos={readMatrix(cameraJob).finish_photos || {}}
+          onSave={handleCameraSave}
+          onClose={() => setCameraJob(null)}
+        />
+      )}
     </div>
   )
 }
