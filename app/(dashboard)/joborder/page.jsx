@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
-import CameraCapture from '@/components/ui/CameraCapture'
+import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 
 const STATUS_BADGE = {
@@ -45,17 +45,20 @@ function readMatrix(j) {
       mockup_url:      j.items.mockup_url      || '',
       finish_photos:   j.items.finish_photos   || {},
       drive_folders:   j.items.drive_folders   || null,
+      design_detail:   j.design_detail         || {},
+      reference_url:   j.reference_url         || '',
     }
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{}, drive_folders: null }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{}, drive_folders: null, design_detail:{}, reference_url:'' }
 }
 
 const emptyForm = () => ({
   customer_id: '', invoice_id: '', note: '', due_date: '', document_date: todayStr(), status: 'รอมัดจำ',
   fabric_type: '', shirt_color: '', screen_color: '', production_note: '',
-  artwork_url: '', mockup_url: '',
+  artwork_url: '', mockup_url: '', reference_url: '',
+  design_detail: { size: '', position: '', color_count: '', technique: '', special: '' },
   sizes: [...DEFAULT_SIZES],
   prod_items: [makeRow(DEFAULT_SIZES)],
   finish_photos: {},
@@ -184,10 +187,13 @@ export default function JobOrderPage() {
   const [artworkPreview, setArtworkPreview] = useState(null)
   const [mockupFile, setMockupFile]         = useState(null)
   const [mockupPreview, setMockupPreview]   = useState(null)
-  const [artworkSourceFile, setArtworkSourceFile] = useState(null)  // .ai / .psd
-  const [mockupSourceFile,  setMockupSourceFile]  = useState(null)  // .ai / .psd
+  const [artworkSourceFile, setArtworkSourceFile] = useState(null)
+  const [mockupSourceFile,  setMockupSourceFile]  = useState(null)
+  const [referenceFile,     setReferenceFile]     = useState(null)
+  const [referencePreview,  setReferencePreview]  = useState(null)
+  const [qcFiles,     setQcFiles]     = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
+  const [qcPreviews,  setQcPreviews]  = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
   const [newSizeInput, setNewSizeInput] = useState('')
-  const [cameraJob,   setCameraJob]   = useState(null)  // job ที่กำลังถ่ายรูปงานเสร็จ
   const printRef = useRef(null)
 
   useEffect(() => { load() }, [])
@@ -273,51 +279,74 @@ export default function JobOrderPage() {
     const jobCode    = editId
       ? (rows.find(r => r.id === editId)?.code || 'JO-EDIT')
       : 'JO-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
-    const custName   = customers.find(c => c.id === form.customer_id)?.name || 'unknown'
+    const cust     = customers.find(c => c.id === form.customer_id) || {}
+    const custName = cust.name || 'unknown'
+    // ใช้ folder ของลูกค้า (สร้างตอน สร้างลูกค้า)
+    const custFolderId = cust.drive_folder_id || null
 
-    // สร้าง / หา Drive folders
-    let jobFolderId     = null
-    let artworkFolderId = null
-    let mockupFolderId  = null
-    let finishFolderId  = null
+    // Upload reference / artwork / mockup → folder ลูกค้า พร้อม naming convention
+    let reference_url = form.reference_url || null
+    let artwork_url   = form.artwork_url   || null
+    let mockup_url    = form.mockup_url    || null
     try {
-      const folders = await createJobFoldersClient(jobCode, custName)
-      jobFolderId     = folders.jobFolderId
-      artworkFolderId = folders.artworkFolderId
-      mockupFolderId  = folders.mockupFolderId
-      finishFolderId  = folders.finishFolderId
-    } catch (e) {
-      console.error('Drive folder error:', e.message)
-      alert('⚠️ สร้าง Folder ใน Drive ไม่สำเร็จ: ' + e.message)
-    }
-
-    // Upload artwork → Drive (ถ้ามี folder) หรือ Supabase (fallback)
-    let artwork_url = form.artwork_url || null
-    let mockup_url  = form.mockup_url  || null
-    try {
-      if (artworkFile && artworkFolderId) {
-        const r = await uploadFileClient(artworkFile, artworkFolderId, `artwork_${Date.now()}.${artworkFile.name.split('.').pop()}`)
-        artwork_url = r.directUrl
-      } else if (artworkFile) {
-        artwork_url = await uploadFile(supabase, 'job-images', artworkFile)
+      if (referenceFile) {
+        const ext  = referenceFile.name.split('.').pop()
+        const name = `${jobCode}_${custName}_REF.${ext}`
+        if (custFolderId) {
+          const r = await uploadFileClient(referenceFile, custFolderId, name)
+          reference_url = r.directUrl
+        } else {
+          reference_url = await uploadFile(supabase, 'job-images', referenceFile)
+        }
       }
-
-      if (mockupFile && mockupFolderId) {
-        const r = await uploadFileClient(mockupFile, mockupFolderId, `mockup_${Date.now()}.${mockupFile.name.split('.').pop()}`)
-        mockup_url = r.directUrl
-      } else if (mockupFile) {
-        mockup_url = await uploadFile(supabase, 'job-images', mockupFile)
+      if (artworkFile) {
+        const ext  = artworkFile.name.split('.').pop()
+        const name = `${jobCode}_${custName}_AW.${ext}`
+        if (custFolderId) {
+          const r = await uploadFileClient(artworkFile, custFolderId, name)
+          artwork_url = r.directUrl
+        } else {
+          artwork_url = await uploadFile(supabase, 'job-images', artworkFile)
+        }
       }
-
-      // อัปโหลดไฟล์ต้นฉบับ .ai / .psd → Drive (ไม่มี fallback เพราะ Supabase ไม่เหมาะกับไฟล์ใหญ่)
-      if (artworkSourceFile && artworkFolderId) {
-        await uploadFileClient(artworkSourceFile, artworkFolderId, artworkSourceFile.name)
+      if (mockupFile) {
+        const ext  = mockupFile.name.split('.').pop()
+        const name = `${jobCode}_${custName}_MOCKUP.${ext}`
+        if (custFolderId) {
+          const r = await uploadFileClient(mockupFile, custFolderId, name)
+          mockup_url = r.directUrl
+        } else {
+          mockup_url = await uploadFile(supabase, 'job-images', mockupFile)
+        }
       }
-      if (mockupSourceFile && mockupFolderId) {
-        await uploadFileClient(mockupSourceFile, mockupFolderId, mockupSourceFile.name)
-      }
+      // .ai / .psd — คงชื่อเดิม
+      if (artworkSourceFile && custFolderId)
+        await uploadFileClient(artworkSourceFile, custFolderId, artworkSourceFile.name)
+      if (mockupSourceFile && custFolderId)
+        await uploadFileClient(mockupSourceFile, custFolderId, mockupSourceFile.name)
     } catch (e) {
       console.warn('Upload error:', e.message)
+    }
+
+    // Upload QC photos
+    const QC_KEYS = ['QC1', 'QC2', 'QC3', 'QC4']
+    let finish_photos = { ...(form.finish_photos || {}) }
+    try {
+      for (const key of QC_KEYS) {
+        const file = qcFiles[key]
+        if (file) {
+          const ext  = file.name.split('.').pop()
+          const name = `${jobCode}_${custName}_${key}.${ext}`
+          if (custFolderId) {
+            const r = await uploadFileClient(file, custFolderId, name)
+            finish_photos[key] = r.directUrl
+          } else {
+            finish_photos[key] = await uploadFile(supabase, 'job-images', file)
+          }
+        }
+      }
+    } catch (e) {
+      console.warn('QC upload error:', e.message)
     }
 
     // Summary for list view
@@ -333,8 +362,10 @@ export default function JobOrderPage() {
       screen_color:    form.screen_color    || null,
       production_note: form.production_note || null,
       mockup_url:      mockup_url           || null,
-      finish_photos:   form.finish_photos   || null,
-      drive_folders:   jobFolderId ? { jobFolderId, artworkFolderId, mockupFolderId, finishFolderId } : null,
+      reference_url:   reference_url        || null,
+      design_detail:   form.design_detail   || null,
+      finish_photos:   Object.keys(finish_photos).length ? finish_photos : null,
+      drive_folders:   custFolderId ? { jobFolderId: custFolderId } : null,
     }
 
     const payload = {
@@ -346,6 +377,8 @@ export default function JobOrderPage() {
       document_date:  form.document_date || todayStr(),
       note:           form.note,
       status:         form.status,
+      reference_url:  reference_url || null,
+      design_detail:  form.design_detail || null,
       ...(artwork_url ? { image_url: artwork_url } : {}),
     }
 
@@ -357,62 +390,16 @@ export default function JobOrderPage() {
     }
 
     setForm(emptyForm())
-    setArtworkFile(null);       setArtworkPreview(null)
-    setMockupFile(null);        setMockupPreview(null)
-    setArtworkSourceFile(null); setMockupSourceFile(null)
+    setReferenceFile(null);      setReferencePreview(null)
+    setQcFiles({ QC1: null, QC2: null, QC3: null, QC4: null })
+    setQcPreviews({ QC1: null, QC2: null, QC3: null, QC4: null })
+    setArtworkFile(null);        setArtworkPreview(null)
+    setMockupFile(null);         setMockupPreview(null)
+    setArtworkSourceFile(null);  setMockupSourceFile(null)
     setShowForm(false); setSaving(false)
     load()
   }
 
-  // ── บันทึกรูปงานเสร็จจาก camera modal ─────────────────────────
-  async function handleCameraSave(photos) {
-    if (!cameraJob) return
-    const m        = readMatrix(cameraJob)
-    const custName = customers.find(c => c.id === cameraJob.customer_id)?.name || 'unknown'
-
-    // หา / สร้าง finish folder ใน Drive
-    let savedPhotos = { ...photos }
-    try {
-      const { finishFolderId } = m.drive_folders?.finishFolderId
-        ? { finishFolderId: m.drive_folders.finishFolderId }
-        : await createJobFoldersClient(cameraJob.code, custName)
-      const LABELS = { front: 'มุมตรง', back: 'มุมหลัง', side: 'มุมข้าง', group: 'รูปรวม' }
-
-      // อัปโหลดทีละรูปที่ยังเป็น dataURL (ยังไม่เคยอัปขึ้น Drive)
-      for (const [key, val] of Object.entries(photos)) {
-        if (val && val.startsWith('data:')) {
-          const result = await uploadDataUrlClient(
-            val,
-            finishFolderId,
-            `${cameraJob.code}_${LABELS[key] || key}_${Date.now()}.jpg`
-          )
-          savedPhotos[key] = result.directUrl
-        }
-      }
-    } catch (e) {
-      console.warn('Drive upload error (เก็บ dataURL แทน):', e.message)
-    }
-
-    const itemsPayload = {
-      type:            'size_matrix',
-      sizes:           m.sizes,
-      rows:            m.prod_items,
-      fabric_type:     m.fabric_type     || null,
-      shirt_color:     m.shirt_color     || null,
-      screen_color:    m.screen_color    || null,
-      production_note: m.production_note || null,
-      mockup_url:      m.mockup_url      || null,
-      finish_photos:   savedPhotos,
-      drive_folders:   m.drive_folders   || null,
-    }
-    await updateJobOrder(cameraJob.id, { items: itemsPayload })
-    setCameraJob(null)
-    load()
-    // อัปเดต view ถ้ากำลังดูอยู่
-    if (view && view.id === cameraJob.id) {
-      setView(v => ({ ...v, items: itemsPayload }))
-    }
-  }
 
   async function handleDelete(j) {
     if (!confirm(`ลบใบงาน ${j.code} ใช่ไหม?`)) return
@@ -428,10 +415,15 @@ export default function JobOrderPage() {
       due_date:        j.due_date    || '',
       document_date:   j.document_date || todayStr(),
       status:          j.status,
-      artwork_url:     j.image_url   || '',
+      artwork_url:     j.image_url      || '',
+      reference_url:   j.reference_url  || '',
+      design_detail:   j.design_detail  || { size:'', position:'', color_count:'', technique:'', special:'' },
       ...m,
-      finish_photos:   m.finish_photos || {},
+      finish_photos:   m.finish_photos  || {},
     })
+    setReferenceFile(null); setReferencePreview(null)
+    setQcFiles({ QC1: null, QC2: null, QC3: null, QC4: null })
+    setQcPreviews({ QC1: null, QC2: null, QC3: null, QC4: null })
     setArtworkFile(null); setArtworkPreview(null)
     setMockupFile(null);  setMockupPreview(null)
     setEditId(j.id); setShowForm(true)
@@ -447,181 +439,244 @@ export default function JobOrderPage() {
   const monthCount = filtered.length
   const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
-  // ──── PRINT VIEW ─────────────────────────────────────────────
+  // ──── PRINT VIEW (3 pages) ───────────────────────────────────
   if (view) {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
     const inv  = invoices.find(i => i.id === view.invoice_id)
     const m    = readMatrix(view)
-    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos } = m
+    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos, design_detail, reference_url } = m
+    const dd = design_detail || {}
     const FINISH_SLOTS = [
       { key: 'front', label: 'มุมตรง' },
       { key: 'back',  label: 'มุมหลัง' },
       { key: 'side',  label: 'มุมข้าง' },
       { key: 'group', label: 'รูปรวม' },
     ]
+    const filePrefix = `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`
 
-    return (
-      <div style={{ maxWidth: 900, margin: '0 auto', padding: 24 }}>
-        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
-          <div style={{ display: 'flex', gap: 8 }}>
-            <button className="btn btn-outline" onClick={() => setCameraJob(view)}>📷 ถ่ายรูปงาน</button>
-            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖼️ JPEG</button>
-            <button className="btn btn-outline" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
+    // shared header component
+    function PageHeader({ page }) {
+      return (
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid var(--primary)' }}>
+          <div>
+            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--primary)', letterSpacing: -1 }}>C-SCREEN</div>
+            <div style={{ fontSize: 10, color: '#666', maxWidth: 240, lineHeight: 1.6 }}>
+              {SHOP.address} | Tel: {SHOP.tel}
+            </div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text)' }}>ใบงานการผลิต <span style={{ color: '#999', fontSize: 12 }}>หน้า {page}/3</span></div>
+            <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
+              {view.code}
+              {m.drive_folders?.jobFolderId && (
+                <a href={`https://drive.google.com/drive/folders/${m.drive_folders.jobFolderId}`}
+                  target="_blank" rel="noreferrer" style={{ fontSize: 11, textDecoration: 'none', color: '#1a73e8' }}>
+                  📁 Drive
+                </a>
+              )}
+            </div>
+            <div style={{ fontSize: 11, color: '#666' }}>วันที่: {fmtDate(view.document_date || view.created_at)}</div>
+            {view.due_date && <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 700 }}>กำหนดส่ง: {fmtDate(view.due_date)}</div>}
           </div>
         </div>
+      )
+    }
 
-        <div id="print-area" ref={printRef} style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 40 }}>
-          {/* Header */}
-          <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 20 }}>
-            <div>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--primary)', letterSpacing: -1 }}>C-SCREEN</div>
-              <div style={{ fontSize: 11, color: '#666', maxWidth: 260, lineHeight: 1.7 }}>
-                {SHOP.address}<br />Tel: {SHOP.tel} | Line: {SHOP.line}
+    return (
+      <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
+        {/* Toolbar */}
+        <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
+          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+          <button className="btn btn-outline" onClick={() => printDoc('print-area', filePrefix)}>🖨️ พิมพ์</button>
+        </div>
+
+        <div id="print-area" ref={printRef}>
+
+          {/* ═══════════════ PAGE 1 ═══════════════ */}
+          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24 }}>
+            <PageHeader page={1} />
+
+            {/* Customer strip */}
+            <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 16px', marginBottom: 16, display: 'flex', gap: 24, alignItems: 'center' }}>
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#888' }}>ลูกค้า</div>
+                <div style={{ fontSize: 15, fontWeight: 800 }}>{cust.name || view.customers?.name || '—'}</div>
+                {cust.phone && <div style={{ fontSize: 11, color: '#666' }}>Tel: {cust.phone}</div>}
               </div>
+              {inv && <div style={{ fontSize: 11, color: '#888', marginLeft: 'auto' }}>อ้างอิง Invoice: <strong>{inv.code}</strong></div>}
+              <span className={STATUS_BADGE[view.status] || 'badge badge-gray'}>{view.status}</span>
             </div>
-            <div style={{ textAlign: 'right' }}>
-              <div style={{ fontSize: 22, fontWeight: 900, color: 'var(--text)', marginBottom: 4 }}>ใบงานการผลิต</div>
-              <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, display:'flex', alignItems:'center', gap:8, justifyContent:'flex-end' }}>
-                {view.code}
-                {m.drive_folders?.jobFolderId && (
-                  <a href={`https://drive.google.com/drive/folders/${m.drive_folders.jobFolderId}`}
-                    target="_blank" rel="noreferrer"
-                    title="เปิด Drive folder"
-                    style={{ fontSize:12, textDecoration:'none', color:'#1a73e8', fontFamily:'sans-serif' }}>
-                    📁 Drive
-                  </a>
-                )}
+
+            {/* Design detail table */}
+            {(dd.size || dd.position || dd.color_count || dd.technique || dd.special) && (
+              <div style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                <div style={{ background: '#374151', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 12px', letterSpacing: .5 }}>
+                  รายละเอียดลาย
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)' }}>
+                  {[
+                    { label: 'ขนาดลาย', value: dd.size },
+                    { label: 'ตำแหน่ง',  value: dd.position },
+                    { label: 'จำนวนสี',  value: dd.color_count },
+                    { label: 'เทคนิค',   value: dd.technique },
+                    { label: 'พิเศษ',    value: dd.special },
+                  ].map(({ label, value }) => (
+                    <div key={label} style={{ padding: '8px 12px', borderRight: '1px solid var(--border)' }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{label}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: value ? 'var(--text)' : '#ccc' }}>{value || '—'}</div>
+                    </div>
+                  ))}
+                </div>
               </div>
-              {inv && <div style={{ fontSize: 11, color: '#888' }}>อ้างอิง: {inv.code}</div>}
-              <div style={{ fontSize: 12, color: '#666', marginTop: 4 }}>วันที่: {fmtDate(view.document_date || view.created_at)}</div>
-              {view.due_date && <div style={{ fontSize: 12, color: 'var(--danger)', fontWeight: 700 }}>กำหนดส่ง: {fmtDate(view.due_date)}</div>}
-            </div>
+            )}
+
+            {/* Images: Reference + Mockup + Artwork */}
+            {(() => {
+              const refUrl  = reference_url || m.reference_url || view.reference_url || null
+              const artUrl  = view.image_url || null
+              const cols = [refUrl && { url: refUrl, label: 'REFERENCE' }, mockup_url && { url: mockup_url, label: 'MOCKUP' }, artUrl && { url: artUrl, label: 'ARTWORK' }].filter(Boolean)
+              if (!cols.length) return null
+              return (
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: 12, marginBottom: 8 }}>
+                  {cols.map(({ url, label }) => (
+                    <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: label === 'REFERENCE' ? '#6B7280' : label === 'MOCKUP' ? '#1D4ED8' : '#374151', padding: '4px 10px', letterSpacing: .5 }}>
+                        {label}
+                      </div>
+                      <img src={url} alt={label} crossOrigin="anonymous"
+                        style={{ width: '100%', maxHeight: 280, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+                    </div>
+                  ))}
+                </div>
+              )
+            })()}
           </div>
 
-          {/* Customer */}
-          <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 16px', marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 2 }}>ลูกค้า</div>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>{cust.name || view.customers?.name || '—'}</div>
-            {cust.phone && <div style={{ fontSize: 12, color: '#666' }}>Tel: {cust.phone}</div>}
-          </div>
+          {/* ═══════════════ PAGE 2 ═══════════════ */}
+          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24, pageBreakBefore: 'always' }}>
+            <PageHeader page={2} />
 
-          {/* Artwork + Mockup — แสดงก่อน size matrix */}
-          {(view.image_url || mockup_url) && (
-            <div style={{ display: 'grid', gridTemplateColumns: view.image_url && mockup_url ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 16 }}>
-              {view.image_url && (
-                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#374151', padding: '4px 10px', letterSpacing: .5 }}>ARTWORK</div>
-                  <img src={view.image_url} alt="artwork" crossOrigin="anonymous"
-                    style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
-                </div>
-              )}
-              {mockup_url && (
-                <div style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                  <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#374151', padding: '4px 10px', letterSpacing: .5 }}>MOCKUP</div>
-                  <img src={mockup_url} alt="mockup" crossOrigin="anonymous"
-                    style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
-                </div>
-              )}
+            {/* Customer mini */}
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
+              {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
             </div>
-          )}
 
-          {/* Production Info badges */}
-          {(fabric_type || shirt_color || screen_color) && (
-            <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-              {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
-                .filter(f => f.v).map(f => (
-                  <div key={f.l} style={{ background: '#EFF6FF', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
-                    <span style={{ color: '#666' }}>{f.l}: </span><span style={{ fontWeight: 700 }}>{f.v}</span>
-                  </div>
-                ))}
-            </div>
-          )}
+            {/* Production info badges */}
+            {(fabric_type || shirt_color || screen_color) && (
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+                {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
+                  .filter(f => f.v).map(f => (
+                    <div key={f.l} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
+                      <span style={{ color: '#666' }}>{f.l}: </span><span style={{ fontWeight: 700 }}>{f.v}</span>
+                    </div>
+                  ))}
+              </div>
+            )}
 
-          {/* Size Matrix */}
-          <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-            <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
-              <thead>
-                <tr style={{ background: 'var(--primary)', color: '#fff' }}>
-                  <th style={{ padding: '8px 12px', textAlign: 'left', minWidth: 160 }}>แบบ / รายการ</th>
-                  {sizes.map(s => <th key={s} style={{ padding: '8px 10px', textAlign: 'center', minWidth: 52 }}>{s}</th>)}
-                  <th style={{ padding: '8px 12px', textAlign: 'center', minWidth: 56, background: '#7f1d1d' }}>รวม</th>
-                </tr>
-              </thead>
-              <tbody>
-                {prod.length > 0 ? prod.map((r, i) => (
-                  <tr key={i} style={{ borderBottom: '1px solid #eee', background: i % 2 ? '#fafafa' : '#fff' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.style || '—'}</td>
-                    {sizes.map(s => (
-                      <td key={s} style={{ padding: '8px 10px', textAlign: 'center',
-                        fontWeight: parseInt(r.qtys?.[s]) > 0 ? 700 : 400,
-                        color:     parseInt(r.qtys?.[s]) > 0 ? 'var(--text)' : '#ccc' }}>
-                        {parseInt(r.qtys?.[s]) > 0 ? r.qtys[s] : '—'}
-                      </td>
-                    ))}
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--primary)' }}>
-                      {rowTotal(r.qtys)}
-                    </td>
+            {/* Size Matrix */}
+            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: 'var(--primary)', color: '#fff' }}>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', minWidth: 160 }}>แบบ / รายการ</th>
+                    {sizes.map(s => <th key={s} style={{ padding: '8px 10px', textAlign: 'center', minWidth: 52 }}>{s}</th>)}
+                    <th style={{ padding: '8px 12px', textAlign: 'center', minWidth: 56, background: '#7f1d1d' }}>รวม</th>
                   </tr>
-                )) : (
-                  <tr><td colSpan={sizes.length + 2} style={{ padding: 20, textAlign: 'center', color: '#999' }}>ไม่มีรายการ</td></tr>
-                )}
-                {prod.length > 0 && (
-                  <tr style={{ background: '#F9FAFB', borderTop: '2px solid var(--border)' }}>
-                    <td style={{ padding: '8px 12px', fontWeight: 700, color: '#888', fontSize: 12 }}>รวมทั้งหมด</td>
-                    {sizes.map(s => (
-                      <td key={s} style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>
-                        {prod.reduce((sum, r) => sum + (parseInt(r.qtys?.[s]) || 0), 0) || '—'}
+                </thead>
+                <tbody>
+                  {prod.length > 0 ? prod.map((r, i) => (
+                    <tr key={i} style={{ borderBottom: '1px solid #eee', background: i % 2 ? '#fafafa' : '#fff' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.style || '—'}</td>
+                      {sizes.map(s => (
+                        <td key={s} style={{ padding: '8px 10px', textAlign: 'center',
+                          fontWeight: parseInt(r.qtys?.[s]) > 0 ? 700 : 400,
+                          color:     parseInt(r.qtys?.[s]) > 0 ? 'var(--text)' : '#ccc' }}>
+                          {parseInt(r.qtys?.[s]) > 0 ? r.qtys[s] : '—'}
+                        </td>
+                      ))}
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--primary)' }}>
+                        {rowTotal(r.qtys)}
                       </td>
-                    ))}
-                    <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 900, color: 'var(--primary)', fontSize: 15 }}>
-                      {grandTotal(prod)}
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
-
-
-          {/* Notes */}
-          {(production_note || view.note) && (
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-              {production_note && (
-                <div style={{ padding: '8px 14px', background: '#FFF7ED', borderRadius: 6, borderLeft: '3px solid #F97316', fontSize: 12 }}>
-                  <span style={{ fontWeight: 700, color: '#C2410C' }}>หมายเหตุผลิต: </span>{production_note}
-                </div>
-              )}
-              {view.note && (
-                <div style={{ padding: '8px 14px', background: '#FFFBEB', borderRadius: 6, fontSize: 12 }}>
-                  <span style={{ fontWeight: 700 }}>หมายเหตุ: </span>{view.note}
-                </div>
-              )}
+                    </tr>
+                  )) : (
+                    <tr><td colSpan={sizes.length + 2} style={{ padding: 20, textAlign: 'center', color: '#999' }}>ไม่มีรายการ</td></tr>
+                  )}
+                  {prod.length > 0 && (
+                    <tr style={{ background: '#F9FAFB', borderTop: '2px solid var(--border)' }}>
+                      <td style={{ padding: '8px 12px', fontWeight: 700, color: '#888', fontSize: 12 }}>รวมทั้งหมด</td>
+                      {sizes.map(s => (
+                        <td key={s} style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>
+                          {prod.reduce((sum, r) => sum + (parseInt(r.qtys?.[s]) || 0), 0) || '—'}
+                        </td>
+                      ))}
+                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 900, color: 'var(--primary)', fontSize: 15 }}>
+                        {grandTotal(prod)}
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
             </div>
-          )}
 
-          {/* รูปงานเสร็จ */}
-          {finish_photos && Object.keys(finish_photos).length > 0 && (
-            <div style={{ marginTop: 16 }}>
-              <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .5 }}>รูปงานเสร็จ</div>
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 8 }}>
-                {FINISH_SLOTS.map(s => finish_photos[s.key] && (
-                  <div key={s.key} style={{ borderRadius: 6, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                    <img src={finish_photos[s.key]} alt={s.label}
-                      style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
-                    <div style={{ fontSize: 10, textAlign: 'center', padding: '3px 0', color: '#888', background: '#f9f9f9' }}>{s.label}</div>
-                  </div>
-                ))}
+            {/* Grand total */}
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
+              <div style={{ fontSize: 15, fontWeight: 700 }}>
+                จำนวนรวม: <span style={{ color: 'var(--primary)', fontSize: 22, fontWeight: 900 }}>{grandTotal(prod)}</span> ตัว
               </div>
             </div>
-          )}
 
-          <div style={{ marginTop: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <span className={STATUS_BADGE[view.status] || 'badge badge-gray'}>{view.status}</span>
-            <div style={{ fontSize: 14, fontWeight: 700 }}>
-              จำนวนรวม: <span style={{ color: 'var(--primary)', fontSize: 18 }}>{grandTotal(prod)}</span> ตัว
-            </div>
+            {/* Notes */}
+            {(production_note || view.note) && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {production_note && (
+                  <div style={{ padding: '8px 14px', background: '#FFF7ED', borderRadius: 6, borderLeft: '3px solid #F97316', fontSize: 12 }}>
+                    <span style={{ fontWeight: 700, color: '#C2410C' }}>หมายเหตุผลิต: </span>{production_note}
+                  </div>
+                )}
+                {view.note && (
+                  <div style={{ padding: '8px 14px', background: '#FFFBEB', borderRadius: 6, fontSize: 12 }}>
+                    <span style={{ fontWeight: 700 }}>หมายเหตุ: </span>{view.note}
+                  </div>
+                )}
+              </div>
+            )}
           </div>
+
+          {/* ═══════════════ PAGE 3 ═══════════════ */}
+          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, pageBreakBefore: 'always' }}>
+            <PageHeader page={3} />
+
+            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>
+              {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
+            </div>
+
+            {finish_photos && Object.keys(finish_photos).length > 0 ? (
+              <div>
+                <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: .5 }}>รูปงานเสร็จ QC</div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }}>
+                  {FINISH_SLOTS.map(s => finish_photos[s.key] ? (
+                    <div key={s.key} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
+                      <img src={finish_photos[s.key]} alt={s.label} crossOrigin="anonymous"
+                        style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                      <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', padding: '5px 0', color: '#555', background: '#f9f9f9' }}>{s.label}</div>
+                    </div>
+                  ) : (
+                    <div key={s.key} style={{ borderRadius: 8, border: '2px dashed #E5E7EB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '4/3', color: '#D1D5DB', gap: 6 }}>
+                      <span style={{ fontSize: 28 }}>📷</span>
+                      <span style={{ fontSize: 11, fontWeight: 600 }}>{s.label}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, color: '#D1D5DB', gap: 12 }}>
+                <span style={{ fontSize: 48 }}>📷</span>
+                <div style={{ fontSize: 14, fontWeight: 700 }}>ยังไม่มีรูปงานเสร็จ</div>
+                <div style={{ fontSize: 13, color: '#9CA3AF' }}>กลับไปแก้ไขใบงานเพื่อแนบรูป QC</div>
+              </div>
+            )}
+          </div>
+
         </div>
       </div>
     )
@@ -837,63 +892,134 @@ export default function JobOrderPage() {
             </div>
           </div>
 
+          {/* Design Detail */}
+          <SectionHeader icon="📐" title="รายละเอียดลาย" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
+            {[
+              { label: 'ขนาดลาย', key: 'size',        placeholder: 'เช่น 10×15 cm' },
+              { label: 'ตำแหน่ง',  key: 'position',    placeholder: 'เช่น หน้าอกซ้าย' },
+              { label: 'จำนวนสี',  key: 'color_count', placeholder: 'เช่น 3 สี' },
+              { label: 'เทคนิค',   key: 'technique',   placeholder: 'เช่น Spot Color, Discharge' },
+              { label: 'พิเศษ',    key: 'special',     placeholder: 'เช่น Puff, Foil, Glitter' },
+            ].map(({ label, key, placeholder }) => (
+              <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
+                <label>{label}</label>
+                <input type="text" placeholder={placeholder}
+                  value={form.design_detail?.[key] || ''}
+                  onChange={e => setForm(f => ({ ...f, design_detail: { ...f.design_detail, [key]: e.target.value } }))} />
+              </div>
+            ))}
+          </div>
+
+          {/* Reference Image */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: .4 }}>📎 Reference — ภาพตัวอย่างจากลูกค้า</div>
+            <FileDropZone
+              accept="image/*"
+              icon="🖼️"
+              label="วางหรือคลิกเพื่อแนบรูป Reference"
+              preview={referencePreview || form.reference_url || null}
+              imageOnly
+              onFile={file => handleFileChange({ target: { files: [file] } }, setReferenceFile, setReferencePreview)}
+              onClear={() => { setReferenceFile(null); setReferencePreview(null); setForm(f => ({ ...f, reference_url: '' })) }}
+            />
+          </div>
+
           {/* Artwork + Mockup */}
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 8 }}>
 
             {/* Artwork column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>🖼️ Artwork</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</label>
-                <input type="file" accept="image/*" onChange={e => handleFileChange(e, setArtworkFile, setArtworkPreview)} />
-                {(artworkPreview || form.artwork_url) && (
-                  <img src={artworkPreview || form.artwork_url} alt="artwork"
-                    style={{ maxHeight: 120, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--border)' }} />
-                )}
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
+                <FileDropZone
+                  accept="image/*"
+                  icon="🎨"
+                  label="วางหรือคลิกแนบ Artwork"
+                  preview={artworkPreview || form.artwork_url || null}
+                  imageOnly
+                  onFile={file => handleFileChange({ target: { files: [file] } }, setArtworkFile, setArtworkPreview)}
+                  onClear={() => { setArtworkFile(null); setArtworkPreview(null); setForm(f => ({ ...f, artwork_url: '' })) }}
+                />
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</label>
-                <input type="file" accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
-                  onChange={e => setArtworkSourceFile(e.target.files?.[0] || null)} />
-                {artworkSourceFile && (
-                  <div style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📄</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{artworkSourceFile.name}</span>
-                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>({(artworkSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
-                  </div>
-                )}
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
+                <FileDropZone
+                  accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
+                  icon="📐"
+                  label="วางหรือคลิกแนบไฟล์ต้นฉบับ"
+                  fileName={artworkSourceFile?.name}
+                  fileSize={artworkSourceFile?.size}
+                  compact
+                  onFile={file => setArtworkSourceFile(file)}
+                  onClear={() => setArtworkSourceFile(null)}
+                />
               </div>
             </div>
 
             {/* Mockup column */}
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, padding: 12, border: '1px solid var(--border)', borderRadius: 8 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>👕 Mockup</div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</label>
-                <input type="file" accept="image/*" onChange={e => handleFileChange(e, setMockupFile, setMockupPreview)} />
-                {(mockupPreview || form.mockup_url) && (
-                  <img src={mockupPreview || form.mockup_url} alt="mockup"
-                    style={{ maxHeight: 120, borderRadius: 6, objectFit: 'contain', border: '1px solid var(--border)' }} />
-                )}
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
+                <FileDropZone
+                  accept="image/*"
+                  icon="👕"
+                  label="วางหรือคลิกแนบ Mockup"
+                  preview={mockupPreview || form.mockup_url || null}
+                  imageOnly
+                  onFile={file => handleFileChange({ target: { files: [file] } }, setMockupFile, setMockupPreview)}
+                  onClear={() => { setMockupFile(null); setMockupPreview(null); setForm(f => ({ ...f, mockup_url: '' })) }}
+                />
               </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-                <label style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</label>
-                <input type="file" accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
-                  onChange={e => setMockupSourceFile(e.target.files?.[0] || null)} />
-                {mockupSourceFile && (
-                  <div style={{ fontSize: 12, color: 'var(--success)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                    <span>📄</span>
-                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mockupSourceFile.name}</span>
-                    <span style={{ color: 'var(--text-muted)', flexShrink: 0 }}>({(mockupSourceFile.size / 1024 / 1024).toFixed(1)} MB)</span>
-                  </div>
-                )}
+              <div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
+                <FileDropZone
+                  accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
+                  icon="📐"
+                  label="วางหรือคลิกแนบไฟล์ต้นฉบับ"
+                  fileName={mockupSourceFile?.name}
+                  fileSize={mockupSourceFile?.size}
+                  compact
+                  onFile={file => setMockupSourceFile(file)}
+                  onClear={() => setMockupSourceFile(null)}
+                />
               </div>
             </div>
 
+          </div>
+
+          {/* QC Photos */}
+          <SectionHeader icon="✅" title="รูปงานเสร็จ QC" />
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
+            {['QC1','QC2','QC3','QC4'].map((key, i) => {
+              const labels = ['มุมตรง','มุมหลัง','มุมข้าง','รูปรวม']
+              const existing = form.finish_photos?.[key]
+              return (
+                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>{key} — {labels[i]}</div>
+                  <FileDropZone
+                    accept="image/*"
+                    icon="📸"
+                    label={labels[i]}
+                    preview={qcPreviews[key] || existing || null}
+                    imageOnly
+                    onFile={file => {
+                      setQcFiles(f => ({ ...f, [key]: file }))
+                      const r = new FileReader()
+                      r.onload = ev => setQcPreviews(p => ({ ...p, [key]: ev.target.result }))
+                      r.readAsDataURL(file)
+                    }}
+                    onClear={() => {
+                      setQcFiles(f => ({ ...f, [key]: null }))
+                      setQcPreviews(p => ({ ...p, [key]: null }))
+                      setForm(f => ({ ...f, finish_photos: { ...f.finish_photos, [key]: null } }))
+                    }}
+                  />
+                </div>
+              )
+            })}
           </div>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
@@ -949,7 +1075,6 @@ export default function JobOrderPage() {
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
                             <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
-                            <button className="btn btn-outline btn-sm" title="ถ่ายรูปงาน" onClick={() => setCameraJob(j)}>📷</button>
                             {j.status !== 'ส่งงานแล้ว' && (
                               <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
                             )}
@@ -979,14 +1104,6 @@ export default function JobOrderPage() {
         )}
       </div>}
 
-      {/* ──── CAMERA MODAL ────────────────────────────────────── */}
-      {cameraJob && (
-        <CameraCapture
-          initialPhotos={readMatrix(cameraJob).finish_photos || {}}
-          onSave={handleCameraSave}
-          onClose={() => setCameraJob(null)}
-        />
-      )}
     </div>
   )
 }

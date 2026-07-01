@@ -146,7 +146,6 @@ export default function ReceiptPage() {
             {view.file_url && (
               <a href={view.file_url} target="_blank" rel="noreferrer" className="btn btn-outline">🔗 เปิดไฟล์</a>
             )}
-            <button className="btn btn-outline" onClick={() => exportJpeg('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>📷 JPEG</button>
             <button className="btn btn-primary" style={{ background: C.primary, borderColor: C.primary }} onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>

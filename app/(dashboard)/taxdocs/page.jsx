@@ -97,7 +97,6 @@ export default function TaxDocsPage() {
         <div className="card" style={{ overflow:'hidden' }}>
           <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:14, fontWeight:700 }}>🛒 VAT ซื้อ — จากการรับสินค้าเข้า</h2>
-            <button className="btn btn-outline btn-sm" onClick={() => exportJpeg('vat-buy-table','VAT-Buy')}>📷 Export</button>
           </div>
           <div id="vat-buy-table" style={{ overflowX:'auto' }}>
             <table>
@@ -143,7 +142,6 @@ export default function TaxDocsPage() {
         <div className="card" style={{ overflow:'hidden' }}>
           <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:14, fontWeight:700 }}>💰 VAT ขาย — จาก Invoice</h2>
-            <button className="btn btn-outline btn-sm" onClick={() => exportJpeg('vat-sell-table','VAT-Sell')}>📷 Export</button>
           </div>
           <div id="vat-sell-table" style={{ overflowX:'auto' }}>
             <table>
@@ -183,7 +181,6 @@ export default function TaxDocsPage() {
         <div className="card" style={{ overflow:'hidden' }}>
           <div style={{ padding:'14px 20px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:14, fontWeight:700 }}>📋 หัก ณ ที่จ่าย (Withholding Tax)</h2>
-            <button className="btn btn-outline btn-sm" onClick={() => exportJpeg('wht-table','WHT-Report')}>📷 Export</button>
           </div>
           <div id="wht-table" style={{ overflowX:'auto' }}>
             <table>

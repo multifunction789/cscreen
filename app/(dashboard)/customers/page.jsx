@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { getCustomers, insertCustomer, updateCustomer, getInvoices } from '@/lib/db'
 import { fmtDate } from '@/lib/shop'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { createCustomerFolderClient } from '@/lib/driveClient'
 
 const PLATFORMS = ['Walk-in','Line','Facebook','Instagram','Referral','อื่น ๆ']
 const TYPES     = ['บุคคลธรรมดา','นิติบุคคล','หน่วยงานราชการ','Dealer']
@@ -48,7 +49,17 @@ export default function CustomersPage() {
       return n > max ? n : max
     }, 0)
     const code = 'C-' + String(maxNum + 1).padStart(3, '0')
-    const { error: err } = await insertCustomer({ ...form, code })
+
+    // สร้าง Drive folder ก่อน insert
+    let drive_folder_id = null
+    try {
+      const { folderId } = await createCustomerFolderClient(code, form.name)
+      drive_folder_id = folderId
+    } catch (e) {
+      console.warn('Drive folder error:', e.message)
+    }
+
+    const { error: err } = await insertCustomer({ ...form, code, drive_folder_id })
     if (err) { setError(err.message); setSaving(false); return }
     setForm(emptyForm); setShowForm(false); setSaving(false)
     load()
