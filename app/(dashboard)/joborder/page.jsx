@@ -596,33 +596,9 @@ export default function JobOrderPage() {
               </div>
             )}
 
-            {/* Mockup + Artwork */}
-            {(mockup_url || view.image_url) && (
-              <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 12 }}>
-                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
-                  <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: bg, padding: '4px 10px', letterSpacing: .5 }}>{label}</div>
-                    <img src={url} alt={label} crossOrigin="anonymous"
-                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
-                  </div>
-                ))}
-              </div>
-            )}
-
-          </div>
-
-          {/* ═══════════════ PAGE 2 ═══════════════ */}
-          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24, pageBreakBefore: 'always' }}>
-            <PageHeader page={2} />
-
-            {/* Customer mini */}
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
-              {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
-            </div>
-
             {/* Production info badges */}
             {(fabric_type || shirt_color || screen_color) && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
+              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
                   .filter(f => f.v).map(f => (
                     <div key={f.l} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
@@ -633,7 +609,7 @@ export default function JobOrderPage() {
             )}
 
             {/* Size Matrix */}
-            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
+            <div style={{ overflowX: 'auto', marginBottom: 12 }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--primary)', color: '#fff' }}>
@@ -677,16 +653,15 @@ export default function JobOrderPage() {
               </table>
             </div>
 
-            {/* Grand total */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>
-                จำนวนรวม: <span style={{ color: 'var(--primary)', fontSize: 22, fontWeight: 900 }}>{grandTotal(prod)}</span> ตัว
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 12 }}>
+              <div style={{ fontSize: 14, fontWeight: 700 }}>
+                จำนวนรวม: <span style={{ color: 'var(--primary)', fontSize: 20, fontWeight: 900 }}>{grandTotal(prod)}</span> ตัว
               </div>
             </div>
 
             {/* Notes */}
             {(production_note || view.note) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginBottom: 12 }}>
                 {production_note && (
                   <div style={{ padding: '8px 14px', background: '#FFF7ED', borderRadius: 6, borderLeft: '3px solid #F97316', fontSize: 12 }}>
                     <span style={{ fontWeight: 700, color: '#C2410C' }}>หมายเหตุผลิต: </span>{production_note}
@@ -699,6 +674,20 @@ export default function JobOrderPage() {
                 )}
               </div>
             )}
+
+            {/* Mockup + Artwork */}
+            {(mockup_url || view.image_url) && (
+              <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12 }}>
+                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
+                  <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: bg, padding: '4px 10px', letterSpacing: .5 }}>{label}</div>
+                    <img src={url} alt={label} crossOrigin="anonymous"
+                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+                  </div>
+                ))}
+              </div>
+            )}
+
           </div>
 
           {/* ═══════════════ PAGE 2 — รูปงานเสร็จ QC ═══════════════ */}
