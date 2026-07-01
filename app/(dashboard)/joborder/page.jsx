@@ -194,6 +194,9 @@ export default function JobOrderPage() {
   const [qcFiles,     setQcFiles]     = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
   const [qcPreviews,  setQcPreviews]  = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
   const [newSizeInput, setNewSizeInput] = useState('')
+  const [viewQcFiles,    setViewQcFiles]    = useState({})
+  const [viewQcPreviews, setViewQcPreviews] = useState({})
+  const [savingQc,       setSavingQc]       = useState(false)
   const printRef = useRef(null)
 
   useEffect(() => { load() }, [])
@@ -439,6 +442,41 @@ export default function JobOrderPage() {
   const monthCount = filtered.length
   const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
+  // ── บันทึก QC photos จาก view inline ─────────────────────────
+  async function handleSaveQc() {
+    if (!view) return
+    setSavingQc(true)
+    const mCur     = readMatrix(view)
+    const custObj  = customers.find(c => c.id === view.customer_id) || {}
+    const custName = custObj.name || 'unknown'
+    const folder   = custObj.drive_folder_id || mCur.drive_folders?.jobFolderId || null
+    const QC_KEYS  = ['QC1','QC2','QC3','QC4']
+    let photos = { ...(mCur.finish_photos || {}) }
+    try {
+      for (const key of QC_KEYS) {
+        const file = viewQcFiles[key]
+        if (file) {
+          const ext  = file.name.split('.').pop()
+          const name = `${view.code}_${custName}_${key}.${ext}`
+          if (folder) {
+            const r = await uploadFileClient(file, folder, name)
+            photos[key] = r.directUrl
+          } else {
+            photos[key] = await uploadFile(supabase, 'job-images', file)
+          }
+        }
+      }
+    } catch (e) { console.warn('QC upload:', e.message) }
+
+    const itemsPayload = { ...view.items, finish_photos: photos }
+    await updateJobOrder(view.id, { items: itemsPayload })
+    setViewQcFiles({})
+    setViewQcPreviews({})
+    setView(v => ({ ...v, items: itemsPayload }))
+    load()
+    setSavingQc(false)
+  }
+
   // ──── PRINT VIEW (3 pages) ───────────────────────────────────
   if (view) {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
@@ -650,29 +688,70 @@ export default function JobOrderPage() {
               {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
             </div>
 
-            {finish_photos && Object.keys(finish_photos).length > 0 ? (
-              <div>
-                <div style={{ fontSize: 11, fontWeight: 700, color: '#888', marginBottom: 12, textTransform: 'uppercase', letterSpacing: .5 }}>รูปงานเสร็จ QC</div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 16 }}>
-                  {FINISH_SLOTS.map(s => finish_photos[s.key] ? (
-                    <div key={s.key} style={{ borderRadius: 8, overflow: 'hidden', border: '1px solid var(--border)' }}>
-                      <img src={finish_photos[s.key]} alt={s.label} crossOrigin="anonymous"
-                        style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
-                      <div style={{ fontSize: 11, fontWeight: 700, textAlign: 'center', padding: '5px 0', color: '#555', background: '#f9f9f9' }}>{s.label}</div>
+            {/* QC grid — รูปที่บันทึกแล้ว + ช่องแนบใหม่ */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
+              {FINISH_SLOTS.map(s => {
+                const qcKey     = s.key.toUpperCase().replace('FRONT','QC1').replace('BACK','QC2').replace('SIDE','QC3').replace('GROUP','QC4')
+                // map FINISH_SLOTS keys → QC keys
+                const KEY_MAP   = { front:'QC1', back:'QC2', side:'QC3', group:'QC4' }
+                const key       = KEY_MAP[s.key]
+                const saved     = finish_photos?.[s.key] || finish_photos?.[key] || null
+                const newPreview = viewQcPreviews[key] || null
+                return (
+                  <div key={s.key} style={{ borderRadius: 10, overflow: 'hidden', border: `2px solid ${newPreview ? '#6366F1' : saved ? 'var(--border)' : '#E5E7EB'}`, background: '#fff' }}>
+                    {/* รูปที่มีอยู่ / preview ใหม่ */}
+                    {(newPreview || saved) ? (
+                      <div style={{ position: 'relative' }}>
+                        <img src={newPreview || saved} alt={s.label} crossOrigin="anonymous"
+                          style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
+                        {newPreview && (
+                          <div style={{ position:'absolute', top:6, right:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>ใหม่</div>
+                        )}
+                      </div>
+                    ) : (
+                      <div style={{ aspectRatio:'4/3', display:'flex', alignItems:'center', justifyContent:'center', background:'#F8FAFC', color:'#D1D5DB', flexDirection:'column', gap:4 }}>
+                        <span style={{ fontSize:28 }}>📷</span>
+                        <span style={{ fontSize:11, fontWeight:600 }}>{s.label}</span>
+                      </div>
+                    )}
+                    {/* ปุ่มแนบรูป — no-print */}
+                    <div className="no-print" style={{ padding:'8px 10px', borderTop:'1px solid #F1F5F9', display:'flex', alignItems:'center', gap:8 }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#64748B', flex:1 }}>{s.label}</span>
+                      <label style={{
+                        fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:7, cursor:'pointer',
+                        background: newPreview ? '#EDE9FE' : 'var(--primary)',
+                        color: newPreview ? '#6D28D9' : '#fff',
+                        border: newPreview ? '1.5px solid #C4B5FD' : 'none',
+                        display:'inline-flex', alignItems:'center', gap:4,
+                      }}>
+                        {newPreview ? '🔄 เปลี่ยน' : '📎 แนบรูป'}
+                        <input type="file" accept="image/*" style={{ display:'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]; if (!file) return
+                            setViewQcFiles(f => ({ ...f, [key]: file }))
+                            const r = new FileReader()
+                            r.onload = ev => setViewQcPreviews(p => ({ ...p, [key]: ev.target.result }))
+                            r.readAsDataURL(file)
+                          }}
+                        />
+                      </label>
+                      {newPreview && (
+                        <button onClick={() => { setViewQcFiles(f=>({...f,[key]:null})); setViewQcPreviews(p=>({...p,[key]:null})) }}
+                          style={{ fontSize:11, padding:'5px 8px', borderRadius:7, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>ยกเลิก</button>
+                      )}
                     </div>
-                  ) : (
-                    <div key={s.key} style={{ borderRadius: 8, border: '2px dashed #E5E7EB', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', aspectRatio: '4/3', color: '#D1D5DB', gap: 6 }}>
-                      <span style={{ fontSize: 28 }}>📷</span>
-                      <span style={{ fontSize: 11, fontWeight: 600 }}>{s.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', minHeight: 300, color: '#D1D5DB', gap: 12 }}>
-                <span style={{ fontSize: 48 }}>📷</span>
-                <div style={{ fontSize: 14, fontWeight: 700 }}>ยังไม่มีรูปงานเสร็จ</div>
-                <div style={{ fontSize: 13, color: '#9CA3AF' }}>กลับไปแก้ไขใบงานเพื่อแนบรูป QC</div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* ปุ่มบันทึก QC — แสดงเฉพาะเมื่อมีรูปใหม่ */}
+            {Object.values(viewQcFiles).some(Boolean) && (
+              <div className="no-print" style={{ marginTop:16, display:'flex', justifyContent:'flex-end' }}>
+                <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc}
+                  style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, padding:'10px 24px' }}>
+                  {savingQc ? '⏳ กำลังบันทึก...' : '💾 บันทึกรูป QC'}
+                </button>
               </div>
             )}
           </div>
