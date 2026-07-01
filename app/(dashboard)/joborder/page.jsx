@@ -32,6 +32,15 @@ function grandTotal(rows) {
   return (rows || []).reduce((s, r) => s + rowTotal(r.qtys), 0)
 }
 
+// แปลง reference เก่า (string) + ใหม่ (array) → [url, ...]
+function normalizeRefImages(j) {
+  const arr = j.items?.reference_images || j.reference_images
+  if (Array.isArray(arr) && arr.length) return arr.filter(Boolean)
+  // legacy single string
+  const single = j.items?.reference_url || j.reference_url
+  return single ? [single] : []
+}
+
 // แปลง finish_photos ทุกรูปแบบ → [{url, label}]
 function normalizeQc(raw) {
   if (!raw) return []
@@ -57,18 +66,18 @@ function readMatrix(j) {
       finish_photos:   normalizeQc(j.items.finish_photos),
       drive_folders:   j.items.drive_folders   || null,
       design_detail:   j.design_detail         || {},
-      reference_url:   j.reference_url         || '',
+      reference_images: normalizeRefImages(j),
     }
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:[], drive_folders: null, design_detail:{}, reference_url:'' }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:[], drive_folders: null, design_detail:{}, reference_images:[] }
 }
 
 const emptyForm = () => ({
   customer_id: '', invoice_id: '', note: '', due_date: '', document_date: todayStr(), status: 'รอมัดจำ',
   fabric_type: '', shirt_color: '', screen_color: '', production_note: '',
-  artwork_url: '', mockup_url: '', reference_url: '',
+  artwork_url: '', mockup_url: '', reference_images: [],
   design_detail: { size: '', position: '', color_count: '', technique: '', special: '' },
   sizes: [...DEFAULT_SIZES],
   prod_items: [makeRow(DEFAULT_SIZES)],
@@ -200,8 +209,7 @@ export default function JobOrderPage() {
   const [mockupPreview, setMockupPreview]   = useState(null)
   const [artworkSourceFile, setArtworkSourceFile] = useState(null)
   const [mockupSourceFile,  setMockupSourceFile]  = useState(null)
-  const [referenceFile,     setReferenceFile]     = useState(null)
-  const [referencePreview,  setReferencePreview]  = useState(null)
+  const [referenceFiles,    setReferenceFiles]    = useState([])   // [{file, preview}]
   const [qcFiles,     setQcFiles]     = useState({})
   const [qcPreviews,  setQcPreviews]  = useState({})
   const [newSizeInput, setNewSizeInput] = useState('')
@@ -298,20 +306,14 @@ export default function JobOrderPage() {
     // ใช้ folder ของลูกค้า (สร้างตอน สร้างลูกค้า)
     const custFolderId = cust.drive_folder_id || null
 
-    // Upload reference / artwork / mockup → folder ลูกค้า พร้อม naming convention
-    let reference_url = form.reference_url || null
-    let artwork_url   = form.artwork_url   || null
-    let mockup_url    = form.mockup_url    || null
+    // Upload reference → Supabase only (ไม่ต้องขึ้น Drive)
+    let reference_images = Array.isArray(form.reference_images) ? [...form.reference_images] : []
+    let artwork_url      = form.artwork_url || null
+    let mockup_url       = form.mockup_url  || null
     try {
-      if (referenceFile) {
-        const ext  = referenceFile.name.split('.').pop()
-        const name = `${jobCode}_${custName}_REF.${ext}`
-        if (custFolderId) {
-          const r = await uploadFileClient(referenceFile, custFolderId, name)
-          reference_url = r.directUrl
-        } else {
-          reference_url = await uploadFile(supabase, 'job-images', referenceFile)
-        }
+      for (const { file } of referenceFiles) {
+        const url = await uploadFile(supabase, 'job-images', file)
+        if (url) reference_images.push(url)
       }
       if (artworkFile) {
         const ext  = artworkFile.name.split('.').pop()
@@ -377,7 +379,7 @@ export default function JobOrderPage() {
       screen_color:    form.screen_color    || null,
       production_note: form.production_note || null,
       mockup_url:      mockup_url           || null,
-      reference_url:   reference_url        || null,
+      reference_images: reference_images.length ? reference_images : null,
       design_detail:   form.design_detail   || null,
       finish_photos:   finish_photos.length ? finish_photos : null,
       drive_folders:   custFolderId ? { jobFolderId: custFolderId } : null,
@@ -392,7 +394,7 @@ export default function JobOrderPage() {
       document_date:  form.document_date || todayStr(),
       note:           form.note,
       status:         form.status,
-      reference_url:  reference_url || null,
+      reference_images: reference_images.length ? reference_images : null,
       design_detail:  form.design_detail || null,
       ...(artwork_url ? { image_url: artwork_url } : {}),
     }
@@ -405,7 +407,7 @@ export default function JobOrderPage() {
     }
 
     setForm(emptyForm())
-    setReferenceFile(null);      setReferencePreview(null)
+    setReferenceFiles([])
     setQcFiles({})
     setQcPreviews({})
     setArtworkFile(null);        setArtworkPreview(null)
@@ -430,13 +432,13 @@ export default function JobOrderPage() {
       due_date:        j.due_date    || '',
       document_date:   j.document_date || todayStr(),
       status:          j.status,
-      artwork_url:     j.image_url      || '',
-      reference_url:   j.reference_url  || '',
-      design_detail:   j.design_detail  || { size:'', position:'', color_count:'', technique:'', special:'' },
+      artwork_url:      j.image_url     || '',
+      reference_images: normalizeRefImages(j),
+      design_detail:    j.design_detail || { size:'', position:'', color_count:'', technique:'', special:'' },
       ...m,
-      finish_photos:   m.finish_photos  || {},
+      finish_photos:    m.finish_photos || [],
     })
-    setReferenceFile(null); setReferencePreview(null)
+    setReferenceFiles([])
     setQcFiles({})
     setQcPreviews({})
     setArtworkFile(null); setArtworkPreview(null)
@@ -509,7 +511,7 @@ export default function JobOrderPage() {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
     const inv  = invoices.find(i => i.id === view.invoice_id)
     const m    = readMatrix(view)
-    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos, design_detail, reference_url } = m
+    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos, design_detail, reference_images } = m
     const dd = design_detail || {}
     const FINISH_SLOTS = [
       { key: 'front', label: 'มุมตรง' },
@@ -595,26 +597,36 @@ export default function JobOrderPage() {
               </div>
             )}
 
-            {/* Images: Reference + Mockup + Artwork */}
-            {(() => {
-              const refUrl  = reference_url || m.reference_url || view.reference_url || null
-              const artUrl  = view.image_url || null
-              const cols = [refUrl && { url: refUrl, label: 'REFERENCE' }, mockup_url && { url: mockup_url, label: 'MOCKUP' }, artUrl && { url: artUrl, label: 'ARTWORK' }].filter(Boolean)
-              if (!cols.length) return null
-              return (
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${cols.length}, 1fr)`, gap: 12, marginBottom: 8 }}>
-                  {cols.map(({ url, label }) => (
-                    <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                      <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: label === 'REFERENCE' ? '#6B7280' : label === 'MOCKUP' ? '#1D4ED8' : '#374151', padding: '4px 10px', letterSpacing: .5 }}>
-                        {label}
-                      </div>
-                      <img src={url} alt={label} crossOrigin="anonymous"
-                        style={{ width: '100%', maxHeight: 280, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+            {/* Mockup + Artwork */}
+            {(mockup_url || view.image_url) && (
+              <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 12 }}>
+                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
+                  <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: bg, padding: '4px 10px', letterSpacing: .5 }}>{label}</div>
+                    <img src={url} alt={label} crossOrigin="anonymous"
+                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Reference images — grid ไม่จำกัดจำนวน */}
+            {reference_images?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: .5 }}>
+                  Reference ({reference_images.length} รูป)
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(reference_images.length, 4)}, 1fr)`, gap: 8 }}>
+                  {reference_images.map((url, i) => (
+                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
+                      <img src={url} alt={`ref-${i+1}`} crossOrigin="anonymous"
+                        style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block', background: '#f9f9f9' }} />
+                      <div style={{ fontSize: 9, textAlign: 'center', padding: '2px 0', color: '#9CA3AF', background: '#F8FAFC' }}>REF {i+1}</div>
                     </div>
                   ))}
                 </div>
-              )
-            })()}
+              </div>
+            )}
           </div>
 
           {/* ═══════════════ PAGE 2 ═══════════════ */}
@@ -1033,18 +1045,59 @@ export default function JobOrderPage() {
             ))}
           </div>
 
-          {/* Reference Image */}
+          {/* Reference Images — เพิ่มได้หลายรูป */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: .4 }}>📎 Reference — ภาพตัวอย่างจากลูกค้า</div>
-            <FileDropZone
-              accept="image/*"
-              icon="🖼️"
-              label="วางหรือคลิกเพื่อแนบรูป Reference"
-              preview={referencePreview || form.reference_url || null}
-              imageOnly
-              onFile={file => handleFileChange({ target: { files: [file] } }, setReferenceFile, setReferencePreview)}
-              onClear={() => { setReferenceFile(null); setReferencePreview(null); setForm(f => ({ ...f, reference_url: '' })) }}
-            />
+            <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .4 }}>
+              📎 Reference — ภาพตัวอย่างจากลูกค้า ({(form.reference_images?.length || 0) + referenceFiles.length} รูป)
+            </div>
+            {/* รูปที่บันทึกแล้ว */}
+            {form.reference_images?.length > 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:8 }}>
+                {form.reference_images.map((url, i) => (
+                  <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                    <img src={url} alt={`ref-${i}`} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                    <button onClick={() => setForm(f => ({ ...f, reference_images: f.reference_images.filter((_,j)=>j!==i) }))}
+                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                    <div style={{ fontSize:9, textAlign:'center', padding:'2px 0', color:'#9CA3AF', background:'#F8FAFC' }}>REF {i+1}</div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* รูปใหม่รอ upload */}
+            {referenceFiles.length > 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:8 }}>
+                {referenceFiles.map((item, i) => (
+                  <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                    <img src={item.preview} alt={`new-ref-${i}`} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                    <div style={{ position:'absolute', top:4, left:4, background:'#6366F1', color:'#fff', fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10 }}>ใหม่</div>
+                    <button onClick={() => setReferenceFiles(f => f.filter((_,j)=>j!==i))}
+                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* ปุ่มเพิ่มรูป */}
+            <label style={{
+              display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+              padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1',
+              background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B',
+              transition:'all .15s',
+            }}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
+            >
+              <span>🖼️</span> เพิ่มรูป Reference (เลือกได้หลายรูปพร้อมกัน)
+              <input type="file" accept="image/*" multiple style={{ display:'none' }}
+                onChange={e => {
+                  Array.from(e.target.files||[]).forEach(file => {
+                    const r = new FileReader()
+                    r.onload = ev => setReferenceFiles(f => [...f, { file, preview: ev.target.result }])
+                    r.readAsDataURL(file)
+                  })
+                  e.target.value=''
+                }}
+              />
+            </label>
           </div>
 
           {/* Artwork + Mockup */}
