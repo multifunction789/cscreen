@@ -1,4 +1,4 @@
-'use client'
+﻿'use client'
 import { useState, useEffect, useRef } from 'react'
 import { getJobOrders, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
@@ -9,19 +9,19 @@ import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 
 const STATUS_BADGE = {
-  'รอมัดจำ'      : 'badge badge-gray',
-  'รอออกแบบ'     : 'badge badge-cyan',
-  'รอทำไฟล์'     : 'badge badge-purple',
-  'สั่งของ'       : 'badge badge-yellow',
-  'กำลังสกรีน'   : 'badge badge-blue',
-  'แพ็คพร้อมส่ง' : 'badge badge-green',
-  'ส่งงานแล้ว'   : 'badge badge-green',
-  'เลยกำหนด'     : 'badge badge-red',
+  'à¸£à¸­à¸¡à¸±à¸”à¸ˆà¸³'      : 'badge badge-gray',
+  'à¸£à¸­à¸­à¸­à¸à¹à¸šà¸š'     : 'badge badge-cyan',
+  'à¸£à¸­à¸—à¸³à¹„à¸Ÿà¸¥à¹Œ'     : 'badge badge-purple',
+  'à¸ªà¸±à¹ˆà¸‡à¸‚à¸­à¸‡'       : 'badge badge-yellow',
+  'à¸à¸³à¸¥à¸±à¸‡à¸ªà¸à¸£à¸µà¸™'   : 'badge badge-blue',
+  'à¹à¸žà¹‡à¸„à¸žà¸£à¹‰à¸­à¸¡à¸ªà¹ˆà¸‡' : 'badge badge-green',
+  'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§'   : 'badge badge-green',
+  'à¹€à¸¥à¸¢à¸à¸³à¸«à¸™à¸”'     : 'badge badge-red',
 }
 const ALL_STATUS = Object.keys(STATUS_BADGE)
 const DEFAULT_SIZES = ['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']
 
-// ── helpers ──────────────────────────────────────────────────────
+// â”€â”€ helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function makeRow(sizes, style = '') {
   return { style, qtys: Object.fromEntries(sizes.map(s => [s, ''])) }
 }
@@ -32,7 +32,7 @@ function grandTotal(rows) {
   return (rows || []).reduce((s, r) => s + rowTotal(r.qtys), 0)
 }
 
-// แปลง reference เก่า (string) + ใหม่ (array) → [url, ...]
+// à¹à¸›à¸¥à¸‡ reference à¹€à¸à¹ˆà¸² (string) + à¹ƒà¸«à¸¡à¹ˆ (array) â†’ [url, ...]
 function normalizeRefImages(j) {
   const arr = j.items?.reference_images || j.reference_images
   if (Array.isArray(arr) && arr.length) return arr.filter(Boolean)
@@ -41,18 +41,18 @@ function normalizeRefImages(j) {
   return single ? [single] : []
 }
 
-// แปลง finish_photos ทุกรูปแบบ → [{url, label}]
+// à¹à¸›à¸¥à¸‡ finish_photos à¸—à¸¸à¸à¸£à¸¹à¸›à¹à¸šà¸š â†’ [{url, label}]
 function normalizeQc(raw) {
   if (!raw) return []
   if (Array.isArray(raw)) return raw.filter(p => p?.url)
-  // legacy object format: {front,back,side,group} หรือ {QC1,QC2,...}
-  const LABELS = { front:'มุมตรง', back:'มุมหลัง', side:'มุมข้าง', group:'รูปรวม' }
+  // legacy object format: {front,back,side,group} à¸«à¸£à¸·à¸­ {QC1,QC2,...}
+  const LABELS = { front:'à¸¡à¸¸à¸¡à¸•à¸£à¸‡', back:'à¸¡à¸¸à¸¡à¸«à¸¥à¸±à¸‡', side:'à¸¡à¸¸à¸¡à¸‚à¹‰à¸²à¸‡', group:'à¸£à¸¹à¸›à¸£à¸§à¸¡' }
   return Object.entries(raw)
     .filter(([, v]) => v)
     .map(([k, url]) => ({ url, label: LABELS[k] || k }))
 }
 
-// ── Extract matrix data stored in items column ───────────────────
+// â”€â”€ Extract matrix data stored in items column â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function readMatrix(j) {
   if (j.items && j.items.type === 'size_matrix') {
     return {
@@ -75,7 +75,7 @@ function readMatrix(j) {
 }
 
 const emptyForm = () => ({
-  customer_id: '', invoice_id: '', note: '', due_date: '', document_date: todayStr(), status: 'รอมัดจำ',
+  customer_id: '', invoice_id: '', note: '', due_date: '', document_date: todayStr(), status: 'à¸£à¸­à¸¡à¸±à¸”à¸ˆà¸³',
   fabric_type: '', shirt_color: '', screen_color: '', production_note: '',
   artwork_url: '', mockup_url: '', reference_images: [],
   design_detail: { size: '', position: '', color_count: '', technique: '', special: '' },
@@ -93,12 +93,12 @@ function SectionHeader({ icon, title }) {
   )
 }
 
-// ── Calendar View Component ──────────────────────────────────────
+// â”€â”€ Calendar View Component â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function CalendarView({ jobs, month, onMonthChange, onView }) {
   const [year, m] = month.split('-').map(Number)
   const firstDay  = new Date(year, m - 1, 1)
   const lastDay   = new Date(year, m, 0)
-  const thM = ['ม.ค.','ก.พ.','มี.ค.','เม.ย.','พ.ค.','มิ.ย.','ก.ค.','ส.ค.','ก.ย.','ต.ค.','พ.ย.','ธ.ค.']
+  const thM = ['à¸¡.à¸„.','à¸.à¸ž.','à¸¡à¸µ.à¸„.','à¹€à¸¡.à¸¢.','à¸ž.à¸„.','à¸¡à¸´.à¸¢.','à¸.à¸„.','à¸ª.à¸„.','à¸.à¸¢.','à¸•.à¸„.','à¸ž.à¸¢.','à¸˜.à¸„.']
 
   // Build cells (Mon-first grid)
   const cells = []
@@ -130,13 +130,13 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
     <div className="card" style={{ overflow: 'hidden' }}>
       {/* Header */}
       <div style={{ padding: '12px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <button className="btn btn-outline btn-sm" onClick={prevMo}>◀ ก่อนหน้า</button>
+        <button className="btn btn-outline btn-sm" onClick={prevMo}>â—€ à¸à¹ˆà¸­à¸™à¸«à¸™à¹‰à¸²</button>
         <span style={{ fontWeight: 700, fontSize: 15 }}>{thM[m - 1]} {year + 543}</span>
-        <button className="btn btn-outline btn-sm" onClick={nextMo}>ถัดไป ▶</button>
+        <button className="btn btn-outline btn-sm" onClick={nextMo}>à¸–à¸±à¸”à¹„à¸› â–¶</button>
       </div>
       {/* Day labels */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(7,1fr)', background: 'var(--bg)', borderBottom: '1px solid var(--border)' }}>
-        {['จ.', 'อ.', 'พ.', 'พฤ.', 'ศ.', 'ส.', 'อา.'].map((d, i) => (
+        {['à¸ˆ.', 'à¸­.', 'à¸ž.', 'à¸žà¸¤.', 'à¸¨.', 'à¸ª.', 'à¸­à¸².'].map((d, i) => (
           <div key={d} style={{ padding: '8px 4px', textAlign: 'center', fontSize: 12, fontWeight: 700, color: i >= 5 ? 'var(--danger)' : 'var(--text-muted)' }}>{d}</div>
         ))}
       </div>
@@ -157,8 +157,8 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
                   color: isToday ? '#fff' : 'var(--text-muted)',
                 }}>{day}</div>
                 {dayJobs.map(j => {
-                  const overdue = dateObj < today && j.status !== 'ส่งงานแล้ว'
-                  const done    = j.status === 'ส่งงานแล้ว'
+                  const overdue = dateObj < today && j.status !== 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§'
+                  const done    = j.status === 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§'
                   return (
                     <div key={j.id} onClick={() => onView(j)} style={{
                       fontSize: 10, padding: '2px 5px', borderRadius: 4, marginBottom: 2, cursor: 'pointer',
@@ -178,7 +178,7 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
       ))}
       {/* Legend */}
       <div style={{ padding: '8px 16px', display: 'flex', gap: 14, fontSize: 11, color: 'var(--text-muted)' }}>
-        {[['#EFF6FF','#BFDBFE','ปกติ'],['#FEE2E2','#FECACA','เลยกำหนด'],['#D1FAE5','#A7F3D0','ส่งแล้ว']].map(([bg, border, label]) => (
+        {[['#EFF6FF','#BFDBFE','à¸›à¸à¸•à¸´'],['#FEE2E2','#FECACA','à¹€à¸¥à¸¢à¸à¸³à¸«à¸™à¸”'],['#D1FAE5','#A7F3D0','à¸ªà¹ˆà¸‡à¹à¸¥à¹‰à¸§']].map(([bg, border, label]) => (
           <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, border: `1px solid ${border}`, display: 'inline-block' }} />{label}
           </span>
@@ -237,7 +237,7 @@ export default function JobOrderPage() {
     setLoading(false)
   }
 
-  // ── Invoice selection → auto-fill ─────────────────────────────
+  // â”€â”€ Invoice selection â†’ auto-fill â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function onSelectInvoice(invId) {
     const inv = invoices.find(i => i.id === invId)
     if (!inv) { setForm(f => ({ ...f, invoice_id: invId })); return }
@@ -249,7 +249,7 @@ export default function JobOrderPage() {
     setForm(f => ({ ...f, invoice_id: invId, customer_id: inv.customer_id, prod_items: newRows }))
   }
 
-  // ── Size matrix helpers ───────────────────────────────────────
+  // â”€â”€ Size matrix helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function addSize() {
     const s = newSizeInput.trim()
     if (!s || form.sizes.includes(s)) return
@@ -279,7 +279,7 @@ export default function JobOrderPage() {
     })
   }
 
-  // ── File upload ───────────────────────────────────────────────
+  // â”€â”€ File upload â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   function handleFileChange(e, setFile, setPreview) {
     const file = e.target.files?.[0]; if (!file) return
     setFile(file)
@@ -288,13 +288,13 @@ export default function JobOrderPage() {
     r.readAsDataURL(file)
   }
 
-  // ── Save ─────────────────────────────────────────────────────
+  // â”€â”€ Save â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function handleSave() {
-    if (!form.invoice_id) return alert('กรุณาเลือก Invoice — ใบงานต้องอ้างอิง Invoice')
-    if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
+    if (!form.invoice_id) return alert('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸ Invoice â€” à¹ƒà¸šà¸‡à¸²à¸™à¸•à¹‰à¸­à¸‡à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡ Invoice')
+    if (!form.customer_id) return alert('à¸à¸£à¸¸à¸“à¸²à¹€à¸¥à¸·à¸­à¸à¸¥à¸¹à¸à¸„à¹‰à¸²')
     setSaving(true)
 
-    // คำนวณ job code ก่อน (ต้องใช้ก่อนสร้าง folder)
+    // à¸„à¸³à¸™à¸§à¸“ job code à¸à¹ˆà¸­à¸™ (à¸•à¹‰à¸­à¸‡à¹ƒà¸Šà¹‰à¸à¹ˆà¸­à¸™à¸ªà¸£à¹‰à¸²à¸‡ folder)
     const maxNum = rows.reduce((max, r) => {
       const n = parseInt(r.code?.replace('JO-', '') || '0'); return n > max ? n : max
     }, 0)
@@ -303,10 +303,10 @@ export default function JobOrderPage() {
       : 'JO-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
     const cust     = customers.find(c => c.id === form.customer_id) || {}
     const custName = cust.name || 'unknown'
-    // ใช้ folder ของลูกค้า (สร้างตอน สร้างลูกค้า)
+    // à¹ƒà¸Šà¹‰ folder à¸‚à¸­à¸‡à¸¥à¸¹à¸à¸„à¹‰à¸² (à¸ªà¸£à¹‰à¸²à¸‡à¸•à¸­à¸™ à¸ªà¸£à¹‰à¸²à¸‡à¸¥à¸¹à¸à¸„à¹‰à¸²)
     const custFolderId = cust.drive_folder_id || null
 
-    // Upload reference → Supabase only (ไม่ต้องขึ้น Drive)
+    // Upload reference â†’ Supabase only (à¹„à¸¡à¹ˆà¸•à¹‰à¸­à¸‡à¸‚à¸¶à¹‰à¸™ Drive)
     let reference_images = Array.isArray(form.reference_images) ? [...form.reference_images] : []
     let artwork_url      = form.artwork_url || null
     let mockup_url       = form.mockup_url  || null
@@ -335,7 +335,7 @@ export default function JobOrderPage() {
           mockup_url = await uploadFile(supabase, 'job-images', mockupFile)
         }
       }
-      // .ai / .psd — คงชื่อเดิม
+      // .ai / .psd â€” à¸„à¸‡à¸Šà¸·à¹ˆà¸­à¹€à¸”à¸´à¸¡
       if (artworkSourceFile && custFolderId)
         await uploadFileClient(artworkSourceFile, custFolderId, artworkSourceFile.name)
       if (mockupSourceFile && custFolderId)
@@ -360,7 +360,7 @@ export default function JobOrderPage() {
         } else {
           url = await uploadFile(supabase, 'job-images', file)
         }
-        finish_photos.push({ url, label: label || `รูปที่ ${qcNum}` })
+        finish_photos.push({ url, label: label || `à¸£à¸¹à¸›à¸—à¸µà¹ˆ ${qcNum}` })
       }
     } catch (e) {
       console.warn('QC upload error:', e.message)
@@ -368,7 +368,7 @@ export default function JobOrderPage() {
 
     // Summary for list view
     const validRows = form.prod_items.filter(r => r.style)
-    const item_desc = validRows.map(r => r.style).join(', ') || '—'
+    const item_desc = validRows.map(r => r.style).join(', ') || 'â€”'
 
     const itemsPayload = {
       type:            'size_matrix',
@@ -418,7 +418,7 @@ export default function JobOrderPage() {
 
 
   async function handleDelete(j) {
-    if (!confirm(`ลบใบงาน ${j.code} ใช่ไหม?`)) return
+    if (!confirm(`à¸¥à¸šà¹ƒà¸šà¸‡à¸²à¸™ ${j.code} à¹ƒà¸Šà¹ˆà¹„à¸«à¸¡?`)) return
     await deleteJobOrder(j.id); load()
   }
 
@@ -451,11 +451,11 @@ export default function JobOrderPage() {
     const dm = !monthFilter || (j.document_date || j.created_at || '').startsWith(monthFilter)
     return ms && (!filterStatus || j.status === filterStatus) && dm
   })
-  const isOverdue = j => j.due_date && new Date(j.due_date) < new Date() && j.status !== 'ส่งงานแล้ว'
+  const isOverdue = j => j.due_date && new Date(j.due_date) < new Date() && j.status !== 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§'
   const monthCount = filtered.length
   const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
-  // ── บันทึก QC photos จาก view inline (array format) ──────────
+  // â”€â”€ à¸šà¸±à¸™à¸—à¸¶à¸ QC photos à¸ˆà¸²à¸ view inline (array format) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function handleSaveQc() {
     if (!view) return
     setSavingQc(true)
@@ -480,7 +480,7 @@ export default function JobOrderPage() {
         } else {
           url = await uploadFile(supabase, 'job-images', file)
         }
-        photos.push({ url, label: label || `รูปที่ ${qcNum}` })
+        photos.push({ url, label: label || `à¸£à¸¹à¸›à¸—à¸µà¹ˆ ${qcNum}` })
       }
     } catch (e) { console.warn('QC upload:', e.message) }
 
@@ -493,7 +493,7 @@ export default function JobOrderPage() {
     setSavingQc(false)
   }
 
-  // ── ลบ QC photo ออกจาก view ───────────────────────────────────
+  // â”€â”€ à¸¥à¸š QC photo à¸­à¸­à¸à¸ˆà¸²à¸ view â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   async function handleDeleteQc(idx) {
     if (!view) return
     const mCur   = readMatrix(view)
@@ -505,7 +505,7 @@ export default function JobOrderPage() {
     load()
   }
 
-  // ──── PRINT VIEW (3 pages) ───────────────────────────────────
+  // â”€â”€â”€â”€ PRINT VIEW (3 pages) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (view) {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
     const inv  = invoices.find(i => i.id === view.invoice_id)
@@ -513,10 +513,10 @@ export default function JobOrderPage() {
     const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos, design_detail, reference_images } = m
     const dd = design_detail || {}
     const FINISH_SLOTS = [
-      { key: 'front', label: 'มุมตรง' },
-      { key: 'back',  label: 'มุมหลัง' },
-      { key: 'side',  label: 'มุมข้าง' },
-      { key: 'group', label: 'รูปรวม' },
+      { key: 'front', label: 'à¸¡à¸¸à¸¡à¸•à¸£à¸‡' },
+      { key: 'back',  label: 'à¸¡à¸¸à¸¡à¸«à¸¥à¸±à¸‡' },
+      { key: 'side',  label: 'à¸¡à¸¸à¸¡à¸‚à¹‰à¸²à¸‡' },
+      { key: 'group', label: 'à¸£à¸¹à¸›à¸£à¸§à¸¡' },
     ]
     const filePrefix = `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`
 
@@ -531,18 +531,18 @@ export default function JobOrderPage() {
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text)' }}>ใบงานการผลิต <span style={{ color: '#999', fontSize: 12 }}>หน้า {page}/3</span></div>
+            <div style={{ fontSize: 18, fontWeight: 900, color: 'var(--text)' }}>à¹ƒà¸šà¸‡à¸²à¸™à¸à¸²à¸£à¸œà¸¥à¸´à¸• <span style={{ color: '#999', fontSize: 12 }}>à¸«à¸™à¹‰à¸² {page}/3</span></div>
             <div style={{ fontSize: 13, color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700, display: 'flex', alignItems: 'center', gap: 6, justifyContent: 'flex-end' }}>
               {view.code}
               {m.drive_folders?.jobFolderId && (
                 <a href={`https://drive.google.com/drive/folders/${m.drive_folders.jobFolderId}`}
                   target="_blank" rel="noreferrer" style={{ fontSize: 11, textDecoration: 'none', color: '#1a73e8' }}>
-                  📁 Drive
+                  ðŸ“ Drive
                 </a>
               )}
             </div>
-            <div style={{ fontSize: 11, color: '#666' }}>วันที่: {fmtDate(view.document_date || view.created_at)}</div>
-            {view.due_date && <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 700 }}>กำหนดส่ง: {fmtDate(view.due_date)}</div>}
+            <div style={{ fontSize: 11, color: '#666' }}>à¸§à¸±à¸™à¸—à¸µà¹ˆ: {fmtDate(view.document_date || view.created_at)}</div>
+            {view.due_date && <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 700 }}>à¸à¸³à¸«à¸™à¸”à¸ªà¹ˆà¸‡: {fmtDate(view.due_date)}</div>}
           </div>
         </div>
       )
@@ -552,281 +552,314 @@ export default function JobOrderPage() {
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
         {/* Toolbar */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
-          <button className="btn btn-outline" onClick={() => printDoc('print-area', filePrefix)}>🖨️ พิมพ์</button>
+          <button className="btn btn-outline" onClick={() => setView(null)}>â† à¸à¸¥à¸±à¸š</button>
+          <button className="btn btn-outline" onClick={() => printDoc('print-area', filePrefix)}>ðŸ–¨ï¸ à¸žà¸´à¸¡à¸žà¹Œ</button>
         </div>
 
         <div id="print-area" ref={printRef}>
+          {/* â”€â”€ shared helpers â”€â”€ */}
+          {(() => {
+            const PAGE_STYLE = { background:'#fff', border:'1px solid var(--border)', borderRadius:8, padding:32, marginBottom:24 }
+            const BREAK      = { ...PAGE_STYLE, pageBreakBefore:'always' }
+            const LABEL_BAR  = (text, bg='#374151') => (
+              <div style={{ fontSize:10, fontWeight:700, color:'#fff', background:bg, padding:'4px 10px', letterSpacing:.5 }}>{text}</div>
+            )
 
-          {/* ═══════════════ PAGE 1 ═══════════════ */}
-          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24 }}>
-            <PageHeader page={1} />
+            // chunk array into groups of n
+            const chunk = (arr, n) => {
+              const out = []
+              for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n))
+              return out
+            }
 
-            {/* Customer strip */}
-            <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 16px', marginBottom: 16, display: 'flex', gap: 24, alignItems: 'center' }}>
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#888' }}>ลูกค้า</div>
-                <div style={{ fontSize: 15, fontWeight: 800 }}>{cust.name || view.customers?.name || '—'}</div>
-                {cust.phone && <div style={{ fontSize: 11, color: '#666' }}>Tel: {cust.phone}</div>}
-              </div>
-              {inv && <div style={{ fontSize: 11, color: '#888', marginLeft: 'auto' }}>อ้างอิง Invoice: <strong>{inv.code}</strong></div>}
-              <span className={STATUS_BADGE[view.status] || 'badge badge-gray'}>{view.status}</span>
-            </div>
-
-            {/* Design detail table */}
-            {(dd.size || dd.position || dd.color_count || dd.technique || dd.special) && (
-              <div style={{ marginBottom: 16, border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                <div style={{ background: '#374151', color: '#fff', fontSize: 11, fontWeight: 700, padding: '5px 12px', letterSpacing: .5 }}>
-                  รายละเอียดลาย
+            // â”€â”€ Customer header strip (reused) â”€â”€
+            const CustStrip = () => (
+              <div style={{ background:'#F9FAFB', borderRadius:8, padding:'8px 16px', marginBottom:14, display:'flex', gap:20, alignItems:'center', flexWrap:'wrap' }}>
+                <div>
+                  <div style={{ fontSize:10, fontWeight:700, color:'#888' }}>à¸¥à¸¹à¸à¸„à¹‰à¸²</div>
+                  <div style={{ fontSize:14, fontWeight:800 }}>{cust.name || view.customers?.name || 'â€”'}</div>
+                  {cust.phone && <div style={{ fontSize:11, color:'#666' }}>Tel: {cust.phone}</div>}
                 </div>
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5,1fr)' }}>
-                  {[
-                    { label: 'ขนาดลาย', value: dd.size },
-                    { label: 'ตำแหน่ง',  value: dd.position },
-                    { label: 'จำนวนสี',  value: dd.color_count },
-                    { label: 'เทคนิค',   value: dd.technique },
-                    { label: 'พิเศษ',    value: dd.special },
-                  ].map(({ label, value }) => (
-                    <div key={label} style={{ padding: '8px 12px', borderRight: '1px solid var(--border)' }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, color: '#999', textTransform: 'uppercase' }}>{label}</div>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: value ? 'var(--text)' : '#ccc' }}>{value || '—'}</div>
+                {inv && <div style={{ fontSize:11, color:'#888', marginLeft:'auto' }}>Invoice: <strong>{inv.code}</strong></div>}
+                <span className={STATUS_BADGE[view.status] || 'badge badge-gray'}>{view.status}</span>
+              </div>
+            )
+
+            // â”€â”€ photo grid 2Ã—2 (4 à¸£à¸¹à¸›à¸•à¹ˆà¸­à¸«à¸™à¹‰à¸²) â”€â”€
+            const PhotoGrid = ({ items, labelFn }) => (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14 }}>
+                {items.map((item, i) => (
+                  <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                    <img src={typeof item === 'string' ? item : item.url} alt={labelFn(item,i)} crossOrigin="anonymous"
+                      style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block', background:'#f9f9f9' }} />
+                    <div style={{ fontSize:11, fontWeight:700, textAlign:'center', padding:'5px 0', color:'#555', background:'#F8FAFC' }}>
+                      {labelFn(item,i)}
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {/* Mockup + Artwork */}
-            {(mockup_url || view.image_url) && (
-              <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12, marginBottom: 12 }}>
-                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
-                  <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                    <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: bg, padding: '4px 10px', letterSpacing: .5 }}>{label}</div>
-                    <img src={url} alt={label} crossOrigin="anonymous"
-                      style={{ width: '100%', maxHeight: 260, objectFit: 'contain', display: 'block', background: '#f9f9f9', padding: 8 }} />
                   </div>
                 ))}
+                {/* fill empty slots so grid stays 2Ã—2 */}
+                {Array.from({ length: (4 - items.length % 4) % 4 }).map((_,i) => (
+                  <div key={`empty-${i}`} style={{ borderRadius:8, border:'1px dashed #E5E7EB', aspectRatio:'4/3', background:'#FAFAFA' }} />
+                ))}
               </div>
-            )}
+            )
 
-            {/* Reference images — grid ไม่จำกัดจำนวน */}
-            {reference_images?.length > 0 && (
-              <div>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#6B7280', marginBottom: 6, textTransform: 'uppercase', letterSpacing: .5 }}>
-                  Reference ({reference_images.length} รูป)
-                </div>
-                <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(reference_images.length, 4)}, 1fr)`, gap: 8 }}>
-                  {reference_images.map((url, i) => (
-                    <div key={i} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
-                      <img src={url} alt={`ref-${i+1}`} crossOrigin="anonymous"
-                        style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block', background: '#f9f9f9' }} />
-                      <div style={{ fontSize: 9, textAlign: 'center', padding: '2px 0', color: '#9CA3AF', background: '#F8FAFC' }}>REF {i+1}</div>
+            const totalPages = 1
+              + (finish_photos.length > 0 ? Math.ceil(finish_photos.length / 4) : 1)
+              + (reference_images.length > 0 ? Math.ceil(reference_images.length / 4) : 1)
+
+            return (<>
+
+          {/* â•â•â•â•â•â•â•â•â•â•â• PAGE 1 â€” à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸‡à¸²à¸™ + Mockup + Artwork â•â•â•â•â•â•â•â•â•â•â• */}
+          <div style={PAGE_STYLE}>
+            <PageHeader page={`1/${totalPages}`} />
+            <CustStrip />
+
+            {/* Design detail */}
+            {(dd.size || dd.position || dd.color_count || dd.technique || dd.special) && (
+              <div style={{ marginBottom:14, border:'1px solid var(--border)', borderRadius:8, overflow:'hidden' }}>
+                <div style={{ background:'#374151', color:'#fff', fontSize:11, fontWeight:700, padding:'5px 12px', letterSpacing:.5 }}>à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¸¥à¸²à¸¢</div>
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)' }}>
+                  {[['à¸‚à¸™à¸²à¸”à¸¥à¸²à¸¢',dd.size],['à¸•à¸³à¹à¸«à¸™à¹ˆà¸‡',dd.position],['à¸ˆà¸³à¸™à¸§à¸™à¸ªà¸µ',dd.color_count],['à¹€à¸—à¸„à¸™à¸´à¸„',dd.technique],['à¸žà¸´à¹€à¸¨à¸©',dd.special]].map(([l,v]) => (
+                    <div key={l} style={{ padding:'7px 12px', borderRight:'1px solid var(--border)' }}>
+                      <div style={{ fontSize:9, fontWeight:700, color:'#999', textTransform:'uppercase' }}>{l}</div>
+                      <div style={{ fontSize:13, fontWeight:700, color:v?'var(--text)':'#ccc' }}>{v||'â€”'}</div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-          </div>
 
-          {/* ═══════════════ PAGE 2 ═══════════════ */}
-          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24, pageBreakBefore: 'always' }}>
-            <PageHeader page={2} />
-
-            {/* Customer mini */}
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
-              {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
-            </div>
-
-            {/* Production info badges */}
-            {(fabric_type || shirt_color || screen_color) && (
-              <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 16 }}>
-                {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
-                  .filter(f => f.v).map(f => (
-                    <div key={f.l} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
-                      <span style={{ color: '#666' }}>{f.l}: </span><span style={{ fontWeight: 700 }}>{f.v}</span>
-                    </div>
-                  ))}
-              </div>
-            )}
-
-            {/* Size Matrix */}
-            <div style={{ overflowX: 'auto', marginBottom: 16 }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+            {/* Size matrix */}
+            <div style={{ overflowX:'auto', marginBottom:14 }}>
+              <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
                 <thead>
-                  <tr style={{ background: 'var(--primary)', color: '#fff' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', minWidth: 160 }}>แบบ / รายการ</th>
-                    {sizes.map(s => <th key={s} style={{ padding: '8px 10px', textAlign: 'center', minWidth: 52 }}>{s}</th>)}
-                    <th style={{ padding: '8px 12px', textAlign: 'center', minWidth: 56, background: '#7f1d1d' }}>รวม</th>
+                  <tr style={{ background:'var(--primary)', color:'#fff' }}>
+                    <th style={{ padding:'7px 10px', textAlign:'left', minWidth:140 }}>à¹à¸šà¸š / à¸£à¸²à¸¢à¸à¸²à¸£</th>
+                    {sizes.map(s=><th key={s} style={{ padding:'7px 8px', textAlign:'center', minWidth:44 }}>{s}</th>)}
+                    <th style={{ padding:'7px 10px', textAlign:'center', minWidth:50, background:'#7f1d1d' }}>à¸£à¸§à¸¡</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {prod.length > 0 ? prod.map((r, i) => (
-                    <tr key={i} style={{ borderBottom: '1px solid #eee', background: i % 2 ? '#fafafa' : '#fff' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 600 }}>{r.style || '—'}</td>
-                      {sizes.map(s => (
-                        <td key={s} style={{ padding: '8px 10px', textAlign: 'center',
-                          fontWeight: parseInt(r.qtys?.[s]) > 0 ? 700 : 400,
-                          color:     parseInt(r.qtys?.[s]) > 0 ? 'var(--text)' : '#ccc' }}>
-                          {parseInt(r.qtys?.[s]) > 0 ? r.qtys[s] : '—'}
+                  {prod.map((r,i)=>(
+                    <tr key={i} style={{ borderBottom:'1px solid #eee', background:i%2?'#fafafa':'#fff' }}>
+                      <td style={{ padding:'6px 10px', fontWeight:600, fontSize:11 }}>{r.style||'â€”'}</td>
+                      {sizes.map(s=>(
+                        <td key={s} style={{ padding:'6px 8px', textAlign:'center', fontWeight:parseInt(r.qtys?.[s])>0?700:400, color:parseInt(r.qtys?.[s])>0?'var(--text)':'#ccc' }}>
+                          {parseInt(r.qtys?.[s])>0?r.qtys[s]:'â€”'}
                         </td>
                       ))}
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 800, color: 'var(--primary)' }}>
-                        {rowTotal(r.qtys)}
-                      </td>
+                      <td style={{ padding:'6px 10px', textAlign:'center', fontWeight:800, color:'var(--primary)' }}>{rowTotal(r.qtys)}</td>
                     </tr>
-                  )) : (
-                    <tr><td colSpan={sizes.length + 2} style={{ padding: 20, textAlign: 'center', color: '#999' }}>ไม่มีรายการ</td></tr>
-                  )}
-                  {prod.length > 0 && (
-                    <tr style={{ background: '#F9FAFB', borderTop: '2px solid var(--border)' }}>
-                      <td style={{ padding: '8px 12px', fontWeight: 700, color: '#888', fontSize: 12 }}>รวมทั้งหมด</td>
-                      {sizes.map(s => (
-                        <td key={s} style={{ padding: '8px 10px', textAlign: 'center', fontWeight: 700 }}>
-                          {prod.reduce((sum, r) => sum + (parseInt(r.qtys?.[s]) || 0), 0) || '—'}
-                        </td>
-                      ))}
-                      <td style={{ padding: '8px 12px', textAlign: 'center', fontWeight: 900, color: 'var(--primary)', fontSize: 15 }}>
-                        {grandTotal(prod)}
+                  ))}
+                  <tr style={{ background:'#F9FAFB', borderTop:'2px solid var(--border)' }}>
+                    <td style={{ padding:'6px 10px', fontWeight:700, color:'#888', fontSize:11 }}>à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</td>
+                    {sizes.map(s=>(
+                      <td key={s} style={{ padding:'6px 8px', textAlign:'center', fontWeight:700, fontSize:12 }}>
+                        {prod.reduce((sum,r)=>sum+(parseInt(r.qtys?.[s])||0),0)||'â€”'}
                       </td>
-                    </tr>
-                  )}
+                    ))}
+                    <td style={{ padding:'6px 10px', textAlign:'center', fontWeight:900, color:'var(--primary)', fontSize:14 }}>{grandTotal(prod)}</td>
+                  </tr>
                 </tbody>
               </table>
             </div>
 
-            {/* Grand total */}
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 16 }}>
-              <div style={{ fontSize: 15, fontWeight: 700 }}>
-                จำนวนรวม: <span style={{ color: 'var(--primary)', fontSize: 22, fontWeight: 900 }}>{grandTotal(prod)}</span> ตัว
+            {/* Production badges + notes */}
+            {(fabric_type||shirt_color||screen_color) && (
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', marginBottom:10 }}>
+                {[['à¸›à¸£à¸°à¹€à¸ à¸—à¸œà¹‰à¸²',fabric_type],['à¸ªà¸µà¹€à¸ªà¸·à¹‰à¸­',shirt_color],['à¸ªà¸µà¸ªà¸à¸£à¸µà¸™',screen_color]].filter(([,v])=>v).map(([l,v])=>(
+                  <div key={l} style={{ background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:6, padding:'4px 10px', fontSize:11 }}>
+                    <span style={{ color:'#666' }}>{l}: </span><span style={{ fontWeight:700 }}>{v}</span>
+                  </div>
+                ))}
               </div>
-            </div>
+            )}
+            {production_note && <div style={{ padding:'6px 12px', background:'#FFF7ED', borderRadius:6, borderLeft:'3px solid #F97316', fontSize:11, marginBottom:6 }}><span style={{ fontWeight:700, color:'#C2410C' }}>à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸à¸œà¸¥à¸´à¸•: </span>{production_note}</div>}
+            {view.note && <div style={{ padding:'6px 12px', background:'#FFFBEB', borderRadius:6, fontSize:11, marginBottom:6 }}><span style={{ fontWeight:700 }}>à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸: </span>{view.note}</div>}
 
-            {/* Notes */}
-            {(production_note || view.note) && (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {production_note && (
-                  <div style={{ padding: '8px 14px', background: '#FFF7ED', borderRadius: 6, borderLeft: '3px solid #F97316', fontSize: 12 }}>
-                    <span style={{ fontWeight: 700, color: '#C2410C' }}>หมายเหตุผลิต: </span>{production_note}
+            {/* Mockup (1) + Artwork (1) */}
+            {(mockup_url || view.image_url) && (
+              <div style={{ display:'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap:12, marginTop:14 }}>
+                {mockup_url && (
+                  <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#fff', background:'#1D4ED8', padding:'4px 10px', letterSpacing:.5 }}>MOCKUP</div>
+                    <img src={mockup_url} alt="mockup" crossOrigin="anonymous"
+                      style={{ width:'100%', maxHeight:280, objectFit:'contain', display:'block', background:'#f9f9f9', padding:8 }} />
                   </div>
                 )}
-                {view.note && (
-                  <div style={{ padding: '8px 14px', background: '#FFFBEB', borderRadius: 6, fontSize: 12 }}>
-                    <span style={{ fontWeight: 700 }}>หมายเหตุ: </span>{view.note}
+                {view.image_url && (
+                  <div style={{ border:'1px solid var(--border)', borderRadius:8, overflow:'hidden' }}>
+                    <div style={{ fontSize:10, fontWeight:700, color:'#fff', background:'#374151', padding:'4px 10px', letterSpacing:.5 }}>ARTWORK</div>
+                    <img src={view.image_url} alt="artwork" crossOrigin="anonymous"
+                      style={{ width:'100%', maxHeight:280, objectFit:'contain', display:'block', background:'#f9f9f9', padding:8 }} />
                   </div>
                 )}
               </div>
             )}
           </div>
 
-          {/* ═══════════════ PAGE 3 ═══════════════ */}
-          <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, pageBreakBefore: 'always' }}>
-            <PageHeader page={3} />
-
-            <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>
-              {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
-            </div>
-
-            {/* รูปที่บันทึกแล้ว */}
-            {finish_photos.length > 0 && (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:16 }}>
-                {finish_photos.map((p, i) => (
-                  <div key={i} style={{ borderRadius:10, overflow:'hidden', border:'1px solid var(--border)', background:'#fff' }}>
-                    <img src={p.url} alt={p.label} crossOrigin="anonymous"
-                      style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                    <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#F8FAFC' }}>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#64748B', flex:1 }}>{p.label || `รูปที่ ${i+1}`}</span>
-                      <button className="no-print" onClick={() => handleDeleteQc(i)}
-                        style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>
-                        ลบ
-                      </button>
-                    </div>
-                  </div>
-                ))}
+          {/* â•â•â•â•â•â•â•â•â•â•â• PAGE 2+ â€” à¸£à¸¹à¸›à¸‡à¸²à¸™à¹€à¸ªà¸£à¹‡à¸ˆ QC (4 à¸£à¸¹à¸›/à¸«à¸™à¹‰à¸²) â•â•â•â•â•â•â•â•â•â•â• */}
+          {chunk(finish_photos.length > 0 ? finish_photos : [], 4).map((group, pi) => (
+            <div key={`qc-${pi}`} style={pi===0 ? { ...PAGE_STYLE, pageBreakBefore:'always' } : BREAK}>
+              <PageHeader page={`${2+pi}/${totalPages}`} />
+              <div style={{ fontSize:13, fontWeight:700, marginBottom:12 }}>
+                {cust.name||'â€”'} <span style={{ color:'#999', fontWeight:400, fontSize:11 }}>Â· {view.code} Â· à¸£à¸¹à¸›à¸‡à¸²à¸™à¹€à¸ªà¸£à¹‡à¸ˆ QC à¸«à¸™à¹‰à¸² {pi+1}</span>
               </div>
-            )}
-
-            {/* ช่องเพิ่มรูปใหม่ */}
-            <div className="no-print">
-              {/* รูปที่รอบันทึก */}
-              {Object.keys(viewQcPreviews).filter(k => viewQcPreviews[k]).length > 0 && (
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:12 }}>
-                  {Object.entries(viewQcPreviews).filter(([,v]) => v).map(([k, src]) => (
-                    <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #6366F1', background:'#fff' }}>
-                      <div style={{ position:'relative' }}>
-                        <img src={src} alt={`new-${k}`}
-                          style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                        <div style={{ position:'absolute', top:6, left:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>รอบันทึก</div>
+              <PhotoGrid items={group} labelFn={(p,i) => p.label || `à¸£à¸¹à¸›à¸—à¸µà¹ˆ ${pi*4+i+1}`} />
+            </div>
+          ))}
+          {finish_photos.length === 0 && (
+            <div style={{ ...PAGE_STYLE, pageBreakBefore:'always' }}>
+              <PageHeader page={`2/${totalPages}`} />
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:260, color:'#D1D5DB', gap:10 }}>
+                <span style={{ fontSize:40 }}>ðŸ“·</span>
+                <div style={{ fontSize:13, fontWeight:700 }}>à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸¹à¸›à¸‡à¸²à¸™à¹€à¸ªà¸£à¹‡à¸ˆ</div>
+              </div>
+              {/* QC upload zone */}
+              <div className="no-print">
+                {Object.keys(viewQcPreviews).filter(k=>viewQcPreviews[k]).length > 0 && (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:12 }}>
+                    {Object.entries(viewQcPreviews).filter(([,v])=>v).map(([k,src])=>(
+                      <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #6366F1' }}>
+                        <div style={{ position:'relative' }}>
+                          <img src={src} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                          <div style={{ position:'absolute', top:6, left:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>à¸£à¸­à¸šà¸±à¸™à¸—à¸¶à¸</div>
+                        </div>
+                        <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#EEF2FF' }}>
+                          <input placeholder="à¸Šà¸·à¹ˆà¸­à¸£à¸¹à¸›" value={viewQcFiles[k]?.label||''} onChange={e=>setViewQcFiles(f=>({...f,[k]:{...f[k],label:e.target.value}}))}
+                            style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5' }} />
+                          <button onClick={()=>{setViewQcFiles(f=>{const n={...f};delete n[k];return n});setViewQcPreviews(p=>{const n={...p};delete n[k];return n})}}
+                            style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>à¸¥à¸š</button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+                <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'12px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:13, fontWeight:700, color:'#64748B' }}
+                  onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                  onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
+                  <span>ðŸ“Ž</span> à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸¹à¸› QC
+                  <input type="file" accept="image/*" multiple style={{ display:'none' }}
+                    onChange={e=>{
+                      const nf={};const np={}
+                      Array.from(e.target.files||[]).forEach(file=>{
+                        const k=`new_${Date.now()}_${Math.random().toString(36).slice(2)}`
+                        nf[k]={file,label:''}
+                        np[k]=URL.createObjectURL(file)
+                      })
+                      setViewQcFiles(f=>({...f,...nf}))
+                      setViewQcPreviews(p=>({...p,...np}))
+                      e.target.value=''
+                    }} />
+                </label>
+                {Object.values(viewQcFiles).some(Boolean) && (
+                  <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end' }}>
+                    <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc} style={{ fontSize:13, padding:'10px 24px' }}>
+                      {savingQc?'â³ à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...':`ðŸ’¾ à¸šà¸±à¸™à¸—à¸¶à¸ ${Object.values(viewQcFiles).filter(Boolean).length} à¸£à¸¹à¸›`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+          {finish_photos.length > 0 && (
+            <div className="no-print" style={{ marginBottom:16, display:'flex', flexDirection:'column', gap:10 }}>
+              {/* upload more QC when photos exist */}
+              {Object.keys(viewQcPreviews).filter(k=>viewQcPreviews[k]).length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12 }}>
+                  {Object.entries(viewQcPreviews).filter(([,v])=>v).map(([k,src])=>(
+                    <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #6366F1' }}>
+                      <div style={{ position:'relative' }}><img src={src} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                        <div style={{ position:'absolute', top:6, left:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>à¸£à¸­à¸šà¸±à¸™à¸—à¸¶à¸</div>
                       </div>
                       <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#EEF2FF' }}>
-                        <input
-                          placeholder="ชื่อรูป เช่น เสื้อแบบ A"
-                          value={viewQcFiles[k]?.label || ''}
-                          onChange={e => setViewQcFiles(f => ({ ...f, [k]: { ...f[k], label: e.target.value } }))}
-                          style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5' }}
-                        />
-                        <button onClick={() => { setViewQcFiles(f=>{const n={...f};delete n[k];return n}); setViewQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
-                          style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>ลบ</button>
+                        <input placeholder="à¸Šà¸·à¹ˆà¸­à¸£à¸¹à¸›" value={viewQcFiles[k]?.label||''} onChange={e=>setViewQcFiles(f=>({...f,[k]:{...f[k],label:e.target.value}}))}
+                          style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5' }} />
+                        <button onClick={()=>{setViewQcFiles(f=>{const n={...f};delete n[k];return n});setViewQcPreviews(p=>{const n={...p};delete n[k];return n})}}
+                          style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>à¸¥à¸š</button>
                       </div>
                     </div>
                   ))}
                 </div>
               )}
-
-              {/* ปุ่มเพิ่มรูป */}
-              <label style={{
-                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
-                padding:'12px', borderRadius:10,
-                border:'2px dashed #CBD5E1', background:'#F8FAFC',
-                cursor:'pointer', fontSize:13, fontWeight:700, color:'#64748B',
-                transition:'border-color .15s, background .15s',
-              }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.background='#EFF6FF' }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor='#CBD5E1'; e.currentTarget.style.background='#F8FAFC' }}
-              >
-                <span style={{ fontSize:18 }}>📎</span> เพิ่มรูป QC
+              <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B' }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
+                <span>ðŸ“Ž</span> à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸¹à¸› QC
                 <input type="file" accept="image/*" multiple style={{ display:'none' }}
-                  onChange={e => {
-                    const newFiles = {}; const newPreviews = {}
-                    Array.from(e.target.files || []).forEach(file => {
-                      const k = `new_${Date.now()}_${Math.random().toString(36).slice(2)}`
-                      newFiles[k] = { file, label: '' }
-                      newPreviews[k] = URL.createObjectURL(file)
+                  onChange={e=>{
+                    const nf={};const np={}
+                    Array.from(e.target.files||[]).forEach(file=>{
+                      const k=`new_${Date.now()}_${Math.random().toString(36).slice(2)}`
+                      nf[k]={file,label:''}
+                      np[k]=URL.createObjectURL(file)
                     })
-                    setViewQcFiles(f => ({ ...f, ...newFiles }))
-                    setViewQcPreviews(p => ({ ...p, ...newPreviews }))
-                    e.target.value = ''
-                  }}
-                />
+                    setViewQcFiles(f=>({...f,...nf}))
+                    setViewQcPreviews(p=>({...p,...np}))
+                    e.target.value=''
+                  }} />
               </label>
-
-              {/* ปุ่มบันทึก */}
               {Object.values(viewQcFiles).some(Boolean) && (
-                <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end' }}>
-                  <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc}
-                    style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, padding:'10px 24px' }}>
-                    {savingQc ? '⏳ กำลังบันทึก...' : `💾 บันทึก ${Object.values(viewQcFiles).filter(Boolean).length} รูป`}
+                <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                  <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc} style={{ fontSize:13, padding:'10px 24px' }}>
+                    {savingQc?'â³ à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...':`ðŸ’¾ à¸šà¸±à¸™à¸—à¸¶à¸ ${Object.values(viewQcFiles).filter(Boolean).length} à¸£à¸¹à¸›`}
                   </button>
                 </div>
               )}
             </div>
-          </div>
+          )}
+
+          {/* â•â•â•â•â•â•â•â•â•â•â• PAGE 3+ â€” à¸£à¸¹à¸› Reference (4 à¸£à¸¹à¸›/à¸«à¸™à¹‰à¸²) â•â•â•â•â•â•â•â•â•â•â• */}
+          {chunk(reference_images.length > 0 ? reference_images : [], 4).map((group, pi) => (
+            <div key={`ref-${pi}`} style={BREAK}>
+              <PageHeader page={`${2 + Math.ceil(Math.max(finish_photos.length,1)/4) + pi}/${totalPages}`} />
+              <div style={{ fontSize:13, fontWeight:700, marginBottom:12 }}>
+                {cust.name||'â€”'} <span style={{ color:'#999', fontWeight:400, fontSize:11 }}>Â· à¸£à¸¹à¸› Reference à¸«à¸™à¹‰à¸² {pi+1}</span>
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:14 }}>
+                {group.map((url,i)=>(
+                  <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                    <img src={url} alt={`REF ${pi*4+i+1}`} crossOrigin="anonymous"
+                      style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block', background:'#f9f9f9' }} />
+                    <div style={{ fontSize:11, fontWeight:700, textAlign:'center', padding:'5px 0', color:'#555', background:'#F8FAFC' }}>REF {pi*4+i+1}</div>
+                  </div>
+                ))}
+                {Array.from({ length:(4-group.length%4)%4 }).map((_,i)=>(
+                  <div key={`e${i}`} style={{ borderRadius:8, border:'1px dashed #E5E7EB', aspectRatio:'4/3', background:'#FAFAFA' }} />
+                ))}
+              </div>
+            </div>
+          ))}
+          {reference_images.length === 0 && (
+            <div style={BREAK}>
+              <PageHeader page={`${totalPages}/${totalPages}`} />
+              <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', minHeight:200, color:'#D1D5DB', gap:8 }}>
+                <span style={{ fontSize:36 }}>ðŸ–¼ï¸</span>
+                <div style={{ fontSize:13, fontWeight:700 }}>à¸¢à¸±à¸‡à¹„à¸¡à¹ˆà¸¡à¸µà¸£à¸¹à¸› Reference</div>
+              </div>
+            </div>
+          )}
+
+            </>)
+          })()}
 
         </div>
       </div>
     )
   }
 
-  // ──── LIST VIEW ─────────────────────────────────────────────
+  // â”€â”€â”€â”€ LIST VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {[
-          { label: 'ใบงานทั้งหมด',              value: rows.length + ' ใบ',                                        accent: 'var(--primary)', icon: '📝' },
-          { label: `ใบงานเดือน ${monthFilter}`,  value: `${monthCount} ใบ · ${monthQty} ตัว`,                       accent: '#7C3AED',        icon: '📅' },
-          { label: 'ส่งงานแล้ว',                 value: rows.filter(j => j.status === 'ส่งงานแล้ว').length + ' ใบ', accent: 'var(--success)', icon: '✅' },
-          { label: 'เลยกำหนด',                   value: rows.filter(j => isOverdue(j)).length + ' ใบ',               accent: 'var(--danger)',  icon: '⏰' },
+          { label: 'à¹ƒà¸šà¸‡à¸²à¸™à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”',              value: rows.length + ' à¹ƒà¸š',                                        accent: 'var(--primary)', icon: 'ðŸ“' },
+          { label: `à¹ƒà¸šà¸‡à¸²à¸™à¹€à¸”à¸·à¸­à¸™ ${monthFilter}`,  value: `${monthCount} à¹ƒà¸š Â· ${monthQty} à¸•à¸±à¸§`,                       accent: '#7C3AED',        icon: 'ðŸ“…' },
+          { label: 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§',                 value: rows.filter(j => j.status === 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§').length + ' à¹ƒà¸š', accent: 'var(--success)', icon: 'âœ…' },
+          { label: 'à¹€à¸¥à¸¢à¸à¸³à¸«à¸™à¸”',                   value: rows.filter(j => isOverdue(j)).length + ' à¹ƒà¸š',               accent: 'var(--danger)',  icon: 'â°' },
         ].map(k => (
           <div key={k.label} style={{ background: 'var(--card)', borderRadius: 'var(--radius)', padding: '14px 16px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)', position: 'relative', overflow: 'hidden' }}>
             <div style={{ position: 'absolute', top: 0, left: 0, width: 4, height: '100%', background: k.accent, borderRadius: '10px 0 0 10px' }} />
@@ -841,17 +874,17 @@ export default function JobOrderPage() {
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
           <div style={{ position: 'relative' }}>
-            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>🔍</span>
-            <input type="text" placeholder="ค้นหาใบงาน..." value={search}
+            <span style={{ position: 'absolute', left: 11, top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }}>ðŸ”</span>
+            <input type="text" placeholder="à¸„à¹‰à¸™à¸«à¸²à¹ƒà¸šà¸‡à¸²à¸™..." value={search}
               onChange={e => setSearch(e.target.value)} style={{ paddingLeft: 36, width: 200 }} />
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>📅</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ðŸ“…</span>
             <input type="month" value={monthFilter}
               onChange={e => setMonthFilter(e.target.value)}
               style={{ fontSize: 13, padding: '5px 8px', borderRadius: 6, border: '1px solid var(--border)' }} />
             {monthFilter && (
-              <button className="btn btn-outline btn-sm" onClick={() => setMonthFilter('')}>ทั้งหมด</button>
+              <button className="btn btn-outline btn-sm" onClick={() => setMonthFilter('')}>à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</button>
             )}
           </div>
           {ALL_STATUS.map(s => {
@@ -859,97 +892,97 @@ export default function JobOrderPage() {
             return count > 0 && (
               <span key={s} onClick={() => setFilter(filterStatus === s ? '' : s)}
                 className={filterStatus === s ? 'badge badge-blue' : 'badge badge-gray'}
-                style={{ cursor: 'pointer' }}>{s} · {count}</span>
+                style={{ cursor: 'pointer' }}>{s} Â· {count}</span>
             )
           })}
-          {filterStatus && <span className="badge badge-gray" style={{ cursor: 'pointer' }} onClick={() => setFilter('')}>✕ ล้าง</span>}
+          {filterStatus && <span className="badge badge-gray" style={{ cursor: 'pointer' }} onClick={() => setFilter('')}>âœ• à¸¥à¹‰à¸²à¸‡</span>}
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
           <button
             className={`btn ${viewMode === 'calendar' ? 'btn-primary' : 'btn-outline'} btn-sm`}
             onClick={() => setViewMode(v => v === 'table' ? 'calendar' : 'table')}>
-            {viewMode === 'calendar' ? '📋 รายการ' : '📅 ตารางงาน'}
+            {viewMode === 'calendar' ? 'ðŸ“‹ à¸£à¸²à¸¢à¸à¸²à¸£' : 'ðŸ“… à¸•à¸²à¸£à¸²à¸‡à¸‡à¸²à¸™'}
           </button>
           <button className="btn btn-primary" onClick={() => {
             setShowForm(!showForm)
             if (showForm) { setEditId(null); setForm(emptyForm()) }
-          }}>{showForm ? '✕ ปิด' : '+ สร้างใบงาน'}</button>
+          }}>{showForm ? 'âœ• à¸›à¸´à¸”' : '+ à¸ªà¸£à¹‰à¸²à¸‡à¹ƒà¸šà¸‡à¸²à¸™'}</button>
         </div>
       </div>
 
-      {/* ──── FORM ──────────────────────────────────────────── */}
+      {/* â”€â”€â”€â”€ FORM â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {showForm && (
         <div className="card" style={{ padding: 24 }}>
-          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>{editId ? '✏️ แก้ไขใบงาน' : '➕ สร้างใบงานใหม่'}</div>
+          <div style={{ fontSize: 15, fontWeight: 700, marginBottom: 20 }}>{editId ? 'âœï¸ à¹à¸à¹‰à¹„à¸‚à¹ƒà¸šà¸‡à¸²à¸™' : 'âž• à¸ªà¸£à¹‰à¸²à¸‡à¹ƒà¸šà¸‡à¸²à¸™à¹ƒà¸«à¸¡à¹ˆ'}</div>
 
-          {/* Section 1: ข้อมูลพื้นฐาน */}
-          <SectionHeader icon="📋" title="ข้อมูลพื้นฐาน" />
+          {/* Section 1: à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸žà¸·à¹‰à¸™à¸à¸²à¸™ */}
+          <SectionHeader icon="ðŸ“‹" title="à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸žà¸·à¹‰à¸™à¸à¸²à¸™" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>Invoice อ้างอิง *</label>
+              <label>Invoice à¸­à¹‰à¸²à¸‡à¸­à¸´à¸‡ *</label>
               <select value={form.invoice_id} onChange={e => onSelectInvoice(e.target.value)}>
-                <option value="">— เลือก Invoice —</option>
-                {invoices.map(i => <option key={i.id} value={i.id}>{i.code} – {i.customers?.name}</option>)}
+                <option value="">â€” à¹€à¸¥à¸·à¸­à¸ Invoice â€”</option>
+                {invoices.map(i => <option key={i.id} value={i.id}>{i.code} â€“ {i.customers?.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>ลูกค้า</label>
+              <label>à¸¥à¸¹à¸à¸„à¹‰à¸²</label>
               <select value={form.customer_id} onChange={e => setForm({ ...form, customer_id: e.target.value })}>
-                <option value="">— เลือกลูกค้า —</option>
+                <option value="">â€” à¹€à¸¥à¸·à¸­à¸à¸¥à¸¹à¸à¸„à¹‰à¸² â€”</option>
                 {customers.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>สถานะ</label>
+              <label>à¸ªà¸–à¸²à¸™à¸°</label>
               <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })}>
                 {ALL_STATUS.map(s => <option key={s}>{s}</option>)}
               </select>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>วันที่เอกสาร</label>
+              <label>à¸§à¸±à¸™à¸—à¸µà¹ˆà¹€à¸­à¸à¸ªà¸²à¸£</label>
               <input type="date" value={form.document_date} onChange={e => setForm({ ...form, document_date: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>กำหนดส่ง</label>
+              <label>à¸à¸³à¸«à¸™à¸”à¸ªà¹ˆà¸‡</label>
               <input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>หมายเหตุ</label>
-              <input type="text" placeholder="หมายเหตุ..." value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
+              <label>à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸</label>
+              <input type="text" placeholder="à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸..." value={form.note} onChange={e => setForm({ ...form, note: e.target.value })} />
             </div>
           </div>
 
           {/* Section 2: Size Matrix */}
-          <SectionHeader icon="📐" title="รายการสินค้า" />
+          <SectionHeader icon="ðŸ“" title="à¸£à¸²à¸¢à¸à¸²à¸£à¸ªà¸´à¸™à¸„à¹‰à¸²" />
           <div style={{ marginBottom: 24 }}>
             {/* Size column controls */}
             <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 10, flexWrap: 'wrap' }}>
-              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ไซส์:</span>
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>à¹„à¸‹à¸ªà¹Œ:</span>
               {form.sizes.map(s => (
                 <span key={s} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--primary)', color: '#fff', borderRadius: 99, padding: '3px 10px', fontSize: 12, fontWeight: 600 }}>
                   {s}
-                  <button onClick={() => removeSize(s)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1, opacity: .8 }}>×</button>
+                  <button onClick={() => removeSize(s)} style={{ background: 'none', border: 'none', color: '#fff', cursor: 'pointer', padding: 0, fontSize: 14, lineHeight: 1, opacity: .8 }}>Ã—</button>
                 </span>
               ))}
               <div style={{ display: 'flex', gap: 4 }}>
-                <input type="text" placeholder="+ ไซส์" value={newSizeInput}
+                <input type="text" placeholder="+ à¹„à¸‹à¸ªà¹Œ" value={newSizeInput}
                   onChange={e => setNewSizeInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && addSize()}
                   style={{ width: 80, fontSize: 12, padding: '4px 8px' }} />
-                <button className="btn btn-outline btn-sm" onClick={addSize}>เพิ่ม</button>
+                <button className="btn btn-outline btn-sm" onClick={addSize}>à¹€à¸žà¸´à¹ˆà¸¡</button>
               </div>
             </div>
 
-            {/* Table: แบบ | sizes | รวม */}
+            {/* Table: à¹à¸šà¸š | sizes | à¸£à¸§à¸¡ */}
             <div style={{ overflowX: 'auto', borderRadius: 8, border: '1px solid var(--border)' }}>
               <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
                 <thead>
                   <tr style={{ background: 'var(--bg)' }}>
-                    <th style={{ padding: '8px 12px', textAlign: 'left', minWidth: 200, color: 'var(--text-muted)', fontSize: 12 }}>แบบ / รายการ</th>
+                    <th style={{ padding: '8px 12px', textAlign: 'left', minWidth: 200, color: 'var(--text-muted)', fontSize: 12 }}>à¹à¸šà¸š / à¸£à¸²à¸¢à¸à¸²à¸£</th>
                     {form.sizes.map(s => (
                       <th key={s} style={{ padding: '8px 8px', textAlign: 'center', minWidth: 56, color: 'var(--text-muted)', fontSize: 12 }}>{s}</th>
                     ))}
-                    <th style={{ padding: '8px 10px', textAlign: 'center', minWidth: 56, color: 'var(--primary)', fontSize: 12, fontWeight: 700 }}>รวม</th>
+                    <th style={{ padding: '8px 10px', textAlign: 'center', minWidth: 56, color: 'var(--primary)', fontSize: 12, fontWeight: 700 }}>à¸£à¸§à¸¡</th>
                     <th style={{ width: 36 }}></th>
                   </tr>
                 </thead>
@@ -957,7 +990,7 @@ export default function JobOrderPage() {
                   {form.prod_items.map((r, idx) => (
                     <tr key={idx} style={{ borderTop: '1px solid var(--border)' }}>
                       <td style={{ padding: '6px 8px' }}>
-                        <input type="text" placeholder="ชื่อแบบ / รายการ" value={r.style}
+                        <input type="text" placeholder="à¸Šà¸·à¹ˆà¸­à¹à¸šà¸š / à¸£à¸²à¸¢à¸à¸²à¸£" value={r.style}
                           onChange={e => updateStyle(idx, e.target.value)}
                           style={{ width: '100%', fontSize: 13 }} />
                       </td>
@@ -969,11 +1002,11 @@ export default function JobOrderPage() {
                         </td>
                       ))}
                       <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 800, color: 'var(--primary)', fontSize: 14 }}>
-                        {rowTotal(r.qtys) || '—'}
+                        {rowTotal(r.qtys) || 'â€”'}
                       </td>
                       <td style={{ padding: '6px 8px', textAlign: 'center' }}>
                         {form.prod_items.length > 1 && (
-                          <button onClick={() => removeRow(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>×</button>
+                          <button onClick={() => removeRow(idx)} style={{ background: 'none', border: 'none', color: 'var(--danger)', cursor: 'pointer', fontSize: 16 }}>Ã—</button>
                         )}
                       </td>
                     </tr>
@@ -982,10 +1015,10 @@ export default function JobOrderPage() {
                 {form.prod_items.length > 0 && (
                   <tfoot>
                     <tr style={{ background: 'var(--bg)', borderTop: '2px solid var(--border)' }}>
-                      <td style={{ padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>รวมทั้งหมด</td>
+                      <td style={{ padding: '6px 12px', fontSize: 12, color: 'var(--text-muted)', fontWeight: 600 }}>à¸£à¸§à¸¡à¸—à¸±à¹‰à¸‡à¸«à¸¡à¸”</td>
                       {form.sizes.map(s => (
                         <td key={s} style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 700, fontSize: 13 }}>
-                          {form.prod_items.reduce((sum, r) => sum + (parseInt(r.qtys[s]) || 0), 0) || '—'}
+                          {form.prod_items.reduce((sum, r) => sum + (parseInt(r.qtys[s]) || 0), 0) || 'â€”'}
                         </td>
                       ))}
                       <td style={{ padding: '6px 8px', textAlign: 'center', fontWeight: 900, color: 'var(--primary)', fontSize: 15 }}>
@@ -997,44 +1030,44 @@ export default function JobOrderPage() {
                 )}
               </table>
             </div>
-            <button className="btn btn-outline btn-sm" style={{ marginTop: 10 }} onClick={addRow}>+ เพิ่มแถว</button>
+            <button className="btn btn-outline btn-sm" style={{ marginTop: 10 }} onClick={addRow}>+ à¹€à¸žà¸´à¹ˆà¸¡à¹à¸–à¸§</button>
           </div>
 
-          {/* Section 3: ข้อมูลการผลิต */}
-          <SectionHeader icon="🎨" title="ข้อมูลการผลิต" />
+          {/* Section 3: à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¸œà¸¥à¸´à¸• */}
+          <SectionHeader icon="ðŸŽ¨" title="à¸‚à¹‰à¸­à¸¡à¸¹à¸¥à¸à¸²à¸£à¸œà¸¥à¸´à¸•" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>ประเภทผ้า</label>
+              <label>à¸›à¸£à¸°à¹€à¸ à¸—à¸œà¹‰à¸²</label>
               <input type="text" placeholder="Cotton 100%, TC, CVC..." value={form.fabric_type}
                 onChange={e => setForm({ ...form, fabric_type: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>สีเสื้อ</label>
-              <input type="text" placeholder="ขาว, ดำ, กรม..." value={form.shirt_color}
+              <label>à¸ªà¸µà¹€à¸ªà¸·à¹‰à¸­</label>
+              <input type="text" placeholder="à¸‚à¸²à¸§, à¸”à¸³, à¸à¸£à¸¡..." value={form.shirt_color}
                 onChange={e => setForm({ ...form, shirt_color: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-              <label>สีสกรีน</label>
-              <input type="text" placeholder="แดง+ขาว, CMYK..." value={form.screen_color}
+              <label>à¸ªà¸µà¸ªà¸à¸£à¸µà¸™</label>
+              <input type="text" placeholder="à¹à¸”à¸‡+à¸‚à¸²à¸§, CMYK..." value={form.screen_color}
                 onChange={e => setForm({ ...form, screen_color: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4, gridColumn: '1 / -1' }}>
-              <label>หมายเหตุผลิต</label>
-              <textarea rows={3} placeholder="รายละเอียดการผลิต..." value={form.production_note}
+              <label>à¸«à¸¡à¸²à¸¢à¹€à¸«à¸•à¸¸à¸œà¸¥à¸´à¸•</label>
+              <textarea rows={3} placeholder="à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¸à¸²à¸£à¸œà¸¥à¸´à¸•..." value={form.production_note}
                 onChange={e => setForm({ ...form, production_note: e.target.value })}
                 style={{ resize: 'vertical' }} />
             </div>
           </div>
 
           {/* Design Detail */}
-          <SectionHeader icon="📐" title="รายละเอียดลาย" />
+          <SectionHeader icon="ðŸ“" title="à¸£à¸²à¸¢à¸¥à¸°à¹€à¸­à¸µà¸¢à¸”à¸¥à¸²à¸¢" />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 16 }}>
             {[
-              { label: 'ขนาดลาย', key: 'size',        placeholder: 'เช่น 10×15 cm' },
-              { label: 'ตำแหน่ง',  key: 'position',    placeholder: 'เช่น หน้าอกซ้าย' },
-              { label: 'จำนวนสี',  key: 'color_count', placeholder: 'เช่น 3 สี' },
-              { label: 'เทคนิค',   key: 'technique',   placeholder: 'เช่น Spot Color, Discharge' },
-              { label: 'พิเศษ',    key: 'special',     placeholder: 'เช่น Puff, Foil, Glitter' },
+              { label: 'à¸‚à¸™à¸²à¸”à¸¥à¸²à¸¢', key: 'size',        placeholder: 'à¹€à¸Šà¹ˆà¸™ 10Ã—15 cm' },
+              { label: 'à¸•à¸³à¹à¸«à¸™à¹ˆà¸‡',  key: 'position',    placeholder: 'à¹€à¸Šà¹ˆà¸™ à¸«à¸™à¹‰à¸²à¸­à¸à¸‹à¹‰à¸²à¸¢' },
+              { label: 'à¸ˆà¸³à¸™à¸§à¸™à¸ªà¸µ',  key: 'color_count', placeholder: 'à¹€à¸Šà¹ˆà¸™ 3 à¸ªà¸µ' },
+              { label: 'à¹€à¸—à¸„à¸™à¸´à¸„',   key: 'technique',   placeholder: 'à¹€à¸Šà¹ˆà¸™ Spot Color, Discharge' },
+              { label: 'à¸žà¸´à¹€à¸¨à¸©',    key: 'special',     placeholder: 'à¹€à¸Šà¹ˆà¸™ Puff, Foil, Glitter' },
             ].map(({ label, key, placeholder }) => (
               <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
                 <label>{label}</label>
@@ -1045,38 +1078,38 @@ export default function JobOrderPage() {
             ))}
           </div>
 
-          {/* Reference Images — เพิ่มได้หลายรูป */}
+          {/* Reference Images â€” à¹€à¸žà¸´à¹ˆà¸¡à¹„à¸”à¹‰à¸«à¸¥à¸²à¸¢à¸£à¸¹à¸› */}
           <div style={{ marginBottom: 16 }}>
             <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: .4 }}>
-              📎 Reference — ภาพตัวอย่างจากลูกค้า ({(form.reference_images?.length || 0) + referenceFiles.length} รูป)
+              ðŸ“Ž Reference â€” à¸ à¸²à¸žà¸•à¸±à¸§à¸­à¸¢à¹ˆà¸²à¸‡à¸ˆà¸²à¸à¸¥à¸¹à¸à¸„à¹‰à¸² ({(form.reference_images?.length || 0) + referenceFiles.length} à¸£à¸¹à¸›)
             </div>
-            {/* รูปที่บันทึกแล้ว */}
+            {/* à¸£à¸¹à¸›à¸—à¸µà¹ˆà¸šà¸±à¸™à¸—à¸¶à¸à¹à¸¥à¹‰à¸§ */}
             {form.reference_images?.length > 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:8 }}>
                 {form.reference_images.map((url, i) => (
                   <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
                     <img src={url} alt={`ref-${i}`} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
                     <button onClick={() => setForm(f => ({ ...f, reference_images: f.reference_images.filter((_,j)=>j!==i) }))}
-                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>âœ•</button>
                     <div style={{ fontSize:9, textAlign:'center', padding:'2px 0', color:'#9CA3AF', background:'#F8FAFC' }}>REF {i+1}</div>
                   </div>
                 ))}
               </div>
             )}
-            {/* รูปใหม่รอ upload */}
+            {/* à¸£à¸¹à¸›à¹ƒà¸«à¸¡à¹ˆà¸£à¸­ upload */}
             {referenceFiles.length > 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:8 }}>
                 {referenceFiles.map((item, i) => (
                   <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
                     <img src={item.preview} alt={`new-ref-${i}`} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                    <div style={{ position:'absolute', top:4, left:4, background:'#6366F1', color:'#fff', fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10 }}>ใหม่</div>
+                    <div style={{ position:'absolute', top:4, left:4, background:'#6366F1', color:'#fff', fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10 }}>à¹ƒà¸«à¸¡à¹ˆ</div>
                     <button onClick={() => setReferenceFiles(f => f.filter((_,j)=>j!==i))}
-                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
+                      style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>âœ•</button>
                   </div>
                 ))}
               </div>
             )}
-            {/* ปุ่มเพิ่มรูป */}
+            {/* à¸›à¸¸à¹ˆà¸¡à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸¹à¸› */}
             <label style={{
               display:'flex', alignItems:'center', justifyContent:'center', gap:8,
               padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1',
@@ -1086,7 +1119,7 @@ export default function JobOrderPage() {
               onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
             >
-              <span>🖼️</span> เพิ่มรูป Reference (เลือกได้หลายรูปพร้อมกัน)
+              <span>ðŸ–¼ï¸</span> à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸¹à¸› Reference (à¹€à¸¥à¸·à¸­à¸à¹„à¸”à¹‰à¸«à¸¥à¸²à¸¢à¸£à¸¹à¸›à¸žà¸£à¹‰à¸­à¸¡à¸à¸±à¸™)
               <input type="file" accept="image/*" multiple style={{ display:'none' }}
                 onChange={e => {
                   const newItems = Array.from(e.target.files || []).map(file => ({
@@ -1105,13 +1138,13 @@ export default function JobOrderPage() {
 
             {/* Artwork column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>🖼️ Artwork</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>ðŸ–¼ï¸ Artwork</div>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>à¸£à¸¹à¸›à¸ à¸²à¸ž (JPG/PNG) â€” à¹à¸ªà¸”à¸‡à¹ƒà¸™à¹ƒà¸šà¸‡à¸²à¸™</div>
                 <FileDropZone
                   accept="image/*"
-                  icon="🎨"
-                  label="วางหรือคลิกแนบ Artwork"
+                  icon="ðŸŽ¨"
+                  label="à¸§à¸²à¸‡à¸«à¸£à¸·à¸­à¸„à¸¥à¸´à¸à¹à¸™à¸š Artwork"
                   preview={artworkPreview || form.artwork_url || null}
                   imageOnly
                   onFile={file => handleFileChange({ target: { files: [file] } }, setArtworkFile, setArtworkPreview)}
@@ -1119,11 +1152,11 @@ export default function JobOrderPage() {
                 />
               </div>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>à¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸™à¸‰à¸šà¸±à¸š (.ai / .psd / .pdf) â†’ Drive</div>
                 <FileDropZone
                   accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
-                  icon="📐"
-                  label="วางหรือคลิกแนบไฟล์ต้นฉบับ"
+                  icon="ðŸ“"
+                  label="à¸§à¸²à¸‡à¸«à¸£à¸·à¸­à¸„à¸¥à¸´à¸à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸™à¸‰à¸šà¸±à¸š"
                   fileName={artworkSourceFile?.name}
                   fileSize={artworkSourceFile?.size}
                   compact
@@ -1135,13 +1168,13 @@ export default function JobOrderPage() {
 
             {/* Mockup column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>👕 Mockup</div>
+              <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>ðŸ‘• Mockup</div>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>à¸£à¸¹à¸›à¸ à¸²à¸ž (JPG/PNG) â€” à¹à¸ªà¸”à¸‡à¹ƒà¸™à¹ƒà¸šà¸‡à¸²à¸™</div>
                 <FileDropZone
                   accept="image/*"
-                  icon="👕"
-                  label="วางหรือคลิกแนบ Mockup"
+                  icon="ðŸ‘•"
+                  label="à¸§à¸²à¸‡à¸«à¸£à¸·à¸­à¸„à¸¥à¸´à¸à¹à¸™à¸š Mockup"
                   preview={mockupPreview || form.mockup_url || null}
                   imageOnly
                   onFile={file => handleFileChange({ target: { files: [file] } }, setMockupFile, setMockupPreview)}
@@ -1149,11 +1182,11 @@ export default function JobOrderPage() {
                 />
               </div>
               <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>à¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸™à¸‰à¸šà¸±à¸š (.ai / .psd / .pdf) â†’ Drive</div>
                 <FileDropZone
                   accept=".ai,.psd,.pdf,.eps,.svg,.cdr,application/postscript,application/pdf,image/svg+xml"
-                  icon="📐"
-                  label="วางหรือคลิกแนบไฟล์ต้นฉบับ"
+                  icon="ðŸ“"
+                  label="à¸§à¸²à¸‡à¸«à¸£à¸·à¸­à¸„à¸¥à¸´à¸à¹à¸™à¸šà¹„à¸Ÿà¸¥à¹Œà¸•à¹‰à¸™à¸‰à¸šà¸±à¸š"
                   fileName={mockupSourceFile?.name}
                   fileSize={mockupSourceFile?.size}
                   compact
@@ -1166,34 +1199,34 @@ export default function JobOrderPage() {
           </div>
 
           {/* QC Photos */}
-          <SectionHeader icon="✅" title="รูปงานเสร็จ QC" />
-          {/* รูปที่มีอยู่แล้ว (edit mode) */}
+          <SectionHeader icon="âœ…" title="à¸£à¸¹à¸›à¸‡à¸²à¸™à¹€à¸ªà¸£à¹‡à¸ˆ QC" />
+          {/* à¸£à¸¹à¸›à¸—à¸µà¹ˆà¸¡à¸µà¸­à¸¢à¸¹à¹ˆà¹à¸¥à¹‰à¸§ (edit mode) */}
           {Array.isArray(form.finish_photos) && form.finish_photos.length > 0 && (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
               {form.finish_photos.map((p, i) => (
                 <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
                   <img src={p.url} alt={p.label} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
                   <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#F8FAFC', gap:4 }}>
-                    <span style={{ fontSize:10, fontWeight:600, color:'#64748B', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.label || `รูปที่ ${i+1}`}</span>
+                    <span style={{ fontSize:10, fontWeight:600, color:'#64748B', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.label || `à¸£à¸¹à¸›à¸—à¸µà¹ˆ ${i+1}`}</span>
                     <button onClick={() => setForm(f => ({ ...f, finish_photos: f.finish_photos.filter((_,j)=>j!==i) }))}
-                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>ลบ</button>
+                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>à¸¥à¸š</button>
                   </div>
                 </div>
               ))}
             </div>
           )}
-          {/* รูปรอบันทึก */}
+          {/* à¸£à¸¹à¸›à¸£à¸­à¸šà¸±à¸™à¸—à¸¶à¸ */}
           {Object.keys(qcPreviews).filter(k => qcPreviews[k]).length > 0 && (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
               {Object.entries(qcPreviews).filter(([,v])=>v).map(([k, src]) => (
                 <div key={k} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
                   <img src={src} alt={k} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
                   <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#EEF2FF', gap:4 }}>
-                    <input placeholder="ชื่อรูป" value={qcFiles[k]?.label||''}
+                    <input placeholder="à¸Šà¸·à¹ˆà¸­à¸£à¸¹à¸›" value={qcFiles[k]?.label||''}
                       onChange={e => setQcFiles(f=>({...f,[k]:{...f[k],label:e.target.value}}))}
                       style={{ flex:1, fontSize:10, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5', minWidth:0 }} />
                     <button onClick={() => { setQcFiles(f=>{const n={...f};delete n[k];return n}); setQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
-                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>ลบ</button>
+                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>à¸¥à¸š</button>
                   </div>
                 </div>
               ))}
@@ -1208,7 +1241,7 @@ export default function JobOrderPage() {
             onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
           >
-            <span>📎</span> เพิ่มรูป QC (เลือกได้หลายรูปพร้อมกัน)
+            <span>ðŸ“Ž</span> à¹€à¸žà¸´à¹ˆà¸¡à¸£à¸¹à¸› QC (à¹€à¸¥à¸·à¸­à¸à¹„à¸”à¹‰à¸«à¸¥à¸²à¸¢à¸£à¸¹à¸›à¸žà¸£à¹‰à¸­à¸¡à¸à¸±à¸™)
             <input type="file" accept="image/*" multiple style={{ display:'none' }}
               onChange={e => {
                 const nf = {}; const np = {}
@@ -1226,14 +1259,14 @@ export default function JobOrderPage() {
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
-              {saving ? 'กำลังบันทึก...' : '💾 บันทึก'}
+              {saving ? 'à¸à¸³à¸¥à¸±à¸‡à¸šà¸±à¸™à¸—à¸¶à¸...' : 'ðŸ’¾ à¸šà¸±à¸™à¸—à¸¶à¸'}
             </button>
-            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()) }}>ยกเลิก</button>
+            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()) }}>à¸¢à¸à¹€à¸¥à¸´à¸</button>
           </div>
         </div>
       )}
 
-      {/* ──── CALENDAR VIEW ─────────────────────────────────── */}
+      {/* â”€â”€â”€â”€ CALENDAR VIEW â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {viewMode === 'calendar' && (
         <CalendarView
           jobs={filtered}
@@ -1243,7 +1276,7 @@ export default function JobOrderPage() {
         />
       )}
 
-      {/* ──── TABLE ──────────────────────────────────────────── */}
+      {/* â”€â”€â”€â”€ TABLE â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {viewMode === 'table' && <div className="card" style={{ overflow: 'hidden' }}>
         {loading ? <LoadingSpinner /> : (
           <>
@@ -1251,9 +1284,9 @@ export default function JobOrderPage() {
               <table>
                 <thead>
                   <tr>
-                    <th>เลขที่</th><th>ลูกค้า</th><th>รายการ</th>
-                    <th style={{ textAlign: 'center' }}>จำนวน</th>
-                    <th>กำหนดส่ง</th><th>สถานะ</th><th></th>
+                    <th>à¹€à¸¥à¸‚à¸—à¸µà¹ˆ</th><th>à¸¥à¸¹à¸à¸„à¹‰à¸²</th><th>à¸£à¸²à¸¢à¸à¸²à¸£</th>
+                    <th style={{ textAlign: 'center' }}>à¸ˆà¸³à¸™à¸§à¸™</th>
+                    <th>à¸à¸³à¸«à¸™à¸”à¸ªà¹ˆà¸‡</th><th>à¸ªà¸–à¸²à¸™à¸°</th><th></th>
                   </tr>
                 </thead>
                 <tbody>
@@ -1262,12 +1295,12 @@ export default function JobOrderPage() {
                     return (
                       <tr key={j.id} className="row-link" style={{ background: isOverdue(j) ? '#FFF5F5' : undefined }}>
                         <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}</td>
-                        <td style={{ fontWeight: 600 }}>{j.customers?.name || '—'}</td>
+                        <td style={{ fontWeight: 600 }}>{j.customers?.name || 'â€”'}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
-                          {(j.item_desc || '').slice(0, 36)}{(j.item_desc || '').length > 36 ? '…' : ''}
+                          {(j.item_desc || '').slice(0, 36)}{(j.item_desc || '').length > 36 ? 'â€¦' : ''}
                         </td>
                         <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
-                          {grandTotal(m.prod_items) > 0 ? grandTotal(m.prod_items) : '—'}
+                          {grandTotal(m.prod_items) > 0 ? grandTotal(m.prod_items) : 'â€”'}
                         </td>
                         <td style={{ fontSize: 12, color: isOverdue(j) ? 'var(--danger)' : 'var(--text-muted)', fontWeight: isOverdue(j) ? 700 : 400 }}>
                           {fmtDate(j.due_date)}
@@ -1275,17 +1308,17 @@ export default function JobOrderPage() {
                         <td><span className={STATUS_BADGE[j.status] || 'badge badge-gray'}>{j.status}</span></td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
-                            <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
-                            {j.status !== 'ส่งงานแล้ว' && (
-                              <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>à¸”à¸¹</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>âœï¸</button>
+                            {j.status !== 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§' && (
+                              <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>ðŸ—‘ï¸</button>
                             )}
-                            {j.status !== 'ส่งงานแล้ว' && (() => {
+                            {j.status !== 'à¸ªà¹ˆà¸‡à¸‡à¸²à¸™à¹à¸¥à¹‰à¸§' && (() => {
                               const idx = ALL_STATUS.indexOf(j.status)
                               const next = ALL_STATUS[idx + 1]
                               return next ? (
                                 <button className="btn btn-primary btn-sm" title={next}
-                                  onClick={() => updateJobStatus(j.id, next).then(() => load())}>▶</button>
+                                  onClick={() => updateJobStatus(j.id, next).then(() => load())}>â–¶</button>
                               ) : null
                             })()}
                           </div>
@@ -1294,13 +1327,13 @@ export default function JobOrderPage() {
                     )
                   })}
                   {filtered.length === 0 && (
-                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>ไม่พบรายการ</td></tr>
+                    <tr><td colSpan={7} style={{ textAlign: 'center', padding: 40, color: 'var(--text-muted)' }}>à¹„à¸¡à¹ˆà¸žà¸šà¸£à¸²à¸¢à¸à¸²à¸£</td></tr>
                   )}
                 </tbody>
               </table>
             </div>
             <div style={{ padding: '10px 14px', borderTop: '1px solid var(--border)', fontSize: 12, color: 'var(--text-muted)' }}>
-              แสดง {filtered.length} จาก {rows.length} รายการ
+              à¹à¸ªà¸”à¸‡ {filtered.length} à¸ˆà¸²à¸ {rows.length} à¸£à¸²à¸¢à¸à¸²à¸£
             </div>
           </>
         )}
