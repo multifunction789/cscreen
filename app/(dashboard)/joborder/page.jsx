@@ -786,13 +786,14 @@ export default function JobOrderPage() {
                 <span style={{ fontSize:18 }}>📎</span> เพิ่มรูป QC
                 <input type="file" accept="image/*" multiple style={{ display:'none' }}
                   onChange={e => {
+                    const newFiles = {}; const newPreviews = {}
                     Array.from(e.target.files || []).forEach(file => {
                       const k = `new_${Date.now()}_${Math.random().toString(36).slice(2)}`
-                      setViewQcFiles(f => ({ ...f, [k]: { file, label: '' } }))
-                      const r = new FileReader()
-                      r.onload = ev => setViewQcPreviews(p => ({ ...p, [k]: ev.target.result }))
-                      r.readAsDataURL(file)
+                      newFiles[k] = { file, label: '' }
+                      newPreviews[k] = URL.createObjectURL(file)
                     })
+                    setViewQcFiles(f => ({ ...f, ...newFiles }))
+                    setViewQcPreviews(p => ({ ...p, ...newPreviews }))
                     e.target.value = ''
                   }}
                 />
@@ -1088,12 +1089,12 @@ export default function JobOrderPage() {
               <span>🖼️</span> เพิ่มรูป Reference (เลือกได้หลายรูปพร้อมกัน)
               <input type="file" accept="image/*" multiple style={{ display:'none' }}
                 onChange={e => {
-                  Array.from(e.target.files||[]).forEach(file => {
-                    const r = new FileReader()
-                    r.onload = ev => setReferenceFiles(f => [...f, { file, preview: ev.target.result }])
-                    r.readAsDataURL(file)
-                  })
-                  e.target.value=''
+                  const newItems = Array.from(e.target.files || []).map(file => ({
+                    file,
+                    preview: URL.createObjectURL(file),
+                  }))
+                  if (newItems.length) setReferenceFiles(f => [...f, ...newItems])
+                  e.target.value = ''
                 }}
               />
             </label>
@@ -1210,13 +1211,14 @@ export default function JobOrderPage() {
             <span>📎</span> เพิ่มรูป QC (เลือกได้หลายรูปพร้อมกัน)
             <input type="file" accept="image/*" multiple style={{ display:'none' }}
               onChange={e => {
+                const nf = {}; const np = {}
                 Array.from(e.target.files||[]).forEach(file => {
                   const k = `qc_${Date.now()}_${Math.random().toString(36).slice(2)}`
-                  setQcFiles(f=>({...f,[k]:{file,label:''}}))
-                  const r = new FileReader()
-                  r.onload = ev => setQcPreviews(p=>({...p,[k]:ev.target.result}))
-                  r.readAsDataURL(file)
+                  nf[k] = { file, label: '' }
+                  np[k] = URL.createObjectURL(file)
                 })
+                setQcFiles(f=>({...f,...nf}))
+                setQcPreviews(p=>({...p,...np}))
                 e.target.value=''
               }}
             />
