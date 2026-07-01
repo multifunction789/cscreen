@@ -32,6 +32,17 @@ function grandTotal(rows) {
   return (rows || []).reduce((s, r) => s + rowTotal(r.qtys), 0)
 }
 
+// แปลง finish_photos ทุกรูปแบบ → [{url, label}]
+function normalizeQc(raw) {
+  if (!raw) return []
+  if (Array.isArray(raw)) return raw.filter(p => p?.url)
+  // legacy object format: {front,back,side,group} หรือ {QC1,QC2,...}
+  const LABELS = { front:'มุมตรง', back:'มุมหลัง', side:'มุมข้าง', group:'รูปรวม' }
+  return Object.entries(raw)
+    .filter(([, v]) => v)
+    .map(([k, url]) => ({ url, label: LABELS[k] || k }))
+}
+
 // ── Extract matrix data stored in items column ───────────────────
 function readMatrix(j) {
   if (j.items && j.items.type === 'size_matrix') {
@@ -43,7 +54,7 @@ function readMatrix(j) {
       screen_color:    j.items.screen_color    || '',
       production_note: j.items.production_note || '',
       mockup_url:      j.items.mockup_url      || '',
-      finish_photos:   j.items.finish_photos   || {},
+      finish_photos:   normalizeQc(j.items.finish_photos),
       drive_folders:   j.items.drive_folders   || null,
       design_detail:   j.design_detail         || {},
       reference_url:   j.reference_url         || '',
@@ -51,7 +62,7 @@ function readMatrix(j) {
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:{}, drive_folders: null, design_detail:{}, reference_url:'' }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:[], drive_folders: null, design_detail:{}, reference_url:'' }
 }
 
 const emptyForm = () => ({
@@ -61,7 +72,7 @@ const emptyForm = () => ({
   design_detail: { size: '', position: '', color_count: '', technique: '', special: '' },
   sizes: [...DEFAULT_SIZES],
   prod_items: [makeRow(DEFAULT_SIZES)],
-  finish_photos: {},
+  finish_photos: [],
 })
 
 function SectionHeader({ icon, title }) {
@@ -191,8 +202,8 @@ export default function JobOrderPage() {
   const [mockupSourceFile,  setMockupSourceFile]  = useState(null)
   const [referenceFile,     setReferenceFile]     = useState(null)
   const [referencePreview,  setReferencePreview]  = useState(null)
-  const [qcFiles,     setQcFiles]     = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
-  const [qcPreviews,  setQcPreviews]  = useState({ QC1: null, QC2: null, QC3: null, QC4: null })
+  const [qcFiles,     setQcFiles]     = useState({})
+  const [qcPreviews,  setQcPreviews]  = useState({})
   const [newSizeInput, setNewSizeInput] = useState('')
   const [viewQcFiles,    setViewQcFiles]    = useState({})
   const [viewQcPreviews, setViewQcPreviews] = useState({})
@@ -331,22 +342,23 @@ export default function JobOrderPage() {
       console.warn('Upload error:', e.message)
     }
 
-    // Upload QC photos
-    const QC_KEYS = ['QC1', 'QC2', 'QC3', 'QC4']
-    let finish_photos = { ...(form.finish_photos || {}) }
+    // Upload QC photos (dynamic array)
+    let finish_photos = Array.isArray(form.finish_photos) ? [...form.finish_photos] : normalizeQc(form.finish_photos)
     try {
-      for (const key of QC_KEYS) {
-        const file = qcFiles[key]
-        if (file) {
-          const ext  = file.name.split('.').pop()
-          const name = `${jobCode}_${custName}_${key}.${ext}`
-          if (custFolderId) {
-            const r = await uploadFileClient(file, custFolderId, name)
-            finish_photos[key] = r.directUrl
-          } else {
-            finish_photos[key] = await uploadFile(supabase, 'job-images', file)
-          }
+      const newEntries = Object.values(qcFiles).filter(e => e?.file)
+      for (let i = 0; i < newEntries.length; i++) {
+        const { file, label } = newEntries[i]
+        const qcNum = finish_photos.length + 1
+        const ext   = file.name.split('.').pop()
+        const name  = `${jobCode}_${custName}_QC${qcNum}.${ext}`
+        let url = ''
+        if (custFolderId) {
+          const r = await uploadFileClient(file, custFolderId, name)
+          url = r.directUrl
+        } else {
+          url = await uploadFile(supabase, 'job-images', file)
         }
+        finish_photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
     } catch (e) {
       console.warn('QC upload error:', e.message)
@@ -367,7 +379,7 @@ export default function JobOrderPage() {
       mockup_url:      mockup_url           || null,
       reference_url:   reference_url        || null,
       design_detail:   form.design_detail   || null,
-      finish_photos:   Object.keys(finish_photos).length ? finish_photos : null,
+      finish_photos:   finish_photos.length ? finish_photos : null,
       drive_folders:   custFolderId ? { jobFolderId: custFolderId } : null,
     }
 
@@ -394,8 +406,8 @@ export default function JobOrderPage() {
 
     setForm(emptyForm())
     setReferenceFile(null);      setReferencePreview(null)
-    setQcFiles({ QC1: null, QC2: null, QC3: null, QC4: null })
-    setQcPreviews({ QC1: null, QC2: null, QC3: null, QC4: null })
+    setQcFiles({})
+    setQcPreviews({})
     setArtworkFile(null);        setArtworkPreview(null)
     setMockupFile(null);         setMockupPreview(null)
     setArtworkSourceFile(null);  setMockupSourceFile(null)
@@ -425,8 +437,8 @@ export default function JobOrderPage() {
       finish_photos:   m.finish_photos  || {},
     })
     setReferenceFile(null); setReferencePreview(null)
-    setQcFiles({ QC1: null, QC2: null, QC3: null, QC4: null })
-    setQcPreviews({ QC1: null, QC2: null, QC3: null, QC4: null })
+    setQcFiles({})
+    setQcPreviews({})
     setArtworkFile(null); setArtworkPreview(null)
     setMockupFile(null);  setMockupPreview(null)
     setEditId(j.id); setShowForm(true)
@@ -442,7 +454,7 @@ export default function JobOrderPage() {
   const monthCount = filtered.length
   const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
-  // ── บันทึก QC photos จาก view inline ─────────────────────────
+  // ── บันทึก QC photos จาก view inline (array format) ──────────
   async function handleSaveQc() {
     if (!view) return
     setSavingQc(true)
@@ -450,21 +462,24 @@ export default function JobOrderPage() {
     const custObj  = customers.find(c => c.id === view.customer_id) || {}
     const custName = custObj.name || 'unknown'
     const folder   = custObj.drive_folder_id || mCur.drive_folders?.jobFolderId || null
-    const QC_KEYS  = ['QC1','QC2','QC3','QC4']
-    let photos = { ...(mCur.finish_photos || {}) }
+    // existing photos (array)
+    let photos = [...(mCur.finish_photos || [])]
     try {
-      for (const key of QC_KEYS) {
-        const file = viewQcFiles[key]
-        if (file) {
-          const ext  = file.name.split('.').pop()
-          const name = `${view.code}_${custName}_${key}.${ext}`
-          if (folder) {
-            const r = await uploadFileClient(file, folder, name)
-            photos[key] = r.directUrl
-          } else {
-            photos[key] = await uploadFile(supabase, 'job-images', file)
-          }
+      // viewQcFiles: { [tempIdx]: { file, label } }
+      const entries = Object.entries(viewQcFiles).sort(([a],[b]) => Number(a)-Number(b))
+      for (const [idx, { file, label }] of entries) {
+        if (!file) continue
+        const qcNum  = photos.length + 1
+        const ext    = file.name.split('.').pop()
+        const name   = `${view.code}_${custName}_QC${qcNum}.${ext}`
+        let url = ''
+        if (folder) {
+          const r = await uploadFileClient(file, folder, name)
+          url = r.directUrl
+        } else {
+          url = await uploadFile(supabase, 'job-images', file)
         }
+        photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
     } catch (e) { console.warn('QC upload:', e.message) }
 
@@ -475,6 +490,18 @@ export default function JobOrderPage() {
     setView(v => ({ ...v, items: itemsPayload }))
     load()
     setSavingQc(false)
+  }
+
+  // ── ลบ QC photo ออกจาก view ───────────────────────────────────
+  async function handleDeleteQc(idx) {
+    if (!view) return
+    const mCur   = readMatrix(view)
+    const photos = [...(mCur.finish_photos || [])]
+    photos.splice(idx, 1)
+    const itemsPayload = { ...view.items, finish_photos: photos }
+    await updateJobOrder(view.id, { items: itemsPayload })
+    setView(v => ({ ...v, items: itemsPayload }))
+    load()
   }
 
   // ──── PRINT VIEW (3 pages) ───────────────────────────────────
@@ -688,72 +715,88 @@ export default function JobOrderPage() {
               {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code}</span>
             </div>
 
-            {/* QC grid — รูปที่บันทึกแล้ว + ช่องแนบใหม่ */}
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2,1fr)', gap: 14 }}>
-              {FINISH_SLOTS.map(s => {
-                const qcKey     = s.key.toUpperCase().replace('FRONT','QC1').replace('BACK','QC2').replace('SIDE','QC3').replace('GROUP','QC4')
-                // map FINISH_SLOTS keys → QC keys
-                const KEY_MAP   = { front:'QC1', back:'QC2', side:'QC3', group:'QC4' }
-                const key       = KEY_MAP[s.key]
-                const saved     = finish_photos?.[s.key] || finish_photos?.[key] || null
-                const newPreview = viewQcPreviews[key] || null
-                return (
-                  <div key={s.key} style={{ borderRadius: 10, overflow: 'hidden', border: `2px solid ${newPreview ? '#6366F1' : saved ? 'var(--border)' : '#E5E7EB'}`, background: '#fff' }}>
-                    {/* รูปที่มีอยู่ / preview ใหม่ */}
-                    {(newPreview || saved) ? (
-                      <div style={{ position: 'relative' }}>
-                        <img src={newPreview || saved} alt={s.label} crossOrigin="anonymous"
-                          style={{ width: '100%', aspectRatio: '4/3', objectFit: 'cover', display: 'block' }} />
-                        {newPreview && (
-                          <div style={{ position:'absolute', top:6, right:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>ใหม่</div>
-                        )}
-                      </div>
-                    ) : (
-                      <div style={{ aspectRatio:'4/3', display:'flex', alignItems:'center', justifyContent:'center', background:'#F8FAFC', color:'#D1D5DB', flexDirection:'column', gap:4 }}>
-                        <span style={{ fontSize:28 }}>📷</span>
-                        <span style={{ fontSize:11, fontWeight:600 }}>{s.label}</span>
-                      </div>
-                    )}
-                    {/* ปุ่มแนบรูป — no-print */}
-                    <div className="no-print" style={{ padding:'8px 10px', borderTop:'1px solid #F1F5F9', display:'flex', alignItems:'center', gap:8 }}>
-                      <span style={{ fontSize:11, fontWeight:700, color:'#64748B', flex:1 }}>{s.label}</span>
-                      <label style={{
-                        fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:7, cursor:'pointer',
-                        background: newPreview ? '#EDE9FE' : 'var(--primary)',
-                        color: newPreview ? '#6D28D9' : '#fff',
-                        border: newPreview ? '1.5px solid #C4B5FD' : 'none',
-                        display:'inline-flex', alignItems:'center', gap:4,
-                      }}>
-                        {newPreview ? '🔄 เปลี่ยน' : '📎 แนบรูป'}
-                        <input type="file" accept="image/*" style={{ display:'none' }}
-                          onChange={e => {
-                            const file = e.target.files?.[0]; if (!file) return
-                            setViewQcFiles(f => ({ ...f, [key]: file }))
-                            const r = new FileReader()
-                            r.onload = ev => setViewQcPreviews(p => ({ ...p, [key]: ev.target.result }))
-                            r.readAsDataURL(file)
-                          }}
-                        />
-                      </label>
-                      {newPreview && (
-                        <button onClick={() => { setViewQcFiles(f=>({...f,[key]:null})); setViewQcPreviews(p=>({...p,[key]:null})) }}
-                          style={{ fontSize:11, padding:'5px 8px', borderRadius:7, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>ยกเลิก</button>
-                      )}
+            {/* รูปที่บันทึกแล้ว */}
+            {finish_photos.length > 0 && (
+              <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:16 }}>
+                {finish_photos.map((p, i) => (
+                  <div key={i} style={{ borderRadius:10, overflow:'hidden', border:'1px solid var(--border)', background:'#fff' }}>
+                    <img src={p.url} alt={p.label} crossOrigin="anonymous"
+                      style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                    <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#F8FAFC' }}>
+                      <span style={{ fontSize:11, fontWeight:700, color:'#64748B', flex:1 }}>{p.label || `รูปที่ ${i+1}`}</span>
+                      <button className="no-print" onClick={() => handleDeleteQc(i)}
+                        style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>
+                        ลบ
+                      </button>
                     </div>
                   </div>
-                )
-              })}
-            </div>
-
-            {/* ปุ่มบันทึก QC — แสดงเฉพาะเมื่อมีรูปใหม่ */}
-            {Object.values(viewQcFiles).some(Boolean) && (
-              <div className="no-print" style={{ marginTop:16, display:'flex', justifyContent:'flex-end' }}>
-                <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc}
-                  style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, padding:'10px 24px' }}>
-                  {savingQc ? '⏳ กำลังบันทึก...' : '💾 บันทึกรูป QC'}
-                </button>
+                ))}
               </div>
             )}
+
+            {/* ช่องเพิ่มรูปใหม่ */}
+            <div className="no-print">
+              {/* รูปที่รอบันทึก */}
+              {Object.keys(viewQcPreviews).filter(k => viewQcPreviews[k]).length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:12 }}>
+                  {Object.entries(viewQcPreviews).filter(([,v]) => v).map(([k, src]) => (
+                    <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #6366F1', background:'#fff' }}>
+                      <div style={{ position:'relative' }}>
+                        <img src={src} alt={`new-${k}`}
+                          style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                        <div style={{ position:'absolute', top:6, left:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>รอบันทึก</div>
+                      </div>
+                      <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#EEF2FF' }}>
+                        <input
+                          placeholder="ชื่อรูป เช่น เสื้อแบบ A"
+                          value={viewQcFiles[k]?.label || ''}
+                          onChange={e => setViewQcFiles(f => ({ ...f, [k]: { ...f[k], label: e.target.value } }))}
+                          style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5' }}
+                        />
+                        <button onClick={() => { setViewQcFiles(f=>{const n={...f};delete n[k];return n}); setViewQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
+                          style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {/* ปุ่มเพิ่มรูป */}
+              <label style={{
+                display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+                padding:'12px', borderRadius:10,
+                border:'2px dashed #CBD5E1', background:'#F8FAFC',
+                cursor:'pointer', fontSize:13, fontWeight:700, color:'#64748B',
+                transition:'border-color .15s, background .15s',
+              }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.background='#EFF6FF' }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor='#CBD5E1'; e.currentTarget.style.background='#F8FAFC' }}
+              >
+                <span style={{ fontSize:18 }}>📎</span> เพิ่มรูป QC
+                <input type="file" accept="image/*" multiple style={{ display:'none' }}
+                  onChange={e => {
+                    Array.from(e.target.files || []).forEach(file => {
+                      const k = `new_${Date.now()}_${Math.random().toString(36).slice(2)}`
+                      setViewQcFiles(f => ({ ...f, [k]: { file, label: '' } }))
+                      const r = new FileReader()
+                      r.onload = ev => setViewQcPreviews(p => ({ ...p, [k]: ev.target.result }))
+                      r.readAsDataURL(file)
+                    })
+                    e.target.value = ''
+                  }}
+                />
+              </label>
+
+              {/* ปุ่มบันทึก */}
+              {Object.values(viewQcFiles).some(Boolean) && (
+                <div style={{ marginTop:12, display:'flex', justifyContent:'flex-end' }}>
+                  <button className="btn btn-primary" onClick={handleSaveQc} disabled={savingQc}
+                    style={{ display:'flex', alignItems:'center', gap:8, fontSize:13, padding:'10px 24px' }}>
+                    {savingQc ? '⏳ กำลังบันทึก...' : `💾 บันทึก ${Object.values(viewQcFiles).filter(Boolean).length} รูป`}
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
 
         </div>
@@ -1071,35 +1114,61 @@ export default function JobOrderPage() {
 
           {/* QC Photos */}
           <SectionHeader icon="✅" title="รูปงานเสร็จ QC" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 12, marginBottom: 20 }}>
-            {['QC1','QC2','QC3','QC4'].map((key, i) => {
-              const labels = ['มุมตรง','มุมหลัง','มุมข้าง','รูปรวม']
-              const existing = form.finish_photos?.[key]
-              return (
-                <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                  <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', textAlign: 'center' }}>{key} — {labels[i]}</div>
-                  <FileDropZone
-                    accept="image/*"
-                    icon="📸"
-                    label={labels[i]}
-                    preview={qcPreviews[key] || existing || null}
-                    imageOnly
-                    onFile={file => {
-                      setQcFiles(f => ({ ...f, [key]: file }))
-                      const r = new FileReader()
-                      r.onload = ev => setQcPreviews(p => ({ ...p, [key]: ev.target.result }))
-                      r.readAsDataURL(file)
-                    }}
-                    onClear={() => {
-                      setQcFiles(f => ({ ...f, [key]: null }))
-                      setQcPreviews(p => ({ ...p, [key]: null }))
-                      setForm(f => ({ ...f, finish_photos: { ...f.finish_photos, [key]: null } }))
-                    }}
-                  />
+          {/* รูปที่มีอยู่แล้ว (edit mode) */}
+          {Array.isArray(form.finish_photos) && form.finish_photos.length > 0 && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
+              {form.finish_photos.map((p, i) => (
+                <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                  <img src={p.url} alt={p.label} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                  <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#F8FAFC', gap:4 }}>
+                    <span style={{ fontSize:10, fontWeight:600, color:'#64748B', flex:1, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{p.label || `รูปที่ ${i+1}`}</span>
+                    <button onClick={() => setForm(f => ({ ...f, finish_photos: f.finish_photos.filter((_,j)=>j!==i) }))}
+                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>ลบ</button>
+                  </div>
                 </div>
-              )
-            })}
-          </div>
+              ))}
+            </div>
+          )}
+          {/* รูปรอบันทึก */}
+          {Object.keys(qcPreviews).filter(k => qcPreviews[k]).length > 0 && (
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
+              {Object.entries(qcPreviews).filter(([,v])=>v).map(([k, src]) => (
+                <div key={k} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                  <img src={src} alt={k} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                  <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#EEF2FF', gap:4 }}>
+                    <input placeholder="ชื่อรูป" value={qcFiles[k]?.label||''}
+                      onChange={e => setQcFiles(f=>({...f,[k]:{...f[k],label:e.target.value}}))}
+                      style={{ flex:1, fontSize:10, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5', minWidth:0 }} />
+                    <button onClick={() => { setQcFiles(f=>{const n={...f};delete n[k];return n}); setQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
+                      style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>ลบ</button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          <label style={{
+            display:'flex', alignItems:'center', justifyContent:'center', gap:8,
+            padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1',
+            background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700,
+            color:'#64748B', marginBottom:20, transition:'all .15s',
+          }}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
+          >
+            <span>📎</span> เพิ่มรูป QC (เลือกได้หลายรูปพร้อมกัน)
+            <input type="file" accept="image/*" multiple style={{ display:'none' }}
+              onChange={e => {
+                Array.from(e.target.files||[]).forEach(file => {
+                  const k = `qc_${Date.now()}_${Math.random().toString(36).slice(2)}`
+                  setQcFiles(f=>({...f,[k]:{file,label:''}}))
+                  const r = new FileReader()
+                  r.onload = ev => setQcPreviews(p=>({...p,[k]:ev.target.result}))
+                  r.readAsDataURL(file)
+                })
+                e.target.value=''
+              }}
+            />
+          </label>
 
           <div style={{ display: 'flex', gap: 8, marginTop: 20, paddingTop: 16, borderTop: '1px solid var(--border)' }}>
             <button className="btn btn-primary" onClick={handleSave} disabled={saving}>
