@@ -394,7 +394,6 @@ export default function JobOrderPage() {
       document_date:  form.document_date || todayStr(),
       note:           form.note,
       status:         form.status,
-      reference_images: reference_images.length ? reference_images : null,
       design_detail:  form.design_detail || null,
       ...(artwork_url ? { image_url: artwork_url } : {}),
     }
