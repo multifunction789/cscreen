@@ -235,6 +235,7 @@ export default function JobOrderPage() {
     setCustomers(cRes.data || [])
     setInvoices(iRes.data || [])
     setLoading(false)
+    return jRes.data || []
   }
 
   // ── Invoice selection → auto-fill ─────────────────────────────
@@ -397,9 +398,9 @@ export default function JobOrderPage() {
       ...(artwork_images[0] ? { image_url: artwork_images[0] } : {}),
     }
 
+    const savedId = editId
     if (editId) {
       await updateJobOrder(editId, payload)
-      setEditId(null)
     } else {
       await insertJobOrder({ ...payload, code: jobCode })
     }
@@ -411,7 +412,13 @@ export default function JobOrderPage() {
     setArtworkFiles([]);         setMockupFiles([])
     setArtworkSourceFile(null);  setMockupSourceFile(null)
     setShowForm(false); setSaving(false)
-    load()
+    setEditId(null)
+    const res = await load()
+    // ถ้ากำลัง view ใบงานนี้อยู่ ให้อัพเดท view ด้วยข้อมูลใหม่
+    if (savedId && view?.id === savedId) {
+      const fresh = res?.find?.(j => j.id === savedId)
+      if (fresh) setView(fresh)
+    }
   }
 
 
