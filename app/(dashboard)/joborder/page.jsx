@@ -63,6 +63,8 @@ function readMatrix(j) {
       screen_color:    j.items.screen_color    || '',
       production_note: j.items.production_note || '',
       mockup_url:      j.items.mockup_url      || '',
+      mockup_images:   Array.isArray(j.items.mockup_images) ? j.items.mockup_images.filter(Boolean) : (j.items.mockup_url ? [j.items.mockup_url] : []),
+      artwork_images:  Array.isArray(j.items.artwork_images) ? j.items.artwork_images.filter(Boolean) : (j.image_url ? [j.image_url] : []),
       finish_photos:   normalizeQc(j.items.finish_photos),
       drive_folders:   j.items.drive_folders   || null,
       design_detail:   j.design_detail         || {},
@@ -71,7 +73,7 @@ function readMatrix(j) {
   }
   // Legacy / empty
   const sizes = [...DEFAULT_SIZES]
-  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', finish_photos:[], drive_folders: null, design_detail:{}, reference_images:[] }
+  return { sizes, prod_items: [makeRow(sizes)], fabric_type:'', shirt_color:'', screen_color:'', production_note:'', mockup_url:'', mockup_images:[], artwork_images:[], finish_photos:[], drive_folders: null, design_detail:{}, reference_images:[] }
 }
 
 const emptyForm = () => ({
@@ -203,10 +205,8 @@ export default function JobOrderPage() {
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
   const [viewMode, setViewMode]       = useState('table')
   const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
-  const [artworkFile, setArtworkFile]   = useState(null)
-  const [artworkPreview, setArtworkPreview] = useState(null)
-  const [mockupFile, setMockupFile]         = useState(null)
-  const [mockupPreview, setMockupPreview]   = useState(null)
+  const [artworkFiles, setArtworkFiles]   = useState([])   // [{file, preview}]
+  const [mockupFiles,  setMockupFiles]    = useState([])   // [{file, preview}]
   const [artworkSourceFile, setArtworkSourceFile] = useState(null)
   const [mockupSourceFile,  setMockupSourceFile]  = useState(null)
   const [referenceFiles,    setReferenceFiles]    = useState([])   // [{file, preview}]
@@ -308,34 +308,31 @@ export default function JobOrderPage() {
 
     // Upload reference → Supabase only (ไม่ต้องขึ้น Drive)
     let reference_images = Array.isArray(form.reference_images) ? [...form.reference_images] : []
-    let artwork_url      = form.artwork_url || null
-    let mockup_url       = form.mockup_url  || null
+    let artwork_images = Array.isArray(form.artwork_images) ? [...form.artwork_images] : (form.artwork_url ? [form.artwork_url] : [])
+    let mockup_images  = Array.isArray(form.mockup_images)  ? [...form.mockup_images]  : (form.mockup_url  ? [form.mockup_url]  : [])
     try {
       for (const { file } of referenceFiles) {
         const url = await uploadFile(supabase, 'job-images', file)
         if (url) reference_images.push(url)
       }
-      if (artworkFile) {
-        const ext  = artworkFile.name.split('.').pop()
-        const name = `${jobCode}_${custName}_AW.${ext}`
-        if (custFolderId) {
-          const r = await uploadFileClient(artworkFile, custFolderId, name)
-          artwork_url = r.directUrl
-        } else {
-          artwork_url = await uploadFile(supabase, 'job-images', artworkFile)
-        }
+      for (let i = 0; i < artworkFiles.length; i++) {
+        const { file } = artworkFiles[i]
+        const ext  = file.name.split('.').pop()
+        const name = `${jobCode}_${custName}_AW${artwork_images.length + 1}.${ext}`
+        let url = ''
+        if (custFolderId) { const r = await uploadFileClient(file, custFolderId, name); url = r.directUrl }
+        else url = await uploadFile(supabase, 'job-images', file)
+        if (url) artwork_images.push(url)
       }
-      if (mockupFile) {
-        const ext  = mockupFile.name.split('.').pop()
-        const name = `${jobCode}_${custName}_MOCKUP.${ext}`
-        if (custFolderId) {
-          const r = await uploadFileClient(mockupFile, custFolderId, name)
-          mockup_url = r.directUrl
-        } else {
-          mockup_url = await uploadFile(supabase, 'job-images', mockupFile)
-        }
+      for (let i = 0; i < mockupFiles.length; i++) {
+        const { file } = mockupFiles[i]
+        const ext  = file.name.split('.').pop()
+        const name = `${jobCode}_${custName}_MOCKUP${mockup_images.length + 1}.${ext}`
+        let url = ''
+        if (custFolderId) { const r = await uploadFileClient(file, custFolderId, name); url = r.directUrl }
+        else url = await uploadFile(supabase, 'job-images', file)
+        if (url) mockup_images.push(url)
       }
-      // .ai / .psd — คงชื่อเดิม
       if (artworkSourceFile && custFolderId)
         await uploadFileClient(artworkSourceFile, custFolderId, artworkSourceFile.name)
       if (mockupSourceFile && custFolderId)
@@ -378,7 +375,9 @@ export default function JobOrderPage() {
       shirt_color:     form.shirt_color     || null,
       screen_color:    form.screen_color    || null,
       production_note: form.production_note || null,
-      mockup_url:      mockup_url           || null,
+      mockup_url:      mockup_images[0]      || null,
+      mockup_images:   mockup_images.length  ? mockup_images  : null,
+      artwork_images:  artwork_images.length ? artwork_images : null,
       reference_images: reference_images.length ? reference_images : null,
       design_detail:   form.design_detail   || null,
       finish_photos:   finish_photos.length ? finish_photos : null,
@@ -395,7 +394,7 @@ export default function JobOrderPage() {
       note:           form.note,
       status:         form.status,
       design_detail:  form.design_detail || null,
-      ...(artwork_url ? { image_url: artwork_url } : {}),
+      ...(artwork_images[0] ? { image_url: artwork_images[0] } : {}),
     }
 
     if (editId) {
@@ -409,8 +408,7 @@ export default function JobOrderPage() {
     setReferenceFiles([])
     setQcFiles({})
     setQcPreviews({})
-    setArtworkFile(null);        setArtworkPreview(null)
-    setMockupFile(null);         setMockupPreview(null)
+    setArtworkFiles([]);         setMockupFiles([])
     setArtworkSourceFile(null);  setMockupSourceFile(null)
     setShowForm(false); setSaving(false)
     load()
@@ -440,8 +438,7 @@ export default function JobOrderPage() {
     setReferenceFiles([])
     setQcFiles({})
     setQcPreviews({})
-    setArtworkFile(null); setArtworkPreview(null)
-    setMockupFile(null);  setMockupPreview(null)
+    setArtworkFiles([]); setMockupFiles([])
     setEditId(j.id); setShowForm(true)
     window.scrollTo({ top: 0, behavior: 'smooth' })
   }
@@ -510,7 +507,7 @@ export default function JobOrderPage() {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
     const inv  = invoices.find(i => i.id === view.invoice_id)
     const m    = readMatrix(view)
-    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, finish_photos, design_detail, reference_images } = m
+    const { sizes, prod_items: prod, fabric_type, shirt_color, screen_color, production_note, mockup_url, mockup_images, artwork_images, finish_photos, design_detail, reference_images } = m
     const dd = design_detail || {}
     const FINISH_SLOTS = [
       { key: 'front', label: 'มุมตรง' },
@@ -675,8 +672,32 @@ export default function JobOrderPage() {
               </div>
             )}
 
-            {/* Mockup + Artwork */}
-            {(mockup_url || view.image_url) && (
+            {/* Mockup images */}
+            {mockup_images?.length > 0 && (
+              <div style={{ marginBottom: 12 }}>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#1D4ED8', padding: '4px 10px', letterSpacing: .5, borderRadius: '8px 8px 0 0' }}>MOCKUP ({mockup_images.length} รูป)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: mockup_images.length === 1 ? '1fr' : 'repeat(2,1fr)', gap: 8, border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 8 }}>
+                  {mockup_images.map((url, i) => (
+                    <img key={i} src={url} alt={`mockup-${i+1}`} crossOrigin="anonymous"
+                      style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', borderRadius: 6 }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Artwork images */}
+            {artwork_images?.length > 0 && (
+              <div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#374151', padding: '4px 10px', letterSpacing: .5, borderRadius: '8px 8px 0 0' }}>ARTWORK ({artwork_images.length} รูป)</div>
+                <div style={{ display: 'grid', gridTemplateColumns: artwork_images.length === 1 ? '1fr' : 'repeat(2,1fr)', gap: 8, border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 8 }}>
+                  {artwork_images.map((url, i) => (
+                    <img key={i} src={url} alt={`artwork-${i+1}`} crossOrigin="anonymous"
+                      style={{ width: '100%', maxHeight: 240, objectFit: 'contain', display: 'block', background: '#f9f9f9', borderRadius: 6 }} />
+                  ))}
+                </div>
+              </div>
+            )}
+            {/* Fallback สำหรับข้อมูลเก่าที่ยังไม่ migrate */}
+            {(!mockup_images?.length && !artwork_images?.length) && (mockup_url || view.image_url) && (
               <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12 }}>
                 {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
                   <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
@@ -1092,18 +1113,45 @@ export default function JobOrderPage() {
             {/* Artwork column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>🖼️ Artwork</div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
-                <FileDropZone
-                  accept="image/*"
-                  icon="🎨"
-                  label="วางหรือคลิกแนบ Artwork"
-                  preview={artworkPreview || form.artwork_url || null}
-                  imageOnly
-                  onFile={file => handleFileChange({ target: { files: [file] } }, setArtworkFile, setArtworkPreview)}
-                  onClear={() => { setArtworkFile(null); setArtworkPreview(null); setForm(f => ({ ...f, artwork_url: '' })) }}
-                />
-              </div>
+              {/* รูปที่มีอยู่แล้ว */}
+              {(form.artwork_images?.length > 0) && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                  {form.artwork_images.map((url, i) => (
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                      <img src={url} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#F8FAFC' }}>
+                        <button onClick={() => setForm(f => ({ ...f, artwork_images: f.artwork_images.filter((_,j)=>j!==i) }))}
+                          style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* รูปใหม่ที่รอ upload */}
+              {artworkFiles.length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                  {artworkFiles.map((item, i) => (
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                      <img src={item.preview} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#EEF2FF' }}>
+                        <button onClick={() => setArtworkFiles(f => f.filter((_,j)=>j!==i))}
+                          style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B' }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
+                🎨 เพิ่มรูป Artwork
+                <input type="file" accept="image/*" multiple style={{ display:'none' }}
+                  onChange={e => {
+                    const items = Array.from(e.target.files||[]).map(file => ({ file, preview: URL.createObjectURL(file) }))
+                    if (items.length) setArtworkFiles(f => [...f, ...items])
+                    e.target.value = ''
+                  }} />
+              </label>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
                 <FileDropZone
@@ -1122,18 +1170,45 @@ export default function JobOrderPage() {
             {/* Mockup column */}
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, padding: 14, border: '1px solid var(--border)', borderRadius: 10 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>👕 Mockup</div>
-              <div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>รูปภาพ (JPG/PNG) — แสดงในใบงาน</div>
-                <FileDropZone
-                  accept="image/*"
-                  icon="👕"
-                  label="วางหรือคลิกแนบ Mockup"
-                  preview={mockupPreview || form.mockup_url || null}
-                  imageOnly
-                  onFile={file => handleFileChange({ target: { files: [file] } }, setMockupFile, setMockupPreview)}
-                  onClear={() => { setMockupFile(null); setMockupPreview(null); setForm(f => ({ ...f, mockup_url: '' })) }}
-                />
-              </div>
+              {/* รูปที่มีอยู่แล้ว */}
+              {(form.mockup_images?.length > 0) && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                  {form.mockup_images.map((url, i) => (
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'1px solid var(--border)' }}>
+                      <img src={url} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#F8FAFC' }}>
+                        <button onClick={() => setForm(f => ({ ...f, mockup_images: f.mockup_images.filter((_,j)=>j!==i) }))}
+                          style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              {/* รูปใหม่ที่รอ upload */}
+              {mockupFiles.length > 0 && (
+                <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
+                  {mockupFiles.map((item, i) => (
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                      <img src={item.preview} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#EEF2FF' }}>
+                        <button onClick={() => setMockupFiles(f => f.filter((_,j)=>j!==i))}
+                          style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+              <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B' }}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
+                👕 เพิ่มรูป Mockup
+                <input type="file" accept="image/*" multiple style={{ display:'none' }}
+                  onChange={e => {
+                    const items = Array.from(e.target.files||[]).map(file => ({ file, preview: URL.createObjectURL(file) }))
+                    if (items.length) setMockupFiles(f => [...f, ...items])
+                    e.target.value = ''
+                  }} />
+              </label>
               <div>
                 <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginBottom: 6 }}>ไฟล์ต้นฉบับ (.ai / .psd / .pdf) → Drive</div>
                 <FileDropZone
