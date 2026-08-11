@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react'
 import {
   getInvoices, insertInvoice, updateInvoice, deleteInvoice,
-  getCustomers, insertJobOrder, getJobOrders,
+  getCustomers, insertJobOrder, getJobOrdersLight,
   getMaterials, deductMaterial,
   getReceipts, insertReceipt,
 } from '@/lib/db'
@@ -81,7 +81,7 @@ export default function InvoicePage() {
 
   async function load() {
     const [invRes, cusRes, jobRes, matRes, recRes] = await Promise.all([
-      getInvoices(), getCustomers(), getJobOrders(), getMaterials(), getReceipts(),
+      getInvoices(), getCustomers(), getJobOrdersLight(), getMaterials(), getReceipts(),
     ])
     setRows(invRes.data    || [])
     setCustomers(cusRes.data  || [])
