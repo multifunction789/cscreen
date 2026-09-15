@@ -242,14 +242,14 @@ export default function QuotationPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1.35fr .65fr', gap: 14, paddingBottom: 12, borderBottom: '1.5px solid #e5e7eb' }}>
               {/* Brand */}
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
-                <img src="/cscreen-logo.png" alt="C-Screen"
+                <img src={SHOP.logo} alt={SHOP.name}
                   style={{ height: 66, width: 66, objectFit: 'contain', flexShrink: 0 }} />
                 <div style={{ lineHeight: 1.65 }}>
                   <div style={{ fontWeight: 900, fontSize: 12.5, color: '#111' }}>
-                    ร้าน C-Screen สกรีนเสื้อ-ตัด-เย็บ-ปัก ครบวงจร - หนองจอก
+                    {SHOP.name}
                   </div>
                   <div style={{ fontSize: 9.5, color: '#374151' }}>
-                    68/148 หมู่บ้านอมรทรัพย์ ซอยอยู่วิทยา 18 ถนนสุวินทวงศ์ แขวงกระทุ่มราย เขตหนองจอก กรุงเทพมหานคร 10530
+                    {SHOP.address}
                   </div>
                   <div style={{ fontSize: 9.5, color: '#374151' }}>เลขประจำตัวผู้เสียภาษี {SHOP.taxId}</div>
                   <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 4 }}>
