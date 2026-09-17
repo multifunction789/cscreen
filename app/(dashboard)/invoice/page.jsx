@@ -1,4 +1,6 @@
 'use client'
+import { productionSnapshot } from '@/lib/jobProduction.mjs'
+import ProductionFields from '@/components/ProductionFields'
 import { useState, useEffect } from 'react'
 import {
   getInvoices, insertInvoice, updateInvoice, deleteInvoice,
@@ -188,18 +190,13 @@ export default function InvoicePage() {
     const joSizes = usedSizesSet.size > 0
       ? [...defSizes.filter(s => usedSizesSet.has(s)), ...[...usedSizesSet].filter(s => !defSizes.includes(s))]
       : defSizes
-    await insertJobOrder({
+    const result = await insertJobOrder({
       code, customer_id: inv.customer_id, invoice_id: inv.id,
       item_desc: (inv.items||[]).map(it => it.desc).join(', '),
       status: 'รอออกแบบ',
-      items: {
-        type: 'size_matrix', sizes: joSizes,
-        rows: (inv.items||[]).map(it => ({
-          style: it.desc||'',
-          qtys: Object.fromEntries(joSizes.map(s => [s, it.sizes?.[s] ? String(it.sizes[s]) : ''])),
-        })),
-      },
+      items: productionSnapshot(inv, defSizes),
     })
+    if (result.error) return alert('สร้างใบงานไม่สำเร็จ: ' + result.error.message)
     await updateInvoice(inv.id, { jo_created: true })
     alert(`✅ สร้างใบงาน ${code} แล้ว`)
     load()
@@ -715,6 +712,7 @@ export default function InvoicePage() {
                     <td style={{ padding:'3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
+<ProductionFields prefix={`รายการ ${i + 1}`} value={it.production || {}} onChange={value => updateItem(i, 'production', value)} />
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
                         {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (

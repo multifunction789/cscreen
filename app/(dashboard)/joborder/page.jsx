@@ -1,6 +1,8 @@
 'use client'
+import ProductionFields from '@/components/ProductionFields'
+import { productionSnapshot, uploadJobImage, PRODUCTION_FIELDS } from '@/lib/jobProduction.mjs'
 import { useState, useEffect, useRef } from 'react'
-import { getJobOrders, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices } from '@/lib/db'
+import { getJobOrders, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices, getSuppliers } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -56,6 +58,7 @@ function normalizeQc(raw) {
 function readMatrix(j) {
   if (j.items && j.items.type === 'size_matrix') {
     return {
+      source_snapshot: j.items.source_snapshot || null,
       sizes:           (j.items.sizes || [...DEFAULT_SIZES]).filter(s => s !== 'XXL'),
       prod_items:      j.items.rows            || [],
       fabric_type:     j.items.fabric_type     || '',
@@ -193,6 +196,7 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
 export default function JobOrderPage() {
   const [rows, setRows]           = useState([])
   const [customers, setCustomers] = useState([])
+  const [suppliers, setSuppliers] = useState([])
   const [invoices, setInvoices]   = useState([])
   const [loading, setLoading]     = useState(true)
   const [search, setSearch]       = useState('')
@@ -202,7 +206,7 @@ export default function JobOrderPage() {
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
   const [view, setView]           = useState(null)
-  const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
+  const [monthFilter, setMonthFilter] = useState('')
   const [viewMode, setViewMode]       = useState('table')
   const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
   const [artworkFiles, setArtworkFiles]   = useState([])   // [{file, preview}]
@@ -230,10 +234,12 @@ export default function JobOrderPage() {
   }, [view])
 
   async function load() {
-    const [jRes, cRes, iRes] = await Promise.all([getJobOrders(), getCustomers(), getInvoices()])
+    const [jRes, cRes, iRes, sRes] = await Promise.all([getJobOrders(), getCustomers(), getInvoices(), getSuppliers()])
     setRows(jRes.data || [])
     setCustomers(cRes.data || [])
     setInvoices(iRes.data || [])
+    setSuppliers(sRes.data || [])
+    if (jRes.error || cRes.error || iRes.error || sRes.error) alert('โหลดข้อมูลไม่ครบ: ' + (jRes.error || cRes.error || iRes.error || sRes.error).message)
     setLoading(false)
     return jRes.data || []
   }
@@ -241,13 +247,12 @@ export default function JobOrderPage() {
   // ── Invoice selection → auto-fill ─────────────────────────────
   function onSelectInvoice(invId) {
     const inv = invoices.find(i => i.id === invId)
-    if (!inv) { setForm(f => ({ ...f, invoice_id: invId })); return }
-    // Build rows from invoice items
-    const invItems = inv.items || []
-    const newRows = invItems.length > 0
-      ? invItems.map(it => makeRow(form.sizes, it.desc || ''))
-      : [makeRow(form.sizes)]
-    setForm(f => ({ ...f, invoice_id: invId, customer_id: inv.customer_id, prod_items: newRows }))
+    if (!inv) { setForm(f => ({ ...f, invoice_id: invId, source_snapshot: null })); return }
+    const snapshot = productionSnapshot(inv, DEFAULT_SIZES)
+    if ((form.prod_items.some(r => r.style) || referenceFiles.length || artworkFiles.length || mockupFiles.length) &&
+        !confirm('ดึงรายการจาก Invoice ใหม่จะแทนที่รายการสินค้าที่กรอกไว้ ต้องการดำเนินการต่อไหม?')) return
+    setForm(f => ({ ...f, invoice_id: invId, customer_id: inv.customer_id,
+      sizes: snapshot.sizes, prod_items: snapshot.rows, source_snapshot: snapshot.source_snapshot }))
   }
 
   // ── Size matrix helpers ───────────────────────────────────────
@@ -306,6 +311,11 @@ export default function JobOrderPage() {
     const custName = cust.name || 'unknown'
     // ใช้ folder ของลูกค้า (สร้างตอน สร้างลูกค้า)
     const custFolderId = cust.drive_folder_id || null
+    if ((artworkSourceFile || mockupSourceFile) && !custFolderId) {
+      setSaving(false)
+      alert('ลูกค้ายังไม่มีโฟลเดอร์ Drive สำหรับไฟล์ต้นฉบับ กรุณาสร้างโฟลเดอร์หรือเอาไฟล์ต้นฉบับออกก่อนบันทึก')
+      return
+    }
 
     // Upload reference → Supabase only (ไม่ต้องขึ้น Drive)
     let reference_images = Array.isArray(form.reference_images) ? [...form.reference_images] : []
@@ -313,7 +323,7 @@ export default function JobOrderPage() {
     let mockup_images  = Array.isArray(form.mockup_images)  ? [...form.mockup_images]  : (form.mockup_url  ? [form.mockup_url]  : [])
     try {
       for (const { file } of referenceFiles) {
-        const url = await uploadFile(supabase, 'job-images', file)
+        const url = await uploadJobImage(supabase, 'job-images', file)
         if (url) reference_images.push(url)
       }
       for (let i = 0; i < artworkFiles.length; i++) {
@@ -322,7 +332,7 @@ export default function JobOrderPage() {
         const name = `${jobCode}_${custName}_AW${artwork_images.length + 1}.${ext}`
         let url = ''
         if (custFolderId) { const r = await uploadFileClient(file, custFolderId, name); url = r.directUrl }
-        else url = await uploadFile(supabase, 'job-images', file)
+        else url = await uploadJobImage(supabase, 'job-images', file)
         if (url) artwork_images.push(url)
       }
       for (let i = 0; i < mockupFiles.length; i++) {
@@ -331,7 +341,7 @@ export default function JobOrderPage() {
         const name = `${jobCode}_${custName}_MOCKUP${mockup_images.length + 1}.${ext}`
         let url = ''
         if (custFolderId) { const r = await uploadFileClient(file, custFolderId, name); url = r.directUrl }
-        else url = await uploadFile(supabase, 'job-images', file)
+        else url = await uploadJobImage(supabase, 'job-images', file)
         if (url) mockup_images.push(url)
       }
       if (artworkSourceFile && custFolderId)
@@ -339,7 +349,7 @@ export default function JobOrderPage() {
       if (mockupSourceFile && custFolderId)
         await uploadFileClient(mockupSourceFile, custFolderId, mockupSourceFile.name)
     } catch (e) {
-      console.warn('Upload error:', e.message)
+      setSaving(false); alert('เพิ่มรูปไม่สำเร็จ: ' + e.message); return
     }
 
     // Upload QC photos (dynamic array)
@@ -356,12 +366,12 @@ export default function JobOrderPage() {
           const r = await uploadFileClient(file, custFolderId, name)
           url = r.directUrl
         } else {
-          url = await uploadFile(supabase, 'job-images', file)
+          url = await uploadJobImage(supabase, 'job-images', file)
         }
         finish_photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
     } catch (e) {
-      console.warn('QC upload error:', e.message)
+      setSaving(false); alert('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return
     }
 
     // Summary for list view
@@ -372,6 +382,7 @@ export default function JobOrderPage() {
       type:            'size_matrix',
       sizes:           form.sizes,
       rows:            form.prod_items,
+      source_snapshot: form.source_snapshot || null,
       fabric_type:     form.fabric_type     || null,
       shirt_color:     form.shirt_color     || null,
       screen_color:    form.screen_color    || null,
@@ -387,7 +398,7 @@ export default function JobOrderPage() {
 
     const payload = {
       customer_id:    form.customer_id,
-      invoice_id:     form.invoice_id,
+      invoice_id:     form.invoice_id || null,
       item_desc,
       items:          itemsPayload,
       due_date:       form.due_date || null,
@@ -399,10 +410,19 @@ export default function JobOrderPage() {
     }
 
     const savedId = editId
-    if (editId) {
-      await updateJobOrder(editId, payload)
-    } else {
-      await insertJobOrder({ ...payload, code: jobCode })
+    // เก็บ URL ที่อัปโหลดสำเร็จไว้ เพื่อไม่อัปโหลดซ้ำหากฐานข้อมูลบันทึกไม่ผ่าน
+    setForm(f => ({ ...f, reference_images, artwork_images, mockup_images, finish_photos }))
+    setReferenceFiles([]); setArtworkFiles([]); setMockupFiles([]); setQcFiles({})
+    setArtworkSourceFile(null); setMockupSourceFile(null)
+    try {
+      const result = editId
+        ? await updateJobOrder(editId, payload)
+        : await insertJobOrder({ ...payload, code: jobCode })
+      if (result.error) throw new Error(result.error.message)
+    } catch (error) {
+      setSaving(false)
+      alert(`บันทึกใบงานไม่สำเร็จ: ${error.message || 'กรุณาลองอีกครั้ง'}`)
+      return
     }
 
     setForm(emptyForm())
@@ -482,14 +502,15 @@ export default function JobOrderPage() {
           const r = await uploadFileClient(file, folder, name)
           url = r.directUrl
         } else {
-          url = await uploadFile(supabase, 'job-images', file)
+          url = await uploadJobImage(supabase, 'job-images', file)
         }
         photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
-    } catch (e) { console.warn('QC upload:', e.message) }
+    } catch (e) { setSavingQc(false); alert('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return }
 
     const itemsPayload = { ...view.items, finish_photos: photos }
-    await updateJobOrder(view.id, { items: itemsPayload })
+    const result = await updateJobOrder(view.id, { items: itemsPayload })
+    if (result.error) { setSavingQc(false); alert('บันทึกรูปไม่สำเร็จ: ' + result.error.message); return }
     setViewQcFiles({})
     setViewQcPreviews({})
     setView(v => ({ ...v, items: itemsPayload }))
@@ -601,7 +622,8 @@ export default function JobOrderPage() {
             )}
 
             {/* Production info badges */}
-            {(fabric_type || shirt_color || screen_color) && (
+            {prod.some(r => r.production || r.supplier_name) && <div style={{ marginBottom: 16 }}>{prod.map((r, i) => <div key={i} style={{ marginBottom: 10 }}><strong>{r.style}</strong><div>{PRODUCTION_FIELDS.filter(([key]) => r.production?.[key]).map(([key, label]) => <span key={key} style={{ marginRight: 12 }}>{label}: {r.production[key]}</span>)}</div>{r.supplier_name && <div>ซัพพลายเออร์: {r.supplier_name}</div>}</div>)}</div>}
+{(fabric_type || shirt_color || screen_color) && (
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
                   .filter(f => f.v).map(f => (
@@ -838,7 +860,7 @@ export default function JobOrderPage() {
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
         {[
           { label: 'ใบงานทั้งหมด',              value: rows.length + ' ใบ',                                        accent: 'var(--primary)', icon: '📝' },
-          { label: `ใบงานเดือน ${monthFilter}`,  value: `${monthCount} ใบ · ${monthQty} ตัว`,                       accent: '#7C3AED',        icon: '📅' },
+          { label: monthFilter ? `ใบงานเดือน ${monthFilter}` : 'ใบงานตามตัวกรอง',  value: `${monthCount} ใบ · ${monthQty} ตัว`,                       accent: '#7C3AED',        icon: '📅' },
           { label: 'ส่งงานแล้ว',                 value: rows.filter(j => j.status === 'ส่งงานแล้ว').length + ' ใบ', accent: 'var(--success)', icon: '✅' },
           { label: 'เลยกำหนด',                   value: rows.filter(j => isOverdue(j)).length + ' ใบ',               accent: 'var(--danger)',  icon: '⏰' },
         ].map(k => (
@@ -898,7 +920,7 @@ export default function JobOrderPage() {
 
           {/* Section 1: ข้อมูลพื้นฐาน */}
           <SectionHeader icon="📋" title="ข้อมูลพื้นฐาน" />
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 12, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(220px,1fr))', gap: 12, marginBottom: 24 }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label>Invoice อ้างอิง *</label>
               <select value={form.invoice_id} onChange={e => onSelectInvoice(e.target.value)}>
@@ -933,7 +955,8 @@ export default function JobOrderPage() {
             </div>
           </div>
 
-          {/* Section 2: Size Matrix */}
+          {form.source_snapshot && <p>อ้างอิง {form.source_snapshot.code} · เก็บรายละเอียด ณ วันที่สร้างใบงาน</p>}
+{/* Section 2: Size Matrix */}
           <SectionHeader icon="📐" title="รายการสินค้า" />
           <div style={{ marginBottom: 24 }}>
             {/* Size column controls */}
@@ -974,6 +997,13 @@ export default function JobOrderPage() {
                         <input type="text" placeholder="ชื่อแบบ / รายการ" value={r.style}
                           onChange={e => updateStyle(idx, e.target.value)}
                           style={{ width: '100%', fontSize: 13 }} />
+<ProductionFields prefix={`ใบงาน รายการ ${idx + 1}`} value={r.production || {}} onChange={value => setForm(f => ({ ...f, prod_items: f.prod_items.map((row, i) => i === idx ? { ...row, production: value } : row) }))} />
+<label style={{ display: 'block', marginTop: 8 }}>ซัพพลายเออร์รายการนี้
+<select aria-label={`ซัพพลายเออร์รายการ ${idx + 1}`} value={r.supplier_id || ''} onChange={e => {
+  const supplier = suppliers.find(x => x.id === e.target.value)
+  setForm(f => ({ ...f, prod_items: f.prod_items.map((row, i) => i === idx ? { ...row, supplier_id: supplier?.id || '', supplier_name: supplier?.name || '' } : row) }))
+}}><option value="">— ยังไม่กำหนด —</option>{suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label>
+{r.ordered_qty > 0 && <small>จำนวนตาม Invoice: {r.ordered_qty} — กรุณาระบุไซส์ให้ครบ</small>}
                       </td>
                       {form.sizes.map(s => (
                         <td key={s} style={{ padding: '6px 4px', textAlign: 'center' }}>

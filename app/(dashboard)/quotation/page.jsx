@@ -1,4 +1,5 @@
 'use client'
+import ProductionFields from '@/components/ProductionFields'
 import { useState, useEffect } from 'react'
 import {
   getQuotations, insertQuotation, updateQuotation, deleteQuotation,
@@ -573,6 +574,7 @@ export default function QuotationPage() {
                     <td style={{ padding: '3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i, 'desc', e.target.value)} style={{ width: '100%' }} />
+<ProductionFields prefix={`รายการ ${i + 1}`} value={it.production || {}} onChange={value => updateItem(i, 'production', value)} />
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
                         {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (
