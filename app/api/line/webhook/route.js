@@ -5,14 +5,32 @@ import { supabaseAdmin } from '@/lib/supabaseAdmin'
  * POST /api/line/webhook — LINE Messaging API webhook
  * ตอบเฉพาะคำสั่ง "สถานะ" / "เช็คสถานะ" / "JO-xxxx"
  * ข้อความอื่นปล่อยให้ auto-reply ใน LINE OA Manager ตอบตามเดิม
+ *
+ * หมายเหตุ: LINE อนุญาต webhook URL เดียวต่อ 1 channel เท่านั้น เดิมช่องนี้ชี้ไปที่
+ * Make.com scenario ที่ยังใช้งานอยู่ — เมื่อเปลี่ยนมาชี้ที่นี่แทน เราจะ forward payload
+ * ดิบต่อให้ Make.com เหมือนเดิมด้วย (fire-and-forget) เพื่อไม่ให้ automation เดิมหยุดทำงาน
+ * ต้องตั้งค่า env var MAKE_WEBHOOK_URL เป็น URL ของ Make.com hook เดิม (ห้าม hardcode
+ * ในซอร์สโค้ด เพราะ URL นี้ทำหน้าที่เหมือน secret — ใครมี URL ก็ยิง event เข้า scenario ได้)
  */
 const STATUS_RE = /^(เช็ค)?สถานะ(งาน)?$|JO-\d+/i
+const MAKE_WEBHOOK_URL = process.env.MAKE_WEBHOOK_URL
+
+function forwardToMake(raw) {
+  if (!MAKE_WEBHOOK_URL) return
+  fetch(MAKE_WEBHOOK_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: raw,
+  }).catch(e => console.warn('[line/webhook] forward to Make failed', e))
+}
 
 export async function POST(req) {
   const raw = await req.text()
   if (!verifySignature(raw, req.headers.get('x-line-signature'))) {
     return new Response('bad signature', { status: 401 })
   }
+
+  forwardToMake(raw)
 
   const { events = [] } = JSON.parse(raw)
   await Promise.all(events.map(handle).map(p => p.catch(e => console.error('[line/webhook]', e))))
