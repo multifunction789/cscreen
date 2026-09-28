@@ -9,6 +9,7 @@ const navItems = [
   ]},
   { group: 'การขาย / Sales', items: [
     { href: '/customers', icon: '👥', label: 'ลูกค้า (Customer)' },
+    { href: '/line-leads', icon: '💬', label: 'คำขอจาก LINE' },
     { href: '/quotation', icon: '📋', label: 'ใบเสนอราคา' },
     { href: '/invoice',   icon: '📄', label: 'ใบแจ้งหนี้ (Invoice)' },
     { href: '/receipt',   icon: '🧾', label: 'ใบเสร็จ (Receipt)' },
