@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { notify, ask } from '@/lib/feedback'
 
 /* ── Green theme ──────────────────────────────────────────── */
 const C = {
@@ -89,8 +90,10 @@ export default function ReceiptPage() {
   }
 
   async function handleDelete(r) {
-    if (!confirm(`ลบใบเสร็จ ${r.code} ใช่ไหม?\n\nใบแจ้งหนี้ที่เชื่อมอยู่จะสามารถออกใบเสร็จใหม่ได้`)) return
-    await deleteReceipt(r.id)
+    if (!(await ask({ title: `ลบใบเสร็จ ${r.code}?`, message: 'ใบแจ้งหนี้ที่เชื่อมอยู่จะสามารถออกใบเสร็จใหม่ได้', confirmLabel: 'ลบ', danger: true }))) return
+    const { error } = await deleteReceipt(r.id)
+    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
+    notify.success(`ลบใบเสร็จ ${r.code} แล้ว`)
     if (view?.id === r.id) setView(null)
     load()
   }

@@ -1,5 +1,4 @@
 'use client'
-import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 
@@ -33,18 +32,13 @@ const navItems = [
   ]},
 ]
 
-export default function Sidebar({ mobileOpen = false, onMobileClose = () => {} }) {
-  const pathname  = usePathname()
-  const [collapsed, setCollapsed] = useState(false)
-
-  // Close mobile sidebar when navigating
-  function handleNavClick() {
-    onMobileClose()
-  }
+export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, collapsed = false, onToggleCollapse = () => {} }) {
+  const pathname = usePathname()
+  const isActive = href => pathname === href || pathname.startsWith(href + '/')
 
   return (
     <aside
-      className={`sidebar${mobileOpen ? ' mobile-open' : ''}`}
+      className={`sidebar${mobileOpen ? ' mobile-open' : ''}${collapsed ? ' collapsed' : ''}`}
       style={{
         width: collapsed ? 60 : 240,
         background: 'var(--sidebar-bg)',
@@ -59,14 +53,18 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {} }
       }}>
 
       {/* Logo */}
-      <div style={{ padding: '20px 20px 16px', borderBottom: '1px solid #2A2A2A', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+      <div style={{ padding: collapsed ? '20px 12px 16px' : '20px 20px 16px', borderBottom: '1px solid #2A2A2A', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+        {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src="/cscreen-logo.png" alt="C-Screen" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
         {!collapsed && (
-          <div style={{ overflow: 'hidden', whiteSpace: 'nowrap' }}>
+          <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 17, letterSpacing: .5 }}>CSCREEN</div>
             <div style={{ color: '#888', fontSize: 10 }}>Screen Printing ERP</div>
           </div>
         )}
+        {/* ปุ่มปิดเมนู — มือถือเท่านั้น */}
+        <button className="sidebar-close-btn" onClick={onMobileClose} aria-label="ปิดเมนู"
+          style={{ display: 'none', background: 'transparent', border: 'none', color: '#999', fontSize: 22, lineHeight: 1, padding: 4 }}>×</button>
       </div>
 
       {/* Nav */}
@@ -78,41 +76,24 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {} }
                 {group.group}
               </div>
             )}
-            {group.items.map((item) => {
-              const active = pathname === item.href
-              return (
-                <Link key={item.href} href={item.href} onClick={handleNavClick}
-                  style={{
-                    display: 'flex', alignItems: 'center', gap: 10,
-                    padding: collapsed ? '12px 0' : '11px 20px',
-                    justifyContent: collapsed ? 'center' : 'flex-start',
-                    color: active ? '#fff' : 'var(--sidebar-text)',
-                    background: active ? '#2A0505' : 'transparent',
-                    borderLeft: active ? '3px solid var(--primary)' : '3px solid transparent',
-                    fontSize: 13.5, textDecoration: 'none',
-                    transition: 'background .15s, color .15s',
-                    cursor: 'pointer',
-                  }}
-                  onMouseEnter={e => { if (!active) { e.currentTarget.style.background = '#2A2A2A'; e.currentTarget.style.color = '#fff' } }}
-                  onMouseLeave={e => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = 'var(--sidebar-text)' } }}
-                >
-                  <span style={{ fontSize: 17, width: 22, textAlign: 'center', flexShrink: 0 }}>{item.icon}</span>
-                  {!collapsed && <span style={{ flex: 1, fontWeight: active ? 600 : 400 }}>{item.label}</span>}
-                </Link>
-              )
-            })}
+            {group.items.map((item) => (
+              <Link key={item.href} href={item.href} onClick={onMobileClose}
+                className={`nav-link${isActive(item.href) ? ' active' : ''}`}
+                title={collapsed ? item.label : undefined}
+                aria-current={isActive(item.href) ? 'page' : undefined}>
+                <span className="nav-icon">{item.icon}</span>
+                {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+              </Link>
+            ))}
           </div>
         ))}
       </nav>
 
       {/* Collapse button — desktop only */}
-      <button onClick={() => setCollapsed(!collapsed)}
-        className="sidebar-collapse-btn"
-        style={{ width: '100%', padding: '12px 0', background: 'transparent', color: '#666', fontSize: 12, border: 'none', borderTop: '1px solid #2A2A2A', display: 'flex', alignItems: 'center', gap: 8, paddingLeft: collapsed ? 0 : 20, justifyContent: collapsed ? 'center' : 'flex-start', cursor: 'pointer', transition: 'background .15s, color .15s', flexShrink: 0 }}
-        onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,.05)'; e.currentTarget.style.color = '#fff' }}
-        onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#666' }}
-      >
-        <span style={{ display: 'inline-block', transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .3s' }}>◀</span>
+      <button onClick={onToggleCollapse}
+        className="sidebar-collapse-btn nav-link"
+        style={{ width: '100%', background: 'transparent', fontSize: 12, border: 'none', borderTop: '1px solid #2A2A2A', color: '#888', flexShrink: 0 }}>
+        <span className="nav-icon" style={{ fontSize: 12, transform: collapsed ? 'rotate(180deg)' : 'none', transition: 'transform .3s' }}>◀</span>
         {!collapsed && <span>ย่อเมนู</span>}
       </button>
     </aside>

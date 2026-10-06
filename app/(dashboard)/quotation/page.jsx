@@ -8,6 +8,7 @@ import {
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { notify, ask } from '@/lib/feedback'
 
 /* ── Blue theme ───────────────────────────────────────────── */
 const C = {
@@ -116,7 +117,7 @@ export default function QuotationPage() {
   const total    = subtotal - discAmt + vatAmt
 
   async function handleSave() {
-    if (!form.customer_id || form.items.length === 0) return alert('กรุณาเลือกลูกค้าและเพิ่มรายการ')
+    if (!form.customer_id || form.items.length === 0) return notify.warn('กรุณาเลือกลูกค้าและเพิ่มรายการ')
     setSaving(true)
     const items   = calcItems(form.items)
     const payload = {
@@ -128,23 +129,28 @@ export default function QuotationPage() {
     }
     if (editId) {
       const { error } = await updateQuotation(editId, payload)
-      if (error) { alert('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
+      if (error) { notify.error('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
       setEditId(null)
+      notify.success('บันทึกการแก้ไขแล้ว')
     } else {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('QT-', '') || '0'); return n > max ? n : max
       }, 0)
       const code = 'QT-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
       const { error } = await insertQuotation({ ...payload, code })
-      if (error) { alert('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
+      if (error) { notify.error('เกิดข้อผิดพลาด: ' + error.message); setSaving(false); return }
+      notify.success(`สร้าง ${code} แล้ว`)
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
     load()
   }
 
   async function handleDelete(qt) {
-    if (!confirm(`ลบ ${qt.code} ใช่ไหม?`)) return
-    await deleteQuotation(qt.id); load()
+    if (!(await ask({ title: `ลบ ${qt.code}?`, message: 'ลบแล้วกู้คืนไม่ได้', confirmLabel: 'ลบ', danger: true }))) return
+    const { error } = await deleteQuotation(qt.id)
+    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
+    notify.success(`ลบ ${qt.code} แล้ว`)
+    load()
   }
 
   function startEdit(qt) {
@@ -162,7 +168,7 @@ export default function QuotationPage() {
 
   async function handleConvertToInvoice(qt) {
     const existInv = invoices.find(i => i.quotation_id === qt.id)
-    if (existInv) return alert(`มี Invoice ${existInv.code} อยู่แล้ว`)
+    if (existInv) return notify.warn(`มี Invoice ${existInv.code} อยู่แล้ว`)
     const maxNum = invoices.reduce((max, r) => {
       const n = parseInt(r.code?.replace('INV-', '') || '0'); return n > max ? n : max
     }, 0)
@@ -177,7 +183,7 @@ export default function QuotationPage() {
       total: qt.total, status: 'รอชำระ',
     })
     await updateQuotation(qt.id, { status: 'แปลงเป็น Invoice' })
-    alert(`✅ สร้าง Invoice ${code} แล้ว`)
+    notify.success(`สร้าง Invoice ${code} แล้ว`)
     load()
     setView(v => v ? { ...v, status: 'แปลงเป็น Invoice' } : v)
   }

@@ -15,13 +15,15 @@ const pageTitles = {
   '/supplier':  { title: 'Supplier',               subtitle: 'จัดการซัพพลายเออร์' },
   '/finance':   { title: 'รายรับ-รายจ่าย',         subtitle: 'Finance' },
   '/taxdocs':   { title: 'เอกสารภาษี',             subtitle: 'Tax Documents' },
+  '/report':    { title: 'รายงานรายเดือน',         subtitle: 'Monthly Report' },
   '/cost':      { title: 'เปรียบเทียบต้นทุน',      subtitle: 'Cost Comparison' },
   '/excel':     { title: 'ดึงรายงาน Excel',         subtitle: 'Export Report' },
 }
 
 export default function Topbar({ onMenuToggle }) {
   const pathname = usePathname()
-  const page     = pageTitles[pathname] || { title: 'CSCREEN', subtitle: '' }
+  const base     = '/' + (pathname.split('/')[1] || '')
+  const page     = pageTitles[pathname] || pageTitles[base] || { title: 'CSCREEN', subtitle: '' }
 
   const [username, setUsername] = useState('เจ้าของร้าน')
   const [editing,  setEditing]  = useState(false)
