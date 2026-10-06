@@ -1,4 +1,5 @@
 'use client'
+import { notify } from '@/lib/feedback'
 import { useState } from 'react'
 import { getJobOrders, getQuotations, getReceipts, getCustomers, getMaterials, getStockIn, getTransactions, getSuppliers } from '@/lib/db'
 
@@ -136,7 +137,7 @@ export default function ExcelPage() {
         await downloadXLSX(headers, filtered, label)
       }
     } catch (e) {
-      alert('เกิดข้อผิดพลาด: ' + e.message)
+      notify.error('เกิดข้อผิดพลาด: ' + e.message)
     }
     setLoading(null)
   }
@@ -155,7 +156,7 @@ export default function ExcelPage() {
       }
       XLSX.writeFile(wb, `cscreen_export_${new Date().toISOString().slice(0,10)}.xlsx`)
     } catch (e) {
-      alert('เกิดข้อผิดพลาด: ' + e.message)
+      notify.error('เกิดข้อผิดพลาด: ' + e.message)
     }
     setLoading(null)
   }

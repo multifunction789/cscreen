@@ -1,7 +1,10 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getDashboardStats, getJobOrders, getTransactions, getCustomers } from '@/lib/db'
+import { getJobOrders, getTransactions, getCustomers } from '@/lib/db'
+import { isJobOverdue, daysUntil, byDueDate, DONE_STATUS } from '@/lib/jobStatus'
+import { notify } from '@/lib/feedback'
 import dynamic from 'next/dynamic'
+import Link from 'next/link'
 
 const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
 const CustomerCharts = dynamic(() => import('@/components/charts/CustomerCharts'), { ssr: false, loading: () => <div style={{height:150}} /> })
@@ -25,22 +28,32 @@ const todayTH = (() => {
 })()
 
 export default function DashboardPage() {
-  const [stats, setStats]     = useState({ totalIn: 0, totalOut: 0, profit: 0, activeJobs: 0, overdue: 0 })
   const [jobs, setJobs]       = useState([])
   const [txs, setTxs]         = useState([])
   const [customers, setCusts] = useState([])
   const [loaded, setLoaded]   = useState(false)
 
   useEffect(() => {
-    Promise.all([getDashboardStats(), getJobOrders(), getTransactions(), getCustomers()])
-      .then(([s, jRes, tRes, cRes]) => {
-        setStats(s)
+    // เดิมดึง job_orders + transactions ซ้ำสองรอบ (getDashboardStats) → คำนวณจากข้อมูลชุดเดียว
+    Promise.all([getJobOrders(), getTransactions(), getCustomers()])
+      .then(([jRes, tRes, cRes]) => {
+        const err = jRes.error || tRes.error || cRes.error
+        if (err) notify.error('โหลดข้อมูลไม่ครบ: ' + err.message)
         setJobs(jRes.data || [])
         setTxs(tRes.data || [])
         setCusts(cRes.data || [])
         setLoaded(true)
       })
   }, [])
+
+  const totalIn  = txs.filter(t => t.type === 'รายรับ').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+  const totalOut = txs.filter(t => t.type === 'รายจ่าย').reduce((s, t) => s + (Number(t.amount) || 0), 0)
+  const stats = {
+    totalIn, totalOut, profit: totalIn - totalOut,
+    activeJobs: jobs.filter(j => j.status !== DONE_STATUS).length,
+    // เดิมนับเฉพาะงานที่สถานะเป็น "เลยกำหนด" ซึ่งแทบไม่มีใครตั้ง → ตัวเลขเป็น 0 เสมอ
+    overdue: jobs.filter(isJobOverdue).length,
+  }
 
   // สร้าง chart data — รายรับ/รายจ่ายรายเดือน 6 เดือนล่าสุด
   const monthlyData = (() => {
@@ -88,9 +101,9 @@ export default function DashboardPage() {
   })()
 
   const urgentFromDB = jobs
-    .filter(j => j.status !== 'ส่งงานแล้ว')
+    .filter(j => j.status !== DONE_STATUS)
     .filter(j => j.due_date)
-    .sort((a, b) => new Date(a.due_date) - new Date(b.due_date))
+    .sort(byDueDate)
     .slice(0, 3)
 
   const recentJobsFromDB = jobs.slice(0, 4)
@@ -99,7 +112,7 @@ export default function DashboardPage() {
   const fmtDate = (d) => d ? new Date(d).toLocaleDateString('th-TH', { day:'2-digit', month:'2-digit' }) : '—'
   const daysLeft = (d) => {
     if (!d) return null
-    const diff = Math.ceil((new Date(d) - new Date()) / 86400000)
+    const diff = daysUntil(d)
     if (diff < 0) return { text: `เลยกำหนด ${Math.abs(diff)} วัน`, color: 'var(--danger)' }
     if (diff === 0) return { text: 'ส่งวันนี้!', color: 'var(--danger)' }
     if (diff === 1) return { text: 'ส่งพรุ่งนี้', color: 'var(--warning)' }
@@ -116,8 +129,8 @@ export default function DashboardPage() {
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>ภาพรวมธุรกิจ — วันนี้ {todayTH}</p>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          <a href="/report" className="btn btn-outline btn-sm">📈 รายงาน</a>
-          <a href="/joborder" className="btn btn-primary btn-sm">+ สร้างงาน</a>
+          <Link href="/report" className="btn btn-outline btn-sm">📈 รายงาน</Link>
+          <Link href="/joborder" className="btn btn-primary btn-sm">+ สร้างงาน</Link>
         </div>
       </div>
 
@@ -188,7 +201,7 @@ export default function DashboardPage() {
       <div className="card">
         <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
           <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>🏆 สินค้าขายดี / Best Sellers</h2>
-          <a href="/report" className="btn btn-outline btn-sm">ดูรายงาน →</a>
+          <Link href="/report" className="btn btn-outline btn-sm">ดูรายงาน →</Link>
         </div>
         <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
           {bestSellersFromDB.map(b => (
@@ -215,7 +228,7 @@ export default function DashboardPage() {
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📋 ใบงานล่าสุด</h2>
-            <a href="/joborder" className="btn btn-outline btn-sm">ดูทั้งหมด →</a>
+            <Link href="/joborder" className="btn btn-outline btn-sm">ดูทั้งหมด →</Link>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table>
@@ -237,7 +250,7 @@ export default function DashboardPage() {
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>💰 รายรับ-จ่ายล่าสุด</h2>
-            <a href="/finance" className="btn btn-outline btn-sm">ดูทั้งหมด →</a>
+            <Link href="/finance" className="btn btn-outline btn-sm">ดูทั้งหมด →</Link>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table>

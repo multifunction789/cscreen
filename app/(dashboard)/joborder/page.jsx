@@ -7,6 +7,8 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { notify, ask } from '@/lib/feedback'
+import { isJobOverdue } from '@/lib/jobStatus'
 import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 
@@ -239,18 +241,18 @@ export default function JobOrderPage() {
     setCustomers(cRes.data || [])
     setInvoices(iRes.data || [])
     setSuppliers(sRes.data || [])
-    if (jRes.error || cRes.error || iRes.error || sRes.error) alert('โหลดข้อมูลไม่ครบ: ' + (jRes.error || cRes.error || iRes.error || sRes.error).message)
+    if (jRes.error || cRes.error || iRes.error || sRes.error) notify.error('โหลดข้อมูลไม่ครบ: ' + (jRes.error || cRes.error || iRes.error || sRes.error).message)
     setLoading(false)
     return jRes.data || []
   }
 
   // ── Invoice selection → auto-fill ─────────────────────────────
-  function onSelectInvoice(invId) {
+  async function onSelectInvoice(invId) {
     const inv = invoices.find(i => i.id === invId)
     if (!inv) { setForm(f => ({ ...f, invoice_id: invId, source_snapshot: null })); return }
     const snapshot = productionSnapshot(inv, DEFAULT_SIZES)
     if ((form.prod_items.some(r => r.style) || referenceFiles.length || artworkFiles.length || mockupFiles.length) &&
-        !confirm('ดึงรายการจาก Invoice ใหม่จะแทนที่รายการสินค้าที่กรอกไว้ ต้องการดำเนินการต่อไหม?')) return
+        !(await ask({ title: 'แทนที่รายการเดิม?', message: 'ดึงรายการจาก Invoice ใหม่จะแทนที่รายการสินค้าที่กรอกไว้', confirmLabel: 'แทนที่' }))) return
     setForm(f => ({ ...f, invoice_id: invId, customer_id: inv.customer_id,
       sizes: snapshot.sizes, prod_items: snapshot.rows, source_snapshot: snapshot.source_snapshot }))
   }
@@ -296,8 +298,8 @@ export default function JobOrderPage() {
 
   // ── Save ─────────────────────────────────────────────────────
   async function handleSave() {
-    if (!form.invoice_id) return alert('กรุณาเลือก Invoice — ใบงานต้องอ้างอิง Invoice')
-    if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
+    if (!form.invoice_id) return notify.warn('กรุณาเลือก Invoice — ใบงานต้องอ้างอิง Invoice')
+    if (!form.customer_id) return notify.warn('กรุณาเลือกลูกค้า')
     setSaving(true)
 
     // คำนวณ job code ก่อน (ต้องใช้ก่อนสร้าง folder)
@@ -313,7 +315,7 @@ export default function JobOrderPage() {
     const custFolderId = cust.drive_folder_id || null
     if ((artworkSourceFile || mockupSourceFile) && !custFolderId) {
       setSaving(false)
-      alert('ลูกค้ายังไม่มีโฟลเดอร์ Drive สำหรับไฟล์ต้นฉบับ กรุณาสร้างโฟลเดอร์หรือเอาไฟล์ต้นฉบับออกก่อนบันทึก')
+      notify.warn('ลูกค้ายังไม่มีโฟลเดอร์ Drive สำหรับไฟล์ต้นฉบับ กรุณาสร้างโฟลเดอร์หรือเอาไฟล์ต้นฉบับออกก่อนบันทึก')
       return
     }
 
@@ -349,7 +351,7 @@ export default function JobOrderPage() {
       if (mockupSourceFile && custFolderId)
         await uploadFileClient(mockupSourceFile, custFolderId, mockupSourceFile.name)
     } catch (e) {
-      setSaving(false); alert('เพิ่มรูปไม่สำเร็จ: ' + e.message); return
+      setSaving(false); notify.error('เพิ่มรูปไม่สำเร็จ: ' + e.message); return
     }
 
     // Upload QC photos (dynamic array)
@@ -371,7 +373,7 @@ export default function JobOrderPage() {
         finish_photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
     } catch (e) {
-      setSaving(false); alert('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return
+      setSaving(false); notify.error('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return
     }
 
     // Summary for list view
@@ -421,9 +423,10 @@ export default function JobOrderPage() {
       if (result.error) throw new Error(result.error.message)
     } catch (error) {
       setSaving(false)
-      alert(`บันทึกใบงานไม่สำเร็จ: ${error.message || 'กรุณาลองอีกครั้ง'}`)
+      notify.error(`บันทึกใบงานไม่สำเร็จ: ${error.message || 'กรุณาลองอีกครั้ง'}`)
       return
     }
+    notify.success(editId ? 'บันทึกใบงานแล้ว' : `สร้างใบงาน ${jobCode} แล้ว`)
 
     setForm(emptyForm())
     setReferenceFiles([])
@@ -443,8 +446,11 @@ export default function JobOrderPage() {
 
 
   async function handleDelete(j) {
-    if (!confirm(`ลบใบงาน ${j.code} ใช่ไหม?`)) return
-    await deleteJobOrder(j.id); load()
+    if (!(await ask({ title: `ลบใบงาน ${j.code}?`, message: 'ลบแล้วกู้คืนไม่ได้', confirmLabel: 'ลบ', danger: true }))) return
+    const { error } = await deleteJobOrder(j.id)
+    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
+    notify.success(`ลบใบงาน ${j.code} แล้ว`)
+    load()
   }
 
   function startEdit(j) {
@@ -475,7 +481,7 @@ export default function JobOrderPage() {
     const dm = !monthFilter || (j.document_date || j.created_at || '').startsWith(monthFilter)
     return ms && (!filterStatus || j.status === filterStatus) && dm
   })
-  const isOverdue = j => j.due_date && new Date(j.due_date) < new Date() && j.status !== 'ส่งงานแล้ว'
+  const isOverdue = isJobOverdue  // เทียบเฉพาะวันที่ — งานที่กำหนดส่งวันนี้ยังไม่นับว่าเลย
   const monthCount = filtered.length
   const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
 
@@ -506,11 +512,11 @@ export default function JobOrderPage() {
         }
         photos.push({ url, label: label || `รูปที่ ${qcNum}` })
       }
-    } catch (e) { setSavingQc(false); alert('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return }
+    } catch (e) { setSavingQc(false); notify.error('เพิ่มรูปตรวจงานไม่สำเร็จ: ' + e.message); return }
 
     const itemsPayload = { ...view.items, finish_photos: photos }
     const result = await updateJobOrder(view.id, { items: itemsPayload })
-    if (result.error) { setSavingQc(false); alert('บันทึกรูปไม่สำเร็จ: ' + result.error.message); return }
+    if (result.error) { setSavingQc(false); notify.error('บันทึกรูปไม่สำเร็จ: ' + result.error.message); return }
     setViewQcFiles({})
     setViewQcPreviews({})
     setView(v => ({ ...v, items: itemsPayload }))

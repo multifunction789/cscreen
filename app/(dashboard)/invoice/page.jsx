@@ -11,6 +11,7 @@ import {
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { notify, ask } from '@/lib/feedback'
 
 const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
@@ -122,8 +123,8 @@ export default function InvoicePage() {
   const balance    = total - depositAmt
 
   async function handleSave() {
-    if (!form.customer_id) return alert('กรุณาเลือกลูกค้า')
-    if (form.items.length === 0) return alert('กรุณาเพิ่มรายการสินค้า')
+    if (!form.customer_id) return notify.warn('กรุณาเลือกลูกค้า')
+    if (form.items.length === 0) return notify.warn('กรุณาเพิ่มรายการสินค้า')
     setSaving(true)
     const items = calcItems(form.items)
     const payload = {
@@ -136,26 +137,31 @@ export default function InvoicePage() {
     }
     if (editId) {
       const { error } = await updateInvoice(editId, payload)
-      if (error) { setSaving(false); return alert('❌ บันทึกไม่สำเร็จ: ' + error.message) }
+      if (error) { setSaving(false); return notify.error('บันทึกไม่สำเร็จ: ' + error.message) }
       setEditId(null)
+      notify.success('บันทึกการแก้ไขแล้ว')
     } else {
       const maxNum = rows.reduce((max, r) => {
         const n = parseInt(r.code?.replace('INV-','')||'0'); return n > max ? n : max
       }, 0)
       const code = 'INV-' + String(Math.max(maxNum + 1, 1001)).padStart(4,'0')
       const { error } = await insertInvoice({ ...payload, code })
-      if (error) { setSaving(false); return alert('❌ บันทึกไม่สำเร็จ: ' + error.message) }
+      if (error) { setSaving(false); return notify.error('บันทึกไม่สำเร็จ: ' + error.message) }
       for (const it of items) {
         if (it.material_id && it.qty > 0) await deductMaterial(it.material_id, parseFloat(it.qty))
       }
+      notify.success(`สร้าง ${code} แล้ว`)
     }
     setForm(emptyForm()); setShowForm(false); setSaving(false)
     load()
   }
 
   async function handleDelete(inv) {
-    if (!confirm(`ลบ ${inv.code} ใช่ไหม?`)) return
-    await deleteInvoice(inv.id); load()
+    if (!(await ask({ title: `ลบ ${inv.code}?`, message: 'ลบแล้วกู้คืนไม่ได้', confirmLabel: 'ลบ', danger: true }))) return
+    const { error } = await deleteInvoice(inv.id)
+    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
+    notify.success(`ลบ ${inv.code} แล้ว`)
+    load()
   }
 
   function startEdit(inv) {
@@ -176,7 +182,7 @@ export default function InvoicePage() {
 
   async function handleConvertToJO(inv) {
     const existJO = jobs.find(j => j.invoice_id === inv.id)
-    if (existJO) return alert(`มีใบงาน ${existJO.code} อยู่แล้ว`)
+    if (existJO) return notify.warn(`มีใบงาน ${existJO.code} อยู่แล้ว`)
     const maxJO = jobs.reduce((max, j) => {
       const n = parseInt(j.code?.replace('JO-','')||'0'); return n > max ? n : max
     }, 0)
@@ -196,9 +202,9 @@ export default function InvoicePage() {
       status: 'รอออกแบบ',
       items: productionSnapshot(inv, defSizes),
     })
-    if (result.error) return alert('สร้างใบงานไม่สำเร็จ: ' + result.error.message)
+    if (result.error) return notify.error('สร้างใบงานไม่สำเร็จ: ' + result.error.message)
     await updateInvoice(inv.id, { jo_created: true })
-    alert(`✅ สร้างใบงาน ${code} แล้ว`)
+    notify.success(`สร้างใบงาน ${code} แล้ว`)
     load()
     setView(v => v ? { ...v, jo_created: true } : v)
   }
@@ -206,7 +212,7 @@ export default function InvoicePage() {
   /* ── Convert Invoice → Receipt ── */
   async function handleConvertToReceipt(inv) {
     const existRec = receipts.find(r => r.invoice_id === inv.id)
-    if (existRec) return alert(`มีใบเสร็จ ${existRec.code} อยู่แล้ว`)
+    if (existRec) return notify.warn(`มีใบเสร็จ ${existRec.code} อยู่แล้ว`)
     const maxRec = receipts.reduce((max, r) => {
       const n = parseInt(r.code?.replace('REC-','')||'0'); return n > max ? n : max
     }, 0)
@@ -219,8 +225,8 @@ export default function InvoicePage() {
       document_date: todayStr(),
       paid:         false,
     })
-    if (error) return alert('เกิดข้อผิดพลาด: ' + error.message)
-    alert(`✅ สร้างใบเสร็จ ${code} แล้ว — ไปที่เมนู "ใบเสร็จ" เพื่อยืนยันการรับเงิน`)
+    if (error) return notify.error('เกิดข้อผิดพลาด: ' + error.message)
+    notify.success(`สร้างใบเสร็จ ${code} แล้ว — ไปที่เมนู "ใบเสร็จ" เพื่อยืนยันการรับเงิน`)
     load()
     setView(v => v ? { ...v, receipt_created: true } : v)
   }

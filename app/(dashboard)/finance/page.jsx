@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase'
 import dynamic from 'next/dynamic'
 const ExpenseChart = dynamic(() => import('@/components/charts/ExpenseChart'), { ssr: false, loading: () => <div style={{height:280}} /> })
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import { notify, ask } from '@/lib/feedback'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าผ้า','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
 const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','ผ้ากีฬา','งานสกรีน','เสื้อพิมพ์ลาย','ปัก','อื่น ๆ']
@@ -80,8 +81,10 @@ export default function FinancePage() {
   }
 
   async function handleDelete(t) {
-    if (!confirm(`ลบรายการ "${t.description}" ใช่ไหม?`)) return
-    await deleteTransaction(t.id)
+    if (!(await ask({ title: 'ลบรายการนี้?', message: t.description, confirmLabel: 'ลบ', danger: true }))) return
+    const { error } = await deleteTransaction(t.id)
+    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
+    notify.success('ลบรายการแล้ว')
     load()
   }
 
