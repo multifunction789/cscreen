@@ -249,8 +249,9 @@ export default function QuotationPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1.35fr .65fr', gap: 14, paddingBottom: 12, borderBottom: '1.5px solid #e5e7eb' }}>
               {/* Brand */}
               <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={SHOP.logo} alt={SHOP.name}
-                  style={{ height: 66, width: 66, objectFit: 'contain', flexShrink: 0 }} />
+                  style={{ height: 74, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
                 <div style={{ lineHeight: 1.65 }}>
                   <div style={{ fontWeight: 900, fontSize: 12.5, color: '#111' }}>
                     {SHOP.name}
