@@ -555,10 +555,14 @@ export default function JobOrderPage() {
     function PageHeader({ page }) {
       return (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid var(--primary)' }}>
-          <div>
-            <div style={{ fontSize: 20, fontWeight: 900, color: 'var(--primary)', letterSpacing: -1 }}>C-SCREEN</div>
-            <div style={{ fontSize: 10, color: '#666', maxWidth: 240, lineHeight: 1.6 }}>
-              {SHOP.address} | Tel: {SHOP.tel}
+          <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src={SHOP.logo} alt={SHOP.name} style={{ height: 74, width: 'auto', objectFit: 'contain', flexShrink: 0 }} />
+            <div>
+              <div style={{ fontSize: 12.5, fontWeight: 900, color: '#111' }}>{SHOP.name}</div>
+              <div style={{ fontSize: 10, color: '#666', maxWidth: 260, lineHeight: 1.6 }}>
+                {SHOP.address} | Tel: {SHOP.tel}
+              </div>
             </div>
           </div>
           <div style={{ textAlign: 'right' }}>
