@@ -38,15 +38,9 @@ export default function LoginPage() {
       }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{
-            width: 60, height: 60,
-            background: 'var(--primary)',
-            borderRadius: 14,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 24, fontWeight: 900, color: '#fff',
-            margin: '0 auto 10px',
-            letterSpacing: -1,
-          }}>CS</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/cstyle-apparel-logo.png" alt="C Style Apparel"
+            style={{ height: 110, width: 'auto', display: 'block', margin: '0 auto 12px' }} />
           <h1 style={{ fontSize: 22, fontWeight: 800, color: 'var(--text)' }}>CSCREEN</h1>
           <p style={{ fontSize: 13, color: 'var(--text-muted)', marginTop: 2 }}>Screen Printing ERP</p>
         </div>
