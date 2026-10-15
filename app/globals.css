@@ -249,6 +249,80 @@ tbody tr:last-child td { border-bottom: none; }
 .sidebar.collapsed .nav-link { justify-content: center; padding: 12px 0; }
 .nav-icon { font-size: 17px; width: 22px; text-align: center; flex-shrink: 0; }
 
+/* ===== DOC CHAIN — เส้นทางเอกสาร QT → INV → JO → REC ===== */
+.doc-chain {
+  display: flex; align-items: stretch; gap: 0; flex-wrap: wrap; row-gap: 8px;
+  background: #fff; border: 1px solid var(--border); border-radius: var(--radius);
+  padding: 8px 10px; margin-bottom: 14px;
+}
+.doc-chain-item { display: flex; align-items: center; }
+.doc-chain-arrow { color: #C4C8CF; font-size: 20px; padding: 0 6px; line-height: 1; }
+.doc-chain-step {
+  display: flex; flex-direction: column; gap: 2px;
+  padding: 5px 10px; border-radius: 8px; min-width: 112px;
+  border: 1px dashed #E5E7EB; background: #FAFAFA;
+}
+.doc-chain-step.has { border-style: solid; background: #fff; }
+.doc-chain-step.current { border: 1.5px solid var(--primary); background: var(--primary-light); }
+.doc-chain-label { font-size: 11px; font-weight: 600; color: var(--text-muted); white-space: nowrap; }
+.doc-chain-codes { display: flex; gap: 6px; flex-wrap: wrap; }
+.doc-chain-code { font-size: 13px; font-weight: 700; color: var(--text); white-space: nowrap; }
+.doc-chain-code.muted { color: #9CA3AF; font-weight: 500; }
+.doc-chain-code.link { color: var(--primary); text-decoration: none; }
+.doc-chain-code.link:hover { text-decoration: underline; }
+.doc-chain-status { font-size: 10.5px; font-weight: 700; padding: 1px 6px; border-radius: 4px; align-self: flex-start; }
+.doc-chain-status.ok    { background: #D1FAE5; color: #065F46; }
+.doc-chain-status.wait  { background: #FEF3C7; color: #92400E; }
+.doc-chain-status.muted { background: #F3F4F6; color: #4B5563; }
+
+/* ===== GLOBAL SEARCH (Ctrl+K) ===== */
+.gsearch-trigger {
+  display: flex; align-items: center; gap: 8px;
+  height: 36px; padding: 0 10px 0 12px; min-width: 240px;
+  border: 1.5px solid var(--border); border-radius: 8px; background: #F9FAFB;
+  color: var(--text-muted); font-size: 13px;
+}
+.gsearch-trigger:hover { border-color: var(--primary); color: var(--text); }
+.gsearch-trigger kbd {
+  margin-left: auto; font-family: inherit; font-size: 11px; color: #6B7280;
+  border: 1px solid var(--border); border-radius: 4px; padding: 1px 5px; background: #fff;
+}
+.gsearch-backdrop {
+  position: fixed; inset: 0; z-index: 1002; background: rgba(17,24,39,.45);
+  display: flex; justify-content: center; align-items: flex-start; padding: 10vh 16px 16px;
+  animation: fade-in .12s ease-out;
+}
+.gsearch {
+  width: 100%; max-width: 620px; background: #fff; border-radius: 14px;
+  box-shadow: 0 20px 50px rgba(0,0,0,.25); overflow: hidden;
+  display: flex; flex-direction: column; max-height: 75vh;
+  animation: dialog-in .15s ease-out;
+}
+.gsearch-input-row { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--border); }
+.gsearch-input-row input[type=text] { flex: 1; border: none; box-shadow: none; padding: 6px 0; font-size: 16px; background: transparent; }
+.gsearch-input-row input[type=text]:focus { box-shadow: none; }
+.gsearch-results { overflow-y: auto; padding: 6px 0; }
+.gsearch-group { font-size: 11px; font-weight: 700; color: var(--text-muted); padding: 8px 16px 4px; letter-spacing: .3px; }
+.gsearch-item {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 9px 16px; border: none; background: transparent; text-align: left;
+  font-size: 13.5px; color: var(--text);
+}
+.gsearch-item.active { background: var(--primary-light); }
+.gsearch-item-code { font-weight: 700; min-width: 92px; }
+.gsearch-item-sub { color: var(--text-muted); flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gsearch-item-meta { font-size: 12px; color: var(--text-muted); white-space: nowrap; }
+.gsearch-hint { padding: 22px 16px; text-align: center; color: var(--text-muted); font-size: 13px; }
+.gsearch-foot { display: flex; gap: 14px; padding: 8px 16px; border-top: 1px solid var(--border); font-size: 11.5px; color: var(--text-muted); background: #FAFAFA; }
+
+/* ===== RECEIVABLES — ต้องตามเงิน ===== */
+.ar-row { cursor: pointer; }
+.ar-flag { font-size: 10.5px; font-weight: 700; padding: 2px 6px; border-radius: 4px; white-space: nowrap; }
+.ar-flag.danger  { background: #FEE2E2; color: #991B1B; }
+.ar-flag.warning { background: #FEF3C7; color: #92400E; }
+.ar-flag.muted   { background: #F3F4F6; color: #4B5563; }
+.ar-cust { font-size: 12.5px; color: var(--text-muted); margin-top: 1px; }
+
 /* ===== PRODUCTION BOARD ===== */
 .board { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 10px; }
 .board-card-actions { display: flex; gap: 4px; flex-shrink: 0; }
@@ -331,6 +405,29 @@ tbody tr:last-child td { border-bottom: none; }
   .board > * { flex: 0 0 82%; scroll-snap-align: start; }
   .board-card-actions button { padding: 6px 10px; font-size: 12px; }
 
+  /* ── ลูกค้า: แผงรายละเอียดขึ้นด้านบน เต็มความกว้าง ── */
+  .customers-layout { flex-direction: column; }
+  .customer-detail { width: 100% !important; position: static !important; order: -1; }
+
+  /* ── Dashboard ── */
+  .dash-split { grid-template-columns: 1fr !important; }
+  .dash-best  { grid-template-columns: 1fr 1fr !important; padding: 12px !important; }
+  .ar-age { display: none; }
+  .ar-flag { white-space: normal; display: inline-block; }
+  td .ar-cust { white-space: normal; }
+
+  /* ── Doc chain: เลื่อนแนวนอน ── */
+  .doc-chain { flex-wrap: nowrap; overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .doc-chain-step { min-width: 96px; }
+
+  /* ── Global search: เหลือแค่ไอคอน ── */
+  .gsearch-trigger { min-width: 0; width: 38px; padding: 0; justify-content: center; }
+  .gsearch-trigger .gs-label, .gsearch-trigger kbd { display: none; }
+  .gsearch-backdrop { padding: 12px; }
+  .gsearch { max-height: 85vh; }
+  .gsearch-item-meta { display: none; }
+  .gsearch-foot { display: none; }
+
   /* ── Toast ── */
   .toast-stack { left: 12px; right: 12px; bottom: 12px; align-items: stretch; }
   .toast { min-width: 0; max-width: none; }
@@ -339,6 +436,15 @@ tbody tr:last-child td { border-bottom: none; }
   /* ── Document views (print-area) ── */
   #print-area { padding: 20px !important; }
   #print-area [style*="repeat("] { grid-template-columns: 1fr !important; }
+}
+
+/* ===== มือถือ: ไม่ให้หน้าล้นแนวนอน + ย่อเอกสาร A4 ให้พอดีจอ (ดู components/DocFit.jsx) ===== */
+@media screen and (max-width: 768px) {
+  .main-content { min-width: 0; }
+  main { min-width: 0; overflow-x: auto; }
+  #print-area { zoom: var(--doc-zoom, 1); }
+  /* กรอบหน้าเอกสาร (ใบเสนอราคา/ใบแจ้งหนี้/ใบเสร็จ/ใบงาน) ไม่ต้องเว้นขอบซ้ำกับ main */
+  main [style*="max-width: 794px"], main [style*="max-width: 960px"] { padding: 0 !important; }
 }
 
 /* ===== PRINT — A4 เฉพาะ #print-area ===== */

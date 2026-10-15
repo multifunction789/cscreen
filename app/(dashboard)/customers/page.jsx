@@ -4,10 +4,23 @@ import { getCustomers, insertCustomer, updateCustomer, getInvoices } from '@/lib
 import { fmtDate } from '@/lib/shop'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { createCustomerFolderClient } from '@/lib/driveClient'
+import Link from 'next/link'
+import { useDocView } from '@/components/OpenDocParam'
+import { docHref } from '@/lib/docLinks'
 
 const PLATFORMS = ['Walk-in','Line','Facebook','Instagram','Referral','อื่น ๆ']
 const TYPES     = ['บุคคลธรรมดา','นิติบุคคล','หน่วยงานราชการ','Dealer']
 const emptyForm = { name:'', type:'บุคคลธรรมดา', phone:'', email:'', line:'', address:'', tax_id:'', platform:'Walk-in', notes:'', contact_person:'' }
+
+// ช่องแสดงข้อมูลในแผงรายละเอียด (ประกาศนอก component เพื่อไม่ให้สร้างใหม่ทุก render)
+function F({ label, val }) {
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+      <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>{label}</span>
+      <span style={{ fontSize:13, color:'var(--text)' }}>{val || '—'}</span>
+    </div>
+  )
+}
 
 export default function CustomersPage() {
   const [rows, setRows]         = useState([])
@@ -20,6 +33,7 @@ export default function CustomersPage() {
   const [saving, setSaving]     = useState(false)
   const [error, setError]       = useState('')
   const [detail, setDetail]     = useState(null)
+  const doc = useDocView(setDetail)
   const [editing, setEditing]   = useState(null) // customer being edited
   const [editForm, setEditForm] = useState({})
 
@@ -30,6 +44,7 @@ export default function CustomersPage() {
     setRows(cusRes.data || [])
     setInvoices(invRes.data || [])
     setLoading(false)
+    doc.loaded(cusRes.data || [])
   }
 
   async function handleUpdate() {
@@ -77,15 +92,10 @@ export default function CustomersPage() {
     return d.getFullYear()===now.getFullYear() && d.getMonth()===now.getMonth()
   })
 
-  const F = ({ label, val }) => (
-    <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
-      <span style={{ fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>{label}</span>
-      <span style={{ fontSize:13, color:'var(--text)' }}>{val || '—'}</span>
-    </div>
-  )
 
   return (
-    <div style={{ display:'flex', gap:20 }}>
+    <div className="customers-layout" style={{ display:'flex', gap:20 }}>
+      {doc.param}
       <div style={{ flex:1, display:'flex', flexDirection:'column', gap:20, minWidth:0 }}>
         {/* KPI */}
         <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:16 }}>
@@ -247,7 +257,7 @@ export default function CustomersPage() {
                           <td><span className="badge badge-blue">{invCount} ใบ</span></td>
                           <td style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDate(c.created_at)}</td>
                           <td style={{ display:'flex', gap:4 }}>
-                            <button className="btn btn-outline btn-sm" onClick={()=>setDetail(detail?.id===c.id?null:c)}>ดู</button>
+                            <button className="btn btn-outline btn-sm" onClick={()=> detail?.id===c.id ? doc.close() : doc.open(c)}>ดู</button>
                             <button className="btn btn-outline btn-sm" onClick={()=>{setEditing(c.id);setEditForm({...c});window.scrollTo({top:0,behavior:'smooth'})}}>✏️</button>
                           </td>
                         </tr>
@@ -269,10 +279,10 @@ export default function CustomersPage() {
 
       {/* Detail Panel */}
       {detail && (
-        <div style={{ width:300, flexShrink:0, background:'var(--card)', border:'1px solid var(--border)', borderRadius:'var(--radius)', boxShadow:'var(--shadow)', height:'fit-content', position:'sticky', top:80 }}>
+        <div className="customer-detail" style={{ width:300, flexShrink:0, background:'var(--card)', border:'1px solid var(--border)', borderRadius:'var(--radius)', boxShadow:'var(--shadow)', height:'fit-content', position:'sticky', top:80 }}>
           <div style={{ padding:'14px 16px', borderBottom:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
             <h2 style={{ fontSize:14, fontWeight:700 }}>👤 {detail.name}</h2>
-            <button onClick={()=>setDetail(null)} style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', color:'var(--text-muted)' }}>✕</button>
+            <button onClick={doc.close} aria-label="ปิด" style={{ background:'none', border:'none', fontSize:16, cursor:'pointer', color:'var(--text-muted)' }}>✕</button>
           </div>
           <div style={{ padding:16, display:'flex', flexDirection:'column', gap:10 }}>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
@@ -293,7 +303,7 @@ export default function CustomersPage() {
               {invoices.filter(i=>i.customer_id===detail.id).slice(0,5).map(i => (
                 <div key={i.id} style={{ display:'flex', justifyContent:'space-between', padding:'5px 0', borderBottom:'1px solid var(--border)' }}>
                   <div>
-                    <div style={{ fontSize:12, fontWeight:700, color:'var(--primary)' }}>{i.code}</div>
+                    <Link href={docHref('invoice', i.id)} style={{ fontSize:12, fontWeight:700, color:'var(--primary)', textDecoration:'none' }}>{i.code}</Link>
                     <div style={{ fontSize:11, color:'var(--text-muted)' }}>฿{(i.total||0).toLocaleString()}</div>
                   </div>
                   <span className={i.status==='ชำระแล้ว'?'badge badge-green':'badge badge-yellow'} style={{ fontSize:10 }}>{i.status}</span>

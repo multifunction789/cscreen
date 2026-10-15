@@ -3,6 +3,7 @@ import { useState } from 'react'
 import Sidebar from '@/components/layout/Sidebar'
 import Topbar from '@/components/layout/Topbar'
 import ErrorBoundary from '@/components/ErrorBoundary'
+import DocFit from '@/components/DocFit'
 import FeedbackHost from '@/components/ui/FeedbackHost'
 
 export default function DashboardLayout({ children }) {
@@ -28,6 +29,7 @@ export default function DashboardLayout({ children }) {
       {/* เนื้อหาขยับตามความกว้าง sidebar (เดิมค้างที่ 240px แม้ย่อเมนูแล้ว) */}
       <div className="main-content"
         style={{ marginLeft: collapsed ? 60 : 240, flex: 1, minWidth: 0, display: 'flex', flexDirection: 'column', minHeight: '100vh', transition: 'margin-left .3s' }}>
+        <DocFit />
         <Topbar onMenuToggle={() => setMobileOpen(o => !o)} />
         <main style={{ flex: 1, padding: 24, minWidth: 0 }}>
           <ErrorBoundary>

@@ -8,6 +8,8 @@ import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
+import { useDocView } from '@/components/OpenDocParam'
+import DocChain from '@/components/DocChain'
 import { isJobOverdue } from '@/lib/jobStatus'
 import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
@@ -208,6 +210,7 @@ export default function JobOrderPage() {
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
   const [view, setView]           = useState(null)
+  const doc = useDocView(setView)
   const [monthFilter, setMonthFilter] = useState('')
   const [viewMode, setViewMode]       = useState('table')
   const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
@@ -243,6 +246,7 @@ export default function JobOrderPage() {
     setSuppliers(sRes.data || [])
     if (jRes.error || cRes.error || iRes.error || sRes.error) notify.error('โหลดข้อมูลไม่ครบ: ' + (jRes.error || cRes.error || iRes.error || sRes.error).message)
     setLoading(false)
+    doc.loaded(jRes.data || [])
     return jRes.data || []
   }
 
@@ -585,11 +589,14 @@ export default function JobOrderPage() {
 
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
+        {doc.param}
         {/* Toolbar */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+          <button className="btn btn-outline" onClick={doc.close}>← กลับ</button>
           <button className="btn btn-outline" onClick={() => printDoc('print-area', filePrefix)}>🖨️ พิมพ์</button>
         </div>
+
+        <DocChain current="joborder" doc={view} />
 
         <div id="print-area" ref={printRef}>
 
@@ -865,6 +872,7 @@ export default function JobOrderPage() {
   // ──── LIST VIEW ─────────────────────────────────────────────
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      {doc.param}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
@@ -1347,7 +1355,7 @@ export default function JobOrderPage() {
           jobs={filtered}
           month={calMonth}
           onMonthChange={setCalMonth}
-          onView={setView}
+          onView={doc.open}
         />
       )}
 
@@ -1383,7 +1391,7 @@ export default function JobOrderPage() {
                         <td><span className={STATUS_BADGE[j.status] || 'badge badge-gray'}>{j.status}</span></td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                            <button className="btn btn-outline btn-sm" onClick={() => setView(j)}>ดู</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => doc.open(j)}>ดู</button>
                             <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
                             {j.status !== 'ส่งงานแล้ว' && (
                               <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>

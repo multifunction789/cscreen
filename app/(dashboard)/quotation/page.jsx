@@ -9,6 +9,8 @@ import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
+import { useDocView } from '@/components/OpenDocParam'
+import DocChain from '@/components/DocChain'
 
 /* ── Blue theme ───────────────────────────────────────────── */
 const C = {
@@ -72,6 +74,7 @@ export default function QuotationPage() {
   const [filterStatus, setFilter] = useState('')
   const [showForm, setShowForm]   = useState(false)
   const [view, setView]           = useState(null)
+  const doc = useDocView(setView)
   const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
@@ -95,6 +98,7 @@ export default function QuotationPage() {
     setCustomers(cusRes.data  || [])
     setInvoices(invRes.data   || [])
     setLoading(false)
+    doc.loaded(qtRes.data || [])
   }
 
   function updateItem(idx, key, val) {
@@ -203,12 +207,13 @@ export default function QuotationPage() {
 
     return (
       <div style={{ maxWidth: 794, margin: '0 auto', padding: 24 }}>
+        {doc.param}
 
         {/* ── TOOLBAR ── */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, gap: 8, flexWrap: 'wrap' }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+          <button className="btn btn-outline" onClick={doc.close}>← กลับ</button>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-            <button className="btn btn-outline" onClick={() => { startEdit(view); setView(null) }}>✏️ แก้ไข</button>
+            <button className="btn btn-outline" onClick={() => { startEdit(view); doc.close() }}>✏️ แก้ไข</button>
 
             {/* → Invoice */}
             {view.status !== 'แปลงเป็น Invoice' ? (
@@ -225,6 +230,8 @@ export default function QuotationPage() {
             <button className="btn btn-primary" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
+
+        <DocChain current="quotation" doc={view} version={invoices.length} />
 
         {/* ── PRINT AREA ── */}
         <div id="print-area" style={{
@@ -466,6 +473,7 @@ export default function QuotationPage() {
   ════════════════════════════════════════════════════════════ */
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {doc.param}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
@@ -684,7 +692,7 @@ export default function QuotationPage() {
                         <td style={{ fontSize: 12, color: 'var(--text-muted)' }}>{fmtDate(q.valid_until)}</td>
                         <td><span className={STATUS_BADGE[q.status] || 'badge badge-gray'}>{q.status}</span></td>
                         <td style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => setView(q)}>ดู</button>
+                          <button className="btn btn-outline btn-sm" onClick={() => doc.open(q)}>ดู</button>
                           {q.status !== 'แปลงเป็น Invoice' && (<>
                             <button className="btn btn-outline btn-sm" onClick={() => startEdit(q)}>✏️</button>
                             <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(q)}>ลบ</button>

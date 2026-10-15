@@ -6,6 +6,8 @@ import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
+import { useDocView } from '@/components/OpenDocParam'
+import DocChain from '@/components/DocChain'
 
 /* ── Green theme ──────────────────────────────────────────── */
 const C = {
@@ -49,6 +51,7 @@ export default function ReceiptPage() {
   const [search, setSearch]           = useState('')
   const [filterPaid, setFilter]       = useState('')
   const [view, setView]               = useState(null)
+  const doc = useDocView(setView)
   const [payMethod, setPayMethod]     = useState('โอน')
   const [fileUploading, setFileUploading] = useState(false)
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
@@ -68,6 +71,7 @@ export default function ReceiptPage() {
     const { data } = await getReceipts()
     setRows(data || [])
     setLoading(false)
+    doc.loaded(data || [])
   }
 
   async function handlePay(r) {
@@ -94,7 +98,7 @@ export default function ReceiptPage() {
     const { error } = await deleteReceipt(r.id)
     if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
     notify.success(`ลบใบเสร็จ ${r.code} แล้ว`)
-    if (view?.id === r.id) setView(null)
+    if (view?.id === r.id) doc.close()
     load()
   }
 
@@ -119,10 +123,11 @@ export default function ReceiptPage() {
 
     return (
       <div style={{ maxWidth: 794, margin: '0 auto', padding: 24 }}>
+        {doc.param}
 
         {/* ── TOOLBAR ── */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16, flexWrap: 'wrap', gap: 8 }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+          <button className="btn btn-outline" onClick={doc.close}>← กลับ</button>
             <button className="btn btn-outline" style={{ color:'var(--danger)', borderColor:'var(--danger)' }}
               onClick={() => handleDelete(view)}>🗑️ ลบใบเสร็จ</button>
           <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
@@ -133,7 +138,7 @@ export default function ReceiptPage() {
                 </select>
                 <button className="btn btn-primary"
                   style={{ background: C.primary, borderColor: C.primary }}
-                  onClick={() => { handlePay(view); setView(null) }}>
+                  onClick={() => { handlePay(view); doc.close() }}>
                   ✓ รับชำระเงิน
                 </button>
               </div>
@@ -152,6 +157,8 @@ export default function ReceiptPage() {
             <button className="btn btn-primary" style={{ background: C.primary, borderColor: C.primary }} onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
+
+        <DocChain current="receipt" doc={view} />
 
         {/* ── PRINT AREA ── */}
         <div id="print-area" style={{
@@ -418,6 +425,7 @@ export default function ReceiptPage() {
   ════════════════════════════════════════════════════════════ */
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+      {doc.param}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
@@ -488,11 +496,11 @@ export default function ReceiptPage() {
                         </span>
                       </td>
                       <td style={{ display: 'flex', gap: 4 }}>
-                        <button className="btn btn-outline btn-sm" onClick={() => setView(r)}>ดู</button>
+                        <button className="btn btn-outline btn-sm" onClick={() => doc.open(r)}>ดู</button>
                         {!r.paid && (
                           <button className="btn btn-primary btn-sm"
                             style={{ background: C.primary, borderColor: C.primary }}
-                            onClick={() => setView(r)}>รับชำระ</button>
+                            onClick={() => doc.open(r)}>รับชำระ</button>
                         )}
                         <button className="btn btn-outline btn-sm"
                           style={{ color: 'var(--danger)', borderColor: 'var(--danger)' }}
