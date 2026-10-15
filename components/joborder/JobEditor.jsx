@@ -98,7 +98,6 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
     const payload = {
       items: d, due_date: due || null, urgent,
       item_desc: d.product?.name || job.item_desc,
-      status: legacyStatus(overall),
     }
     const { error } = await updateJobOrder(job.id, payload)
     setSaving(false)
@@ -120,14 +119,10 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
     if (!error) setLogs(l => [{ ...row, id: rid(), changed_at: new Date().toISOString() }, ...l])
   }
 
-  /** อัปเดตสถานะรวมของใบงานให้หน้าติดตามงาน/บอร์ดเดิมเห็น */
+  /** สถานะรวมคำนวณจากแผนการผลิต (job_steps) ทุกหน้าที่แสดงผล —
+   *  คอลัมน์ status ในฐานข้อมูลถูกคำนวณโดย trigger และห้ามเขียนตรง จึงไม่บันทึกที่นี่ */
   async function syncStatus(nextSteps) {
-    const st = legacyStatus(computeOverall(nextSteps))
-    if (st !== statusRef.current) {
-      statusRef.current = st
-      await updateJobOrder(job.id, { status: st })
-      onSaved?.({ ...job, status: st }, { silent: true })
-    }
+    statusRef.current = legacyStatus(computeOverall(nextSteps))
   }
 
   async function addStep(name = '') {
@@ -281,7 +276,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
             <input className="jo-in" aria-label="ชื่อสินค้า" value={d.product?.name || ''} onChange={e => set('product.name', e.target.value)}
               style={{ width: 'auto', minWidth: 220, flex: '0 1 320px', background: '#F8E1E0', borderColor: '#F8E1E0', fontWeight: 800, fontSize: 16, color: '#8B0B08' }} />
             <span style={{ fontWeight: 800, fontSize: 16 }}>— {total || d.product?.qty || 0} ตัว</span>
-            <span style={{ fontSize: 12.5, color: '#6B5B5A' }}>สร้าง {thDateLong(job.document_date || job.created_at?.slice(0, 10))}{job.created_by ? ` โดย ${job.created_by}` : ''}</span>
+            <span style={{ fontSize: 12.5, color: '#6B5B5A' }}>สร้าง {thDateLong(job.document_date || job.created_at?.slice(0, 10))}{d.created_by_email ? ` โดย ${d.created_by_email}` : ''}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
