@@ -252,7 +252,7 @@ export default function CostPage() {
         <div className="card" style={{ padding: 60, textAlign: 'center', color: 'var(--text-muted)' }}>
           <div style={{ fontSize: 32, marginBottom: 8 }}>📊</div>
           <div style={{ fontWeight: 700 }}>ยังไม่มีรายการเปรียบเทียบราคา</div>
-          <div style={{ fontSize: 13, marginTop: 4 }}>กดปุ่ม "เพิ่มรายการ" เพื่อเริ่มต้น</div>
+          <div style={{ fontSize: 13, marginTop: 4 }}>กดปุ่ม “เพิ่มรายการ” เพื่อเริ่มต้น</div>
         </div>
       )}
     </div>

@@ -2,6 +2,7 @@
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
 import GlobalSearch from '@/components/GlobalSearch'
+import { supabase } from '@/lib/supabase'
 
 const pageTitles = {
   '/dashboard': { title: 'Dashboard',             subtitle: 'ภาพรวมธุรกิจ' },
@@ -26,20 +27,23 @@ export default function Topbar({ onMenuToggle }) {
   const base     = '/' + (pathname.split('/')[1] || '')
   const page     = pageTitles[pathname] || pageTitles[base] || { title: 'CSCREEN', subtitle: '' }
 
-  const [username, setUsername] = useState('เจ้าของร้าน')
-  const [editing,  setEditing]  = useState(false)
-  const [tmp, setTmp]           = useState('')
+  const [user, setUser]         = useState(null)
+  const [menuOpen, setMenuOpen] = useState(false)
 
+  // ผู้ใช้ที่ล็อกอินอยู่ (จาก Supabase Auth) — เดิมเป็นชื่อที่พิมพ์เก็บไว้ในเบราว์เซอร์
   useEffect(() => {
-    const saved = localStorage.getItem('cscreen_username')
-    if (saved) setUsername(saved)
+    let alive = true
+    supabase.auth.getUser().then(({ data }) => { if (alive) setUser(data?.user || null) })
+    const { data: sub } = supabase.auth.onAuthStateChange((_e, session) => setUser(session?.user || null))
+    return () => { alive = false; sub?.subscription?.unsubscribe() }
   }, [])
 
-  function saveName() {
-    const name = tmp.trim() || username
-    setUsername(name)
-    localStorage.setItem('cscreen_username', name)
-    setEditing(false)
+  const displayName = user?.user_metadata?.full_name || user?.user_metadata?.name || user?.email?.split('@')[0] || '…'
+
+  async function logout() {
+    setMenuOpen(false)
+    await supabase.auth.signOut()
+    window.location.href = '/login'
   }
 
   return (
@@ -94,25 +98,29 @@ export default function Topbar({ onMenuToggle }) {
         <GlobalSearch />
 
         {/* User */}
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <div style={{ width: 34, height: 34, background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
-            {username.charAt(0).toUpperCase()}
-          </div>
-          {editing ? (
-            <div style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
-              <input autoFocus value={tmp}
-                onChange={e => setTmp(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') saveName(); if (e.key === 'Escape') setEditing(false) }}
-                style={{ width: 120, fontSize: 12, padding: '4px 8px', borderRadius: 6 }} />
-              <button onClick={saveName}
-                style={{ background: 'var(--primary)', border: 'none', borderRadius: 6, color: '#fff', fontSize: 12, padding: '4px 8px', cursor: 'pointer' }}>✓</button>
-            </div>
-          ) : (
-            <div className="topbar-username" style={{ cursor: 'pointer' }}
-              onClick={() => { setTmp(username); setEditing(true) }} title="คลิกเพื่อแก้ไขชื่อ">
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>{username} ✏️</div>
-              <div className="topbar-subtitle" style={{ fontSize: 11, color: 'var(--text-muted)' }}>Owner · C-Screen</div>
-            </div>
+        <div style={{ position: 'relative' }}>
+          <button type="button" onClick={() => setMenuOpen(o => !o)} aria-haspopup="menu" aria-expanded={menuOpen}
+            title={user?.email || ''}
+            style={{ display: 'flex', alignItems: 'center', gap: 8, background: 'none', border: 'none', padding: 0, cursor: 'pointer' }}>
+            <span style={{ width: 34, height: 34, background: 'var(--primary)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontWeight: 700, fontSize: 13, flexShrink: 0 }}>
+              {displayName.charAt(0).toUpperCase()}
+            </span>
+            <span className="topbar-username" style={{ textAlign: 'left' }}>
+              <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: 'var(--text)', lineHeight: 1.2 }}>{displayName} ▾</span>
+              <span className="topbar-subtitle" style={{ display: 'block', fontSize: 11, color: 'var(--text-muted)' }}>{user?.email || ''}</span>
+            </span>
+          </button>
+          {menuOpen && (
+            <>
+              <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 60 }} />
+              <div role="menu" style={{ position: 'absolute', right: 0, top: 44, zIndex: 61, background: '#fff', border: '1px solid var(--border)', borderRadius: 10, boxShadow: 'var(--shadow-md)', minWidth: 220, padding: 6 }}>
+                <div style={{ padding: '8px 10px', fontSize: 12, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)', marginBottom: 4, wordBreak: 'break-all' }}>{user?.email || 'ไม่ทราบผู้ใช้'}</div>
+                <button type="button" role="menuitem" onClick={logout}
+                  style={{ width: '100%', textAlign: 'left', padding: '9px 10px', border: 'none', background: 'none', borderRadius: 6, fontSize: 13.5, fontWeight: 600, color: 'var(--danger)', cursor: 'pointer' }}>
+                  ออกจากระบบ
+                </button>
+              </div>
+            </>
           )}
         </div>
       </div>
