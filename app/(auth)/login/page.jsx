@@ -16,10 +16,14 @@ export default function LoginPage() {
     setError('')
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     if (error) {
-      setError(error.message)
+      setError(error.message === 'Invalid login credentials' ? 'อีเมลหรือรหัสผ่านไม่ถูกต้อง' : error.message)
       setLoading(false)
     } else {
-      router.push('/dashboard')
+      // กลับไปหน้าที่ตั้งใจจะเปิด (?next=) — รับเฉพาะ path ภายในเว็บ กัน open redirect
+      const next = new URLSearchParams(window.location.search).get('next') || ''
+      const safe = next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\') && !next.startsWith('/login')
+      router.replace(safe ? next : '/dashboard')
+      router.refresh()
     }
   }
 
@@ -60,6 +64,7 @@ export default function LoginPage() {
               value={email}
               onChange={e => setEmail(e.target.value)}
               required
+              autoComplete="email"
               placeholder="your@email.com"
             />
           </div>
@@ -67,8 +72,8 @@ export default function LoginPage() {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
               <label>รหัสผ่าน</label>
-              <span style={{ fontSize: 12, color: 'var(--primary)', cursor: 'pointer', fontWeight: 600 }}>
-                ลืมรหัสผ่าน?
+              <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>
+                ลืมรหัสผ่าน? ติดต่อผู้ดูแลระบบ
               </span>
             </div>
             <input
@@ -76,6 +81,7 @@ export default function LoginPage() {
               value={password}
               onChange={e => setPassword(e.target.value)}
               required
+              autoComplete="current-password"
               placeholder="••••••••"
             />
           </div>

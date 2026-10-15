@@ -19,17 +19,14 @@ export default function ReportPage() {
   const [loading, setLoading]   = useState(true)
   const [year, setYear]         = useState(new Date().getFullYear())
 
-  useEffect(() => { load() }, [])
-
-  async function load() {
-    const [invRes, recRes, jobRes] = await Promise.all([
-      getInvoices(), getReceipts(), getJobOrders(),
-    ])
-    setInvoices(invRes.data || [])
-    setReceipts(recRes.data || [])
-    setJobs(jobRes.data     || [])
-    setLoading(false)
-  }
+  useEffect(() => {
+    Promise.all([getInvoices(), getReceipts(), getJobOrders()]).then(([invRes, recRes, jobRes]) => {
+      setInvoices(invRes.data || [])
+      setReceipts(recRes.data || [])
+      setJobs(jobRes.data     || [])
+      setLoading(false)
+    })
+  }, [])
 
   /* ── Monthly data ─────────────────────────────────────────── */
   const monthlyData = THAI_MONTHS.map((label, idx) => {

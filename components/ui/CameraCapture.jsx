@@ -56,9 +56,10 @@ export default function CameraCapture({ initialPhotos = {}, onSave, onClose }) {
   }, [])
 
   useEffect(() => {
-    startCamera(facing)
-    return () => { streamRef.current?.getTracks().forEach(t => t.stop()) }
-  }, [])
+    // เปิดกล้องหลัง render แรก (async) — ไม่ setState ใน effect โดยตรง
+    const t = setTimeout(() => startCamera(facing), 0)
+    return () => { clearTimeout(t); streamRef.current?.getTracks().forEach(t => t.stop()) }
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── สลับกล้องหน้า/หลัง ──────────────────────────────────────
   async function toggleCamera() {
