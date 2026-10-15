@@ -2,7 +2,8 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { docHref } from '@/lib/docLinks'
-import { getJobOrders, updateJobStatus } from '@/lib/db'
+import { getJobOrders, updateJobStatus, getStepsForJobs } from '@/lib/db'
+import { isV2, computeOverall, statusCls } from '@/lib/jobV2'
 import { fmtShort } from '@/lib/shop'
 import { notify } from '@/lib/feedback'
 import {
@@ -35,7 +36,8 @@ function DueChip({ job }) {
 export default function ProductionPage() {
   const [jobs, setJobs]         = useState([])
   const [loading, setLoading]   = useState(true)
-  const [view, setView]         = useState('kanban')
+  const [view, setView]         = useState('plan')
+  const [stepsBy, setStepsBy]   = useState({})
   const [query, setQuery]       = useState('')
   const [onlyUrgent, setOnlyUrgent] = useState(false)
   const [showDone, setShowDone] = useState(false)
@@ -49,6 +51,14 @@ export default function ProductionPage() {
       if (error) notify.error('โหลดใบงานไม่สำเร็จ: ' + error.message)
       setJobs(data || [])
       setLoading(false)
+      // แผนการผลิตของใบงานแบบใหม่ → ใช้คำนวณสถานะรวม
+      const ids = (data || []).filter(isV2).map(j => j.id)
+      getStepsForJobs(ids).then(res => {
+        if (!alive) return
+        const by = {}
+        ;(res.data || []).forEach(st => { (by[st.job_order_id] ||= []).push(st) })
+        setStepsBy(by)
+      })
     })
     return () => { alive = false }
   }, [])
@@ -57,6 +67,10 @@ export default function ProductionPage() {
   async function moveJob(jobId, newStatus, { undoable = false } = {}) {
     const job = jobs.find(j => j.id === jobId)
     if (!job || job.status === newStatus) return
+    if (isV2(job)) {
+      notify.info(`${job.code} เป็นใบงานแบบใหม่ — สถานะคำนวณจากแผนการผลิต กรุณาเปลี่ยนที่ขั้นตอนในใบงาน`)
+      return
+    }
     const prevStatus = job.status
     setJobs(prev => prev.map(j => j.id === jobId ? { ...j, status: newStatus } : j))
 
@@ -118,10 +132,10 @@ export default function ProductionPage() {
           </button>
         </div>
         <div style={{ display: 'flex', gap: 8 }}>
-          {['kanban', 'timeline'].map(v => (
+          {[['plan', '📊 ตามแผนผลิต'], ['kanban', '📋 บอร์ด'], ['timeline', '📅 เรียงตามกำหนดส่ง']].map(([v, label]) => (
             <button key={v} onClick={() => setView(v)}
               className={view === v ? 'btn btn-primary btn-sm' : 'btn btn-outline btn-sm'}>
-              {v === 'kanban' ? '📋 บอร์ด' : '📅 เรียงตามกำหนดส่ง'}
+              {label}
             </button>
           ))}
         </div>
@@ -221,6 +235,52 @@ export default function ProductionPage() {
               </section>
             )
           })}
+        </div>
+      )}
+
+      {/* PLAN — สถานะรวมจากแผนการผลิต (ไม่ต้องเปิดใบงานทีละใบ) */}
+      {view === 'plan' && (
+        <div className="card jo" style={{ overflow: 'hidden', gap: 0 }}>
+          <div style={{ padding: '10px 14px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'flex-end' }}>
+            <label style={{ fontSize: 12.5, color: 'var(--text-muted)', display: 'flex', gap: 6, alignItems: 'center', cursor: 'pointer' }}>
+              <input type="checkbox" checked={showDone} onChange={e => setShowDone(e.target.checked)} />
+              แสดงงานที่ส่งแล้ว
+            </label>
+          </div>
+          <div className="table-wrap">
+            <table className="jo-tbl" style={{ minWidth: 960 }}>
+              <thead><tr><th>ใบงาน</th><th>ลูกค้า · สินค้า</th><th>แผนการผลิต</th><th>สถานะรวม</th><th>ขั้นที่ค้าง · Supplier</th><th>กำหนดส่ง</th></tr></thead>
+              <tbody>
+                {visible.filter(j => showDone || j.status !== DONE_STATUS).sort(byDueDate).map(j => {
+                  const v2 = isV2(j)
+                  const st = v2 ? [...(stepsBy[j.id] || [])].sort((a, b) => a.seq - b.seq) : []
+                  const ov = v2 ? computeOverall(st) : null
+                  return (
+                    <tr key={j.id} style={{ background: isJobOverdue(j) ? '#FFF5F5' : undefined }}>
+                      <td><Link href={docHref('joborder', j.id)} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>{j.code}</Link>
+                        {v2 && j.items.source?.invoice_code && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {j.items.source.item_no}/{j.items.source.item_count}</div>}</td>
+                      <td><b>{j.customers?.name || j.items?.customer?.name || '—'}</b><div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{j.item_desc || '—'}</div></td>
+                      <td>
+                        {v2 ? (
+                          <>
+                            <div style={{ display: 'flex', gap: 3 }} aria-label={`เสร็จ ${ov.doneCount} จาก ${ov.total} ขั้น`}>
+                              {st.map(x => <span key={x.id} title={`${x.name}: ${x.status}`} className={`jo-badge ${statusCls(x.status)}`} style={{ width: 22, height: 10, padding: 0, borderRadius: 3, border: '1px solid' }} />)}
+                              {!st.length && <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ยังไม่วางแผน</span>}
+                            </div>
+                            {st.length > 0 && <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 4 }}>เสร็จ {ov.doneCount} จาก {ov.total} ขั้น</div>}
+                          </>
+                        ) : <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>ใบงานแบบเดิม</span>}
+                      </td>
+                      <td>{v2 ? <span className={`jo-badge ${ov.tone}`}>{ov.label}</span> : <span className="jo-badge wait">{j.status}</span>}</td>
+                      <td style={{ fontSize: 13 }}>{v2 && ov.step ? <><b>{ov.step.name}</b><div style={{ color: 'var(--text-muted)' }}>{ov.step.suppliers?.name || ov.step.assignee || 'ภายใน'}{ov.step.due_date ? ` · รับ ${fmtShort(ov.step.due_date)}` : ''}</div></> : '—'}</td>
+                      <td style={{ whiteSpace: 'nowrap' }}><span style={{ fontSize: 12, color: 'var(--text-muted)', marginRight: 6 }}>{fmtShort(j.due_date)}</span><DueChip job={j} /></td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
+            {visible.length === 0 && <div className="empty-state"><div className="empty-icon">📭</div>ไม่พบงาน</div>}
+          </div>
         </div>
       )}
 

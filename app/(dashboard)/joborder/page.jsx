@@ -13,6 +13,9 @@ import DocChain from '@/components/DocChain'
 import { isJobOverdue } from '@/lib/jobStatus'
 import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
+import JobPicker from '@/components/joborder/JobPicker'
+import JobEditor from '@/components/joborder/JobEditor'
+import { isV2, sizeTotal } from '@/lib/jobV2'
 
 const STATUS_BADGE = {
   'รอมัดจำ'      : 'badge badge-gray',
@@ -36,6 +39,10 @@ function rowTotal(qtys) {
 }
 function grandTotal(rows) {
   return (rows || []).reduce((s, r) => s + rowTotal(r.qtys), 0)
+}
+/** จำนวนตัวของใบงาน (รองรับทั้งแบบเดิมและแบบใหม่) */
+function jobQty(j) {
+  return isV2(j) ? sizeTotal(j.items.qtys) : grandTotal(readMatrix(j).prod_items)
 }
 
 // แปลง reference เก่า (string) + ใหม่ (array) → [url, ...]
@@ -225,6 +232,7 @@ export default function JobOrderPage() {
   const [viewQcFiles,    setViewQcFiles]    = useState({})
   const [viewQcPreviews, setViewQcPreviews] = useState({})
   const [savingQc,       setSavingQc]       = useState(false)
+  const [picker, setPicker] = useState(null)   // { invoiceId } เมื่อเปิดหน้าต่างสร้างใบงานจาก Invoice
   const printRef = useRef(null)
 
   useEffect(() => { load() }, [])
@@ -247,6 +255,12 @@ export default function JobOrderPage() {
     if (jRes.error || cRes.error || iRes.error || sRes.error) notify.error('โหลดข้อมูลไม่ครบ: ' + (jRes.error || cRes.error || iRes.error || sRes.error).message)
     setLoading(false)
     doc.loaded(jRes.data || [])
+    // ลิงก์จากหน้าใบแจ้งหนี้: /joborder?new=<invoiceId> → เปิดหน้าต่างเลือกรายการทันที
+    const from = new URLSearchParams(window.location.search).get('new')
+    if (from) {
+      setPicker({ invoiceId: from === '1' ? '' : from })
+      window.history.replaceState(null, '', window.location.pathname)
+    }
     return jRes.data || []
   }
 
@@ -487,7 +501,7 @@ export default function JobOrderPage() {
   })
   const isOverdue = isJobOverdue  // เทียบเฉพาะวันที่ — งานที่กำหนดส่งวันนี้ยังไม่นับว่าเลย
   const monthCount = filtered.length
-  const monthQty   = filtered.reduce((s, j) => s + grandTotal(readMatrix(j).prod_items), 0)
+  const monthQty   = filtered.reduce((s, j) => s + jobQty(j), 0)
 
   // ── บันทึก QC photos จาก view inline (array format) ──────────
   async function handleSaveQc() {
@@ -540,6 +554,33 @@ export default function JobOrderPage() {
     load()
   }
 
+  async function afterCreate(created) {
+    setPicker(null)
+    await load()
+    if (created.length === 1) doc.open(created[0])
+  }
+
+  const pickerEl = picker && (
+    <JobPicker invoices={invoices} customers={customers} jobs={rows} initialInvoiceId={picker.invoiceId}
+      onClose={() => setPicker(null)} onCreated={afterCreate} />
+  )
+
+  // ──── ใบงานแบบใหม่ (1 ใบงาน = 1 รายการใน Invoice) ────────────
+  if (view && isV2(view)) {
+    const inv = invoices.find(i => i.id === view.invoice_id) || null
+    return (
+      <div>
+        {doc.param}
+        <JobEditor key={view.id} job={view} invoice={inv} suppliers={suppliers}
+          siblings={rows.filter(r => r.invoice_id && r.invoice_id === view.invoice_id)}
+          onBack={doc.close}
+          onSaved={(j) => { setRows(rs => rs.map(r => r.id === j.id ? { ...r, ...j } : r)) }}
+          onCreateFromInvoice={id => setPicker({ invoiceId: id })} />
+        {pickerEl}
+      </div>
+    )
+  }
+
   // ──── PRINT VIEW (3 pages) ───────────────────────────────────
   if (view) {
     const cust = customers.find(c => c.id === view.customer_id) || view.customers || {}
@@ -556,8 +597,7 @@ export default function JobOrderPage() {
     const filePrefix = `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`
 
     // shared header component
-    function PageHeader({ page }) {
-      return (
+    const pageHeader = (page) => (
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 16, paddingBottom: 12, borderBottom: '2px solid var(--primary)' }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'flex-start' }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -584,8 +624,7 @@ export default function JobOrderPage() {
             {view.due_date && <div style={{ fontSize: 11, color: 'var(--danger)', fontWeight: 700 }}>กำหนดส่ง: {fmtDate(view.due_date)}</div>}
           </div>
         </div>
-      )
-    }
+    )
 
     return (
       <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
@@ -602,7 +641,7 @@ export default function JobOrderPage() {
 
           {/* ═══════════════ PAGE 1 ═══════════════ */}
           <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, marginBottom: 24 }}>
-            <PageHeader page={1} />
+            {pageHeader(1)}
 
             {/* Customer strip */}
             <div style={{ background: '#F9FAFB', borderRadius: 8, padding: '10px 16px', marginBottom: 16, display: 'flex', gap: 24, alignItems: 'center' }}>
@@ -759,7 +798,7 @@ export default function JobOrderPage() {
 
           {/* ═══════════════ PAGE 2 — รูปงานเสร็จ QC ═══════════════ */}
           <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, pageBreakBefore: 'always' }}>
-            <PageHeader page={2} />
+            {pageHeader(2)}
 
             <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 16 }}>
               {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· {view.code} · รูปงานเสร็จ QC</span>
@@ -848,7 +887,7 @@ export default function JobOrderPage() {
           {/* ═══════════════ PAGE 3 — รูป Reference (หน้าสุดท้าย) ═══════════════ */}
           {reference_images?.length > 0 && (
             <div style={{ background: '#fff', border: '1px solid var(--border)', borderRadius: 8, padding: 32, pageBreakBefore: 'always' }}>
-              <PageHeader page={3} />
+              {pageHeader(3)}
               <div style={{ fontSize: 13, fontWeight: 700, marginBottom: 12 }}>
                 {cust.name || '—'} <span style={{ color: '#999', fontWeight: 400, fontSize: 11 }}>· รูป Reference ({reference_images.length} รูป)</span>
               </div>
@@ -873,6 +912,7 @@ export default function JobOrderPage() {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {doc.param}
+      {pickerEl}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
@@ -924,10 +964,11 @@ export default function JobOrderPage() {
             onClick={() => setViewMode(v => v === 'table' ? 'calendar' : 'table')}>
             {viewMode === 'calendar' ? '📋 รายการ' : '📅 ตารางงาน'}
           </button>
-          <button className="btn btn-primary" onClick={() => {
-            setShowForm(!showForm)
-            if (showForm) { setEditId(null); setForm(emptyForm()) }
-          }}>{showForm ? '✕ ปิด' : '+ สร้างใบงาน'}</button>
+          {showForm ? (
+            <button className="btn btn-outline" onClick={() => { setShowForm(false); setEditId(null); setForm(emptyForm()) }}>✕ ปิดฟอร์มใบงานเดิม</button>
+          ) : (
+            <button className="btn btn-primary" onClick={() => setPicker({ invoiceId: '' })}>+ สร้างใบงานจาก Invoice</button>
+          )}
         </div>
       </div>
 
@@ -1374,16 +1415,17 @@ export default function JobOrderPage() {
                 </thead>
                 <tbody>
                   {filtered.map(j => {
-                    const m = readMatrix(j)
                     return (
                       <tr key={j.id} className="row-link" style={{ background: isOverdue(j) ? '#FFF5F5' : undefined }}>
-                        <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}</td>
+                        <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}
+                          {isV2(j) && j.items.source?.invoice_code && <div style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {j.items.source.item_no}/{j.items.source.item_count}</div>}
+                        </td>
                         <td style={{ fontWeight: 600 }}>{j.customers?.name || '—'}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
                           {(j.item_desc || '').slice(0, 36)}{(j.item_desc || '').length > 36 ? '…' : ''}
                         </td>
                         <td style={{ textAlign: 'center', fontWeight: 700, color: 'var(--primary)' }}>
-                          {grandTotal(m.prod_items) > 0 ? grandTotal(m.prod_items) : '—'}
+                          {jobQty(j) > 0 ? jobQty(j) : '—'}
                         </td>
                         <td style={{ fontSize: 12, color: isOverdue(j) ? 'var(--danger)' : 'var(--text-muted)', fontWeight: isOverdue(j) ? 700 : 400 }}>
                           {fmtDate(j.due_date)}
@@ -1392,11 +1434,11 @@ export default function JobOrderPage() {
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <button className="btn btn-outline btn-sm" onClick={() => doc.open(j)}>ดู</button>
-                            <button className="btn btn-outline btn-sm" onClick={() => startEdit(j)}>✏️</button>
+                            <button className="btn btn-outline btn-sm" onClick={() => isV2(j) ? doc.open(j) : startEdit(j)} aria-label="แก้ไข">✏️</button>
                             {j.status !== 'ส่งงานแล้ว' && (
                               <button className="btn btn-outline btn-sm" style={{ color: 'var(--danger)' }} onClick={() => handleDelete(j)}>🗑️</button>
                             )}
-                            {j.status !== 'ส่งงานแล้ว' && (() => {
+                            {j.status !== 'ส่งงานแล้ว' && !isV2(j) && (() => {
                               const idx = ALL_STATUS.indexOf(j.status)
                               const next = ALL_STATUS[idx + 1]
                               return next ? (
