@@ -54,7 +54,8 @@ create table if not exists job_step_logs (
 create index if not exists job_step_logs_job_idx on job_step_logs (job_order_id, changed_at desc);
 
 -- 4) ไฟล์งาน: ประเภท + เวอร์ชัน + ฉบับที่อนุมัติ
-create table if not exists job_files (
+--    (ชื่อ job_attachments เพราะฐานข้อมูลมีตาราง job_files แบบเก่าอยู่แล้ว — ไม่แตะตารางนั้น)
+create table if not exists job_attachments (
   id            uuid primary key default gen_random_uuid(),
   job_order_id  uuid not null references job_orders(id) on delete cascade,
   kind          text not null,                        -- mockup | logo | artwork | pattern | reference | finished
@@ -69,19 +70,19 @@ create table if not exists job_files (
   uploaded_by   text,
   created_at    timestamptz default now()
 );
-create index if not exists job_files_job_idx on job_files (job_order_id, kind, version desc);
+create index if not exists job_attachments_job_idx on job_attachments (job_order_id, kind, version desc);
 
 -- 5) สิทธิ์: เหมือนตารางอื่นในระบบ — ผู้ใช้ที่ล็อกอินแล้วเท่านั้น
 alter table job_steps     enable row level security;
 alter table job_step_logs enable row level security;
-alter table job_files     enable row level security;
+alter table job_attachments     enable row level security;
 
 drop policy if exists "auth_all_job_steps"     on job_steps;
-drop policy if exists "auth_all_job_files"     on job_files;
+drop policy if exists "auth_all_job_attachments"     on job_attachments;
 create policy "auth_all_job_steps"     on job_steps     for all to authenticated using (true) with check (true);
 -- ประวัติ: อ่าน + เพิ่มได้อย่างเดียว (แก้/ลบย้อนหลังไม่ได้ เพื่อให้ตรวจสอบได้จริง)
 drop policy if exists "auth_read_job_step_logs"   on job_step_logs;
 drop policy if exists "auth_insert_job_step_logs" on job_step_logs;
 create policy "auth_read_job_step_logs"   on job_step_logs for select to authenticated using (true);
 create policy "auth_insert_job_step_logs" on job_step_logs for insert to authenticated with check (true);
-create policy "auth_all_job_files"     on job_files     for all to authenticated using (true) with check (true);
+create policy "auth_all_job_attachments"     on job_attachments     for all to authenticated using (true) with check (true);
