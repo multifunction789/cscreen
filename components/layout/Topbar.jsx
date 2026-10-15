@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { usePathname } from 'next/navigation'
+import GlobalSearch from '@/components/GlobalSearch'
 
 const pageTitles = {
   '/dashboard': { title: 'Dashboard',             subtitle: 'ภาพรวมธุรกิจ' },
@@ -90,13 +91,7 @@ export default function Topbar({ onMenuToggle }) {
 
       {/* Right: user */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
-        {/* Notification */}
-        <button style={{ width: 36, height: 36, border: '1.5px solid var(--border)', borderRadius: 8, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 15, color: 'var(--text-muted)', position: 'relative', cursor: 'pointer' }}
-          onMouseEnter={e => { e.currentTarget.style.borderColor = 'var(--primary)' }}
-          onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)' }}>
-          🔔
-          <span style={{ position: 'absolute', top: 4, right: 4, width: 8, height: 8, background: 'var(--primary)', borderRadius: '50%', border: '2px solid #fff' }} />
-        </button>
+        <GlobalSearch />
 
         {/* User */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

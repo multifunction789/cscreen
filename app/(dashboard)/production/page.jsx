@@ -1,5 +1,7 @@
 'use client'
 import { useState, useEffect, useMemo } from 'react'
+import Link from 'next/link'
+import { docHref } from '@/lib/docLinks'
 import { getJobOrders, updateJobStatus } from '@/lib/db'
 import { fmtShort } from '@/lib/shop'
 import { notify } from '@/lib/feedback'
@@ -188,7 +190,7 @@ export default function ProductionPage() {
                           opacity: dragId === j.id ? .4 : 1, transition: 'opacity .15s',
                         }}>
                         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 4, marginBottom: 2 }}>
-                          <span style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace' }}>{j.code}</span>
+                          <Link href={docHref('joborder', j.id)} title="เปิดใบงาน" style={{ fontSize: 10.5, fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace', textDecoration: 'none' }}>{j.code}</Link>
                           <DueChip job={j} />
                         </div>
                         <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text)', lineHeight: 1.3, marginBottom: 2 }}>{j.customers?.name || '—'}</div>
@@ -243,7 +245,7 @@ export default function ProductionPage() {
                   const next    = idx === -1 ? STAGE_IDS[0] : STAGE_IDS[idx + 1]
                   return (
                     <tr key={j.id} style={{ background: overdue ? '#FFF5F5' : undefined }}>
-                      <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}</td>
+                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}><Link href={docHref('joborder', j.id)} style={{ color: 'var(--primary)', textDecoration: 'none' }}>{j.code}</Link></td>
                       <td style={{ fontWeight: 600 }}>{j.customers?.name || '—'}</td>
                       <td style={{ fontSize: 13, color: 'var(--text-muted)', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }} title={j.item_desc}>{j.item_desc || '—'}</td>
                       <td style={{ whiteSpace: 'nowrap' }}>

@@ -12,6 +12,8 @@ import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, printDoc } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
+import { useDocView } from '@/components/OpenDocParam'
+import DocChain from '@/components/DocChain'
 
 const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
@@ -63,6 +65,7 @@ export default function InvoicePage() {
   const [search, setSearch]       = useState('')
   const [showForm, setShowForm]   = useState(false)
   const [view, setView]           = useState(null)
+  const doc = useDocView(setView)
   const [saving, setSaving]       = useState(false)
   const [editId, setEditId]       = useState(null)
   const [form, setForm]           = useState(emptyForm())
@@ -92,6 +95,7 @@ export default function InvoicePage() {
     setMaterials(matRes.data  || [])
     setReceipts(recRes.data   || [])
     setLoading(false)
+    doc.loaded(invRes.data || [])
   }
 
   function updateItem(idx, key, val) {
@@ -253,12 +257,13 @@ export default function InvoicePage() {
 
     return (
       <div style={{ maxWidth:794, margin:'0 auto', padding:24 }}>
+        {doc.param}
 
         {/* ── TOOLBAR ── */}
         <div className="no-print" style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, gap:8, flexWrap:'wrap' }}>
-          <button className="btn btn-outline" onClick={() => setView(null)}>← กลับ</button>
+          <button className="btn btn-outline" onClick={doc.close}>← กลับ</button>
           <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
-            <button className="btn btn-outline" onClick={() => { startEdit(view); setView(null) }}>✏️ แก้ไข</button>
+            <button className="btn btn-outline" onClick={() => { startEdit(view); doc.close() }}>✏️ แก้ไข</button>
 
             {/* → ใบงาน */}
             {!relJO ? (
@@ -291,6 +296,8 @@ export default function InvoicePage() {
             <button className="btn btn-primary" onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
         </div>
+
+        <DocChain current="invoice" doc={view} version={`${jobs.length}:${receipts.length}`} />
 
         {/* ── PRINT AREA ── */}
         <div id="print-area" style={{
@@ -560,6 +567,7 @@ export default function InvoicePage() {
   // ──── LIST VIEW ──────────────────────────────────────────────
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+      {doc.param}
 
       {/* KPI */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
@@ -850,7 +858,7 @@ export default function InvoicePage() {
                         </td>
                         <td style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDate(r.due_date)}</td>
                         <td style={{ display:'flex', gap:4, flexWrap:'wrap' }}>
-                          <button className="btn btn-outline btn-sm" onClick={() => setView(r)}>ดู</button>
+                          <button className="btn btn-outline btn-sm" onClick={() => doc.open(r)}>ดู</button>
                           <button className="btn btn-outline btn-sm" onClick={() => startEdit(r)}>✏️</button>
                           {!relJO && (
                             <button className="btn btn-outline btn-sm" onClick={() => handleConvertToJO(r)} title="สร้างใบงาน">→ JO</button>

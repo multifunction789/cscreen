@@ -1,10 +1,12 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getJobOrders, getTransactions, getCustomers } from '@/lib/db'
+import { getJobOrders, getTransactions, getCustomers, getInvoicesLight, getReceiptsLight } from '@/lib/db'
+import { computeReceivables } from '@/lib/receivables'
 import { isJobOverdue, daysUntil, byDueDate, DONE_STATUS } from '@/lib/jobStatus'
 import { notify } from '@/lib/feedback'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
+import { docHref } from '@/lib/docLinks'
 
 const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
 const CustomerCharts = dynamic(() => import('@/components/charts/CustomerCharts'), { ssr: false, loading: () => <div style={{height:150}} /> })
@@ -32,16 +34,21 @@ export default function DashboardPage() {
   const [txs, setTxs]         = useState([])
   const [customers, setCusts] = useState([])
   const [loaded, setLoaded]   = useState(false)
+  const [invoices, setInvoices] = useState([])
+  const [receipts, setReceipts] = useState([])
+  const [arAll, setArAll]       = useState(false)
 
   useEffect(() => {
     // เดิมดึง job_orders + transactions ซ้ำสองรอบ (getDashboardStats) → คำนวณจากข้อมูลชุดเดียว
-    Promise.all([getJobOrders(), getTransactions(), getCustomers()])
-      .then(([jRes, tRes, cRes]) => {
-        const err = jRes.error || tRes.error || cRes.error
+    Promise.all([getJobOrders(), getTransactions(), getCustomers(), getInvoicesLight(), getReceiptsLight()])
+      .then(([jRes, tRes, cRes, iRes, rRes]) => {
+        const err = jRes.error || tRes.error || cRes.error || iRes.error || rRes.error
         if (err) notify.error('โหลดข้อมูลไม่ครบ: ' + err.message)
         setJobs(jRes.data || [])
         setTxs(tRes.data || [])
         setCusts(cRes.data || [])
+        setInvoices(iRes.data || [])
+        setReceipts(rRes.data || [])
         setLoaded(true)
       })
   }, [])
@@ -100,6 +107,10 @@ export default function DashboardPage() {
     }))
   })()
 
+  const ar = computeReceivables(invoices, receipts, jobs)
+  const arShown = arAll ? ar.items : ar.items.slice(0, 6)
+  const baht = n => '฿' + Math.round(n).toLocaleString()
+
   const urgentFromDB = jobs
     .filter(j => j.status !== DONE_STATUS)
     .filter(j => j.due_date)
@@ -156,8 +167,63 @@ export default function DashboardPage() {
         ))}
       </div>
 
+      {/* ต้องตามเงิน — ใบแจ้งหนี้ที่ยังรับเงินไม่ครบ */}
+      <div className="card">
+        <div style={{ padding: '14px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+          <div>
+            <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>💸 ต้องตามเงิน</h2>
+            <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>
+              {loaded
+                ? ar.items.length
+                  ? <>ค้างรับ <strong style={{ color: 'var(--text)' }}>{baht(ar.total)}</strong> จาก {ar.items.length} ใบแจ้งหนี้{ar.deliveredUnpaid > 0 && <> · <strong style={{ color: 'var(--danger)' }}>ส่งงานแล้วแต่ยังไม่ได้เงิน {ar.deliveredUnpaid} งาน</strong></>}</>
+                  : 'ไม่มียอดค้างรับ'
+                : 'กำลังโหลด…'}
+            </div>
+          </div>
+          <Link href="/invoice" className="btn btn-outline btn-sm">ใบแจ้งหนี้ทั้งหมด →</Link>
+        </div>
+        {loaded && ar.items.length === 0 ? (
+          <div className="empty-state"><div className="empty-icon">✓</div>เก็บเงินครบทุกใบแล้ว</div>
+        ) : (
+          <div className="table-wrap">
+            <table>
+              <thead><tr><th>ใบแจ้งหนี้ / ลูกค้า</th><th>สถานะ</th><th style={{ textAlign: 'right' }}>ค้างรับ</th><th className="ar-age" style={{ textAlign: 'right' }}>อายุ</th></tr></thead>
+              <tbody>
+                {arShown.map(x => (
+                  <tr key={x.invoice.id}>
+                    <td>
+                      <Link href={docHref('invoice', x.invoice.id)} style={{ color: 'var(--primary)', textDecoration: 'none', fontWeight: 700, fontFamily: 'monospace' }}>{x.invoice.code}</Link>
+                      <div className="ar-cust">{x.invoice.customers?.name || '—'}</div>
+                    </td>
+                    <td>
+                      {x.job
+                        ? <Link href={docHref('joborder', x.job.id)} className={`ar-flag ${x.flag.tone}`} style={{ textDecoration: 'none' }}>{x.flag.text}</Link>
+                        : <span className={`ar-flag ${x.flag.tone}`}>{x.flag.text}</span>}
+                    </td>
+                    <td style={{ textAlign: 'right', fontWeight: 700, fontFamily: 'monospace' }}>
+                      {baht(x.outstanding)}
+                      {x.paid === 0 && x.flag.key !== 'delivered' && x.deposit > 0 && x.deposit < x.outstanding && (
+                        <div style={{ fontSize: 11, fontWeight: 500, color: 'var(--text-muted)' }}>มัดจำ {baht(x.deposit)}</div>
+                      )}
+                    </td>
+                    <td className="ar-age" style={{ textAlign: 'right', fontSize: 12, color: x.ageDays > 30 ? 'var(--danger)' : 'var(--text-muted)', whiteSpace: 'nowrap' }}>{x.ageDays} วัน</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {ar.items.length > 6 && (
+              <div style={{ padding: '8px 20px 12px', textAlign: 'center' }}>
+                <button className="btn btn-outline btn-sm" onClick={() => setArAll(v => !v)}>
+                  {arAll ? 'ย่อรายการ' : `ดูทั้งหมด ${ar.items.length} รายการ`}
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
       {/* Chart + งานใกล้ส่ง */}
-      <div style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', gap: 20 }}>
+      <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '6fr 4fr', gap: 20 }}>
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📈 ยอดขายรายเดือน (6 เดือนล่าสุด)</h2>
@@ -184,7 +250,7 @@ export default function DashboardPage() {
               const bg    = overdue ? '#FEE2E2' : dl?.text.includes('วันนี้') || dl?.text.includes('พรุ่งนี้') ? '#FEF3C7' : '#F0FDF4'
               return (
                 <div key={j.id} style={{ padding: 10, background: bg, borderRadius: 8, borderLeft: `3px solid ${color}` }}>
-                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}>{j.code} · {j.customers?.name}</div>
+                  <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text)' }}><Link href={docHref('joborder', j.id)} style={{ color: 'inherit', textDecoration: 'none' }}>{j.code}</Link> · {j.customers?.name}</div>
                   <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 4 }}>{j.item_desc}</div>
                   <div style={{ fontSize: 11, fontWeight: 700, color }}>{dl?.text}</div>
                 </div>
@@ -203,7 +269,7 @@ export default function DashboardPage() {
           <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>🏆 สินค้าขายดี / Best Sellers</h2>
           <Link href="/report" className="btn btn-outline btn-sm">ดูรายงาน →</Link>
         </div>
-        <div style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
+        <div className="dash-best" style={{ padding: 20, display: 'grid', gridTemplateColumns: 'repeat(5,1fr)', gap: 12 }}>
           {bestSellersFromDB.map(b => (
             <div key={b.name} style={{
               background: 'var(--card)', border: '1px solid var(--border)', borderRadius: 10,
@@ -224,7 +290,7 @@ export default function DashboardPage() {
       </div>
 
       {/* Recent Jobs + Recent Finance */}
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
+      <div className="dash-split" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20 }}>
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>📋 ใบงานล่าสุด</h2>
@@ -236,7 +302,7 @@ export default function DashboardPage() {
               <tbody>
                 {recentJobsFromDB.map(j => (
                   <tr key={j.id} className="row-link">
-                    <td style={{ fontWeight: 700, color: 'var(--primary)', fontFamily: 'monospace' }}>{j.code}</td>
+                    <td style={{ fontWeight: 700, fontFamily: 'monospace' }}><Link href={docHref('joborder', j.id)} style={{ color: 'var(--primary)', textDecoration: 'none' }}>{j.code}</Link></td>
                     <td>{j.customers?.name || '—'}</td>
                     <td><span className={statusBadge[j.status] || 'badge badge-gray'}>{j.status}</span></td>
                     <td style={{ fontWeight: 700, fontFamily: 'monospace' }}>฿{(j.total || 0).toLocaleString()}</td>
