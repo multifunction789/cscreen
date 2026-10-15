@@ -1,10 +1,10 @@
 'use client'
-import { productionSnapshot } from '@/lib/jobProduction.mjs'
+import Link from 'next/link'
 import ProductionFields from '@/components/ProductionFields'
 import { useState, useEffect } from 'react'
 import {
   getInvoices, insertInvoice, updateInvoice, deleteInvoice,
-  getCustomers, insertJobOrder, getJobOrdersLight,
+  getCustomers, getJobOrdersLight,
   getMaterials, deductMaterial,
   getReceipts, insertReceipt,
 } from '@/lib/db'
@@ -184,35 +184,6 @@ export default function InvoicePage() {
     window.scrollTo({ top:0, behavior:'smooth' })
   }
 
-  async function handleConvertToJO(inv) {
-    const existJO = jobs.find(j => j.invoice_id === inv.id)
-    if (existJO) return notify.warn(`มีใบงาน ${existJO.code} อยู่แล้ว`)
-    const maxJO = jobs.reduce((max, j) => {
-      const n = parseInt(j.code?.replace('JO-','')||'0'); return n > max ? n : max
-    }, 0)
-    const code = 'JO-' + String(Math.max(maxJO + 1, 1001)).padStart(4,'0')
-    // Build size columns — use sizes that have qtys in the invoice items, fall back to defaults
-    const defSizes = ['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL']
-    const usedSizesSet = new Set()
-    ;(inv.items||[]).forEach(it => {
-      Object.entries(it.sizes||{}).forEach(([s,v]) => { if (parseInt(v) > 0) usedSizesSet.add(s) })
-    })
-    const joSizes = usedSizesSet.size > 0
-      ? [...defSizes.filter(s => usedSizesSet.has(s)), ...[...usedSizesSet].filter(s => !defSizes.includes(s))]
-      : defSizes
-    const result = await insertJobOrder({
-      code, customer_id: inv.customer_id, invoice_id: inv.id,
-      item_desc: (inv.items||[]).map(it => it.desc).join(', '),
-      status: 'รอออกแบบ',
-      items: productionSnapshot(inv, defSizes),
-    })
-    if (result.error) return notify.error('สร้างใบงานไม่สำเร็จ: ' + result.error.message)
-    await updateInvoice(inv.id, { jo_created: true })
-    notify.success(`สร้างใบงาน ${code} แล้ว`)
-    load()
-    setView(v => v ? { ...v, jo_created: true } : v)
-  }
-
   /* ── Convert Invoice → Receipt ── */
   async function handleConvertToReceipt(inv) {
     const existRec = receipts.find(r => r.invoice_id === inv.id)
@@ -267,13 +238,13 @@ export default function InvoicePage() {
 
             {/* → ใบงาน */}
             {!relJO ? (
-              <button className="btn btn-outline" onClick={() => handleConvertToJO(view)}>
+              <Link className="btn btn-outline" href={`/joborder?new=${view.id}`}>
                 📝 สร้างใบงาน
-              </button>
+              </Link>
             ) : (
               <span style={{ display:'inline-flex', alignItems:'center', gap:5, padding:'6px 12px', borderRadius:8, background:'#EFF6FF', fontSize:13, color:'#1D4ED8', fontWeight:600 }}>
-                📝 {relJO.code}
-                <span style={{ padding:'2px 6px', borderRadius:4, background:'#DBEAFE', fontSize:11 }}>{relJO.status}</span>
+                📝 {jobs.filter(j => j.invoice_id===view.id).length > 1 ? `ใบงาน ${jobs.filter(j => j.invoice_id===view.id).length} ใบ` : relJO.code}
+                <Link href={`/joborder?new=${view.id}`} style={{ padding:'2px 6px', borderRadius:4, background:'#DBEAFE', fontSize:11, textDecoration:'none', color:'#1D4ED8' }}>+ เพิ่ม</Link>
               </span>
             )}
 
@@ -861,7 +832,7 @@ export default function InvoicePage() {
                           <button className="btn btn-outline btn-sm" onClick={() => doc.open(r)}>ดู</button>
                           <button className="btn btn-outline btn-sm" onClick={() => startEdit(r)}>✏️</button>
                           {!relJO && (
-                            <button className="btn btn-outline btn-sm" onClick={() => handleConvertToJO(r)} title="สร้างใบงาน">→ JO</button>
+                            <Link className="btn btn-outline btn-sm" href={`/joborder?new=${r.id}`} title="สร้างใบงาน">→ JO</Link>
                           )}
                           {!relRec && (
                             <button className="btn btn-outline btn-sm" style={{ color:'#065F46', borderColor:'#10B981' }}
