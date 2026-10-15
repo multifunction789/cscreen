@@ -33,8 +33,9 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
   function chooseInvoice(id) {
     setInvId(id); setPicked([])
     const it = invoices.find(i => i.id === id)
+    const hasLegacy = jobs.some(j => j.invoice_id === id && !j.invoice_item_no)
     const free = (it?.items || []).map((_, i) => i + 1).filter(n => !jobs.some(j => j.invoice_id === id && j.invoice_item_no === n))
-    if (free.length === 1) setPicked(free)
+    if (free.length === 1 && !hasLegacy) setPicked(free)
   }
   const toggle = n => setPicked(p => p.includes(n) ? p.filter(x => x !== n) : [...p, n].sort((a, b) => a - b))
 
@@ -47,11 +48,12 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
     const created = []
     for (let k = 0; k < picked.length; k++) {
       const n = picked[k]
-      const detail = buildFromInvoice(inv, n, cust)
+      const detail = { ...buildFromInvoice(inv, n, cust), created_by_email: email || '' }
+      // created_by / status ไม่ต้องส่ง — ฐานข้อมูลตั้งให้เอง (trigger guard_job_workflow)
       const { data, error } = await insertJobOrder({
         code: codes[k], customer_id: inv.customer_id, invoice_id: inv.id, invoice_item_no: n,
         item_desc: detail.product.name || `รายการที่ ${n}`, items: detail,
-        status: 'รอออกแบบ', document_date: todayStr(), created_by: email, urgent: false,
+        document_date: todayStr(), urgent: false,
       })
       if (error) {
         const dup = error.code === '23505' || /duplicate|unique/i.test(error.message)
@@ -118,7 +120,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
                 return (
                   <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 9, cursor: has ? 'default' : 'pointer',
                     border: on ? '2px solid #B80F0B' : '1.5px solid #EBD3D1', background: has ? '#FAFAFA' : on ? '#FDF3F2' : '#fff' }}>
-                    <input type="checkbox" disabled={!!has || busy} checked={on} onChange={() => toggle(n)} style={{ width: 20, height: 20, accentColor: '#B80F0B' }} />
+                    <input type="checkbox" disabled={!!has || busy || legacyJobs.length > 0} checked={on} onChange={() => toggle(n)} style={{ width: 20, height: 20, accentColor: '#B80F0B' }} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <b style={{ color: has ? '#6B7280' : '#1F1A1A' }}>{n} · {it.desc || '(ไม่มีชื่อรายการ)'}</b>
                       <span style={{ display: 'block', fontSize: 12.5, color: '#6B5B5A' }}>{Number(it.qty) || sizeTotal(it.sizes)} ตัว{sz ? ` · ${sz}` : ''}</span>
@@ -132,7 +134,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
               {!items.length && <div className="empty-state">Invoice นี้ไม่มีรายการสินค้า</div>}
               {legacyJobs.length > 0 && (
                 <div style={{ fontSize: 12.5, background: '#FFFBEB', border: '1px solid #FDE68A', color: '#92400E', borderRadius: 8, padding: '8px 12px' }}>
-                  Invoice นี้มีใบงานแบบเดิมอยู่แล้ว ({legacyJobs.map(j => j.code).join(', ')}) — ตรวจให้แน่ใจว่าไม่ได้ผลิตรายการเดียวกันซ้ำ
+                  Invoice นี้มีใบงานแบบเดิมอยู่แล้ว ({legacyJobs.map(j => j.code).join(', ')}) — กรุณาเปิดใบงานเดิม (ระบบกันสร้างใบงานซ้ำซ้อนกับใบงานเดิม)
                 </div>
               )}
             </>
