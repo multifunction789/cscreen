@@ -150,7 +150,7 @@ end $$;
 create or replace function public.approve_payment_submission(p_submission_id uuid, p_amount numeric, p_paid_at timestamptz,
   p_method text, p_bank_reference text, p_idempotency_key uuid)
 returns jsonb language plpgsql security definer set search_path = public, pg_temp as $$
-declare s payment_submissions; inv invoices; rec receipts; ref text; paid_total numeric; reserved numeric; amt numeric;
+declare s payment_submissions; inv invoices; rec receipts; ref text; paid_total numeric; reserved numeric; amt numeric; inv_id uuid;
 begin
   perform workflow_role(array['owner','accounting']);
   if p_idempotency_key is null then raise exception 'ไม่มีรหัสคำขอ'; end if;
@@ -163,9 +163,9 @@ begin
       'balance', (select to_jsonb(b) from invoice_balances b where b.invoice_id = s.invoice_id), 'repeated', true);
   end if;
 
-  select invoice_id into inv.id from payment_submissions where id = p_submission_id;
-  if inv.id is null then raise exception 'ไม่พบรายการแจ้งชำระ'; end if;
-  select * into inv from invoices where id = inv.id for update;            -- one approval per invoice at a time
+  select invoice_id into inv_id from payment_submissions where id = p_submission_id;
+  if inv_id is null then raise exception 'ไม่พบรายการแจ้งชำระ'; end if;
+  select * into inv from invoices where id = inv_id for update;            -- one approval per invoice at a time
   select * into s from payment_submissions where id = p_submission_id for update;
   if s.status = 'approved' then raise exception 'รายการนี้อนุมัติไปแล้ว (%)', (select code from receipts where id = s.receipt_id); end if;
   if s.status <> 'pending' then raise exception 'รายการนี้ถูกปฏิเสธ/ยกเลิกแล้ว'; end if;
