@@ -6,16 +6,16 @@ import { DEFAULT_TERMS, money, thaiDate } from '@/lib/docs/quotation'
 import { SHOP } from '@/lib/shop'
 import { requireUser, createSupabaseServer } from '@/lib/supabaseServer'
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
+import { documentImageMessages } from '@/lib/server/documentImages'
 
 export const maxDuration = 60
 const SENDERS = ['owner', 'admin', 'sales']
-const LINK_DAYS = 30
 const fail = (error, status = 400) => NextResponse.json({ error }, { status })
 
 /**
  * POST /api/inbox/send-quotation (login, owner/admin/sales)
  * Body: { conversationId, quotationId, clientKey }
- * Snapshot → PDF (once per version, stored in private documents) → LINE card with a 30-day link.
+ * Snapshot → PDF (once per version, stored in private documents) → LINE: the pages as pictures + a short caption.
  * Same clientKey = same message; LINE is asked at most once.
  */
 export async function POST(req) {
@@ -49,10 +49,10 @@ export async function POST(req) {
   if (vErr) return fail(vErr.message, 409)
 
   // 2) PDF once per version
-  let pdfPath = v.pdf_path
+  let pdfPath = v.pdf_path, pdf = null
   if (!pdfPath) {
     try {
-      const pdf = await renderQuotationPdf(v.snapshot)
+      pdf = await renderQuotationPdf(v.snapshot)
       pdfPath = `quotations/${q.code}-v${v.version}.pdf`
       const up = await db.storage.from('documents').upload(pdfPath, pdf, { contentType: 'application/pdf', upsert: true })
       if (up.error) throw new Error(up.error.message)
@@ -75,14 +75,14 @@ export async function POST(req) {
   if (msg.status === 'sent') return NextResponse.json({ message: msg, version: v.version })
 
   try {
-    const { data: signed, error } = await db.storage.from('documents').createSignedUrl(pdfPath, LINK_DAYS * 86400, { download: false })
-    if (error || !signed?.signedUrl) throw new Error('สร้างลิงก์ไม่สำเร็จ')
-    const card = line.documentCard({
-      title: 'ใบเสนอราคา', code: `${q.code}${v.version > 1 ? ` · ฉบับที่ ${v.version}` : ''}`,
-      lines: [['ลูกค้า', q.customer?.name || '—'], ...(q.valid_until ? [['ใช้ได้ถึง', thaiDate(q.valid_until)]] : [])],
-      total: money(v.total), url: signed.signedUrl, button: 'เปิดใบเสนอราคา (PDF)',
-    })
-    await line.push(conv.identity.external_id, [card], clientKey)
+    const { messages: pictures } = await documentImageMessages(db, pdfPath, pdf)
+    const text = [
+      `ใบเสนอราคา ${q.code}${v.version > 1 ? ` (ฉบับที่ ${v.version})` : ''}`,
+      `ลูกค้า: ${q.customer?.name || '—'}`,
+      `ยอดสุทธิ ${money(v.total)} บาท`,
+      ...(q.valid_until ? [`ราคานี้ใช้ได้ถึง ${thaiDate(q.valid_until)}`] : []),
+    ].join('\n')
+    await line.push(conv.identity.external_id, [...pictures, { type: 'text', text }], clientKey)
     await db.rpc('finish_outgoing_message', { p_message_id: msg.id, p_ok: true })
     await db.rpc('mark_quotation_sent', { p_version_id: v.id, p_message_id: msg.id })
     return NextResponse.json({ message: { ...msg, status: 'sent' }, version: v.version })

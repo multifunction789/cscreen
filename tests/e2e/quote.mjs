@@ -1,6 +1,8 @@
 // e2e: quotation from chat → PDF → LINE card (mock Supabase + mock LINE on :54321). Same app env as line.mjs.
 import { chromium } from 'playwright'
 import crypto from 'node:crypto'
+import fs from 'node:fs'
+const require_write = (f, b) => fs.writeFileSync(f, b)
 const B = 'http://localhost:3100', DB = 'http://localhost:54321'
 const OUT = process.argv[2]
 const check = (c, m) => { console.log((c ? 'PASS ' : 'FAIL ') + m); if (!c) process.exitCode = 1 }
@@ -58,12 +60,15 @@ await p.locator('.ib-sheet').screenshot({ path: OUT + '/quote-form.png' })
 await p.getByRole('button', { name: 'บันทึกและส่งให้ลูกค้า' }).click()
 await p.waitForSelector('.ib-doccard')
 let L = await line()
-const card = L.pushes.at(-1)?.messages?.[0]
-check(card?.type === 'flex' && /ใบเสนอราคา QT-1017 ยอด 6,420\.00 บาท/.test(card.altText), 'LINE ได้การ์ดใบเสนอราคา + ยอด')
-const url = card?.contents?.footer?.contents?.[0]?.action?.uri || ''
-check(url.includes('/sign/documents/quotations/QT-1017-v1.pdf'), 'ปุ่มเปิด PDF เป็นลิงก์หมดอายุไปที่ไฟล์ส่วนตัว')
+const sent = L.pushes.at(-1)?.messages || []
+const img = sent[0], caption = sent.at(-1)
+check(img?.type === 'image' && /\/sign\/documents\/quotations\/QT-1017-v1-p1\.jpg/.test(img.originalContentUrl) && /-p1-s\.jpg/.test(img.previewImageUrl), 'LINE ได้รูปใบเสนอราคา (ไม่ใช่ลิงก์)')
+check(caption?.type === 'text' && caption.text.includes('QT-1017') && caption.text.includes('6,420.00 บาท') && !/https?:/.test(caption.text), 'ข้อความกำกับมีเลขที่ + ยอด ไม่มีลิงก์')
+const jpg = Buffer.from(await (await fetch(`${DB}/storage/v1/object/sign/documents/quotations/QT-1017-v1-p1.jpg`)).arrayBuffer())
+check(jpg.subarray(0, 2).toString('hex') === 'ffd8' && jpg.length > 50000, 'รูปเป็น JPEG จริงจาก PDF')
 const pdf = Buffer.from(await (await fetch(`${DB}/storage/v1/object/sign/documents/quotations/QT-1017-v1.pdf`)).arrayBuffer())
-check(pdf.subarray(0, 4).toString() === '%PDF' && pdf.length > 20000, 'สร้าง PDF จริงเก็บใน documents')
+check(pdf.subarray(0, 4).toString() === '%PDF' && pdf.length > 20000, 'ยังเก็บ PDF ต้นฉบับใน documents')
+if (OUT) require_write(OUT + '/quote-line.jpg', jpg)
 check((await p.locator('.ib-doccard').last().innerText()).includes('ใบเสนอราคา QT-1017'), 'หน้าแชทแสดงการ์ดเอกสาร')
 d = await dbs()
 check(d.deals.find(x => x.conversation_id === conv.id)?.stage === 'Quotation Sent', 'งานขายเปลี่ยนเป็น "ส่งใบเสนอราคาแล้ว"')
@@ -75,7 +80,7 @@ await p.waitForSelector('.ib-qline')
 await p.locator('.ib-qline', { hasText: 'QT-1017' }).getByRole('button', { name: /ส่ง/ }).click()
 await p.waitForFunction(n => document.querySelectorAll('.ib-doccard').length > n, 1)
 d = await dbs(); L = await line()
-check(d.quotation_versions.length === 1 && L.pushes.length >= 2, 'ส่งซ้ำโดยไม่แก้ → ฉบับเดิม ไม่สร้าง PDF ใหม่')
+check(d.quotation_versions.length === 1 && L.pushes.length >= 2 && L.pushes.at(-1).messages[0].type === 'image', 'ส่งซ้ำโดยไม่แก้ → ฉบับเดิม ไม่สร้าง PDF ใหม่ (ส่งเป็นรูปอีกครั้ง)')
 await p.screenshot({ path: OUT + '/quote-chat.png' })
 
 console.log('errors:', errors)
