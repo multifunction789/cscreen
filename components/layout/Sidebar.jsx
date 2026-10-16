@@ -7,6 +7,7 @@ const navItems = [
     { href: '/dashboard', icon: '📊', label: 'Dashboard' },
   ]},
   { group: 'การขาย / Sales', items: [
+    { href: '/inbox',     icon: '💬', label: 'แชทลูกค้า' },
     { href: '/customers', icon: '👥', label: 'ลูกค้า (Customer)' },
     { href: '/quotation', icon: '📋', label: 'ใบเสนอราคา' },
     { href: '/invoice',   icon: '📄', label: 'ใบแจ้งหนี้ (Invoice)' },
