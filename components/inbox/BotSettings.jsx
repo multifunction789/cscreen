@@ -5,7 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { notify } from '@/lib/feedback'
 import { decide } from '@/lib/bot/engine'
 
-const KINDS = { answer: 'ตอบข้อความ', payment: 'ส่งช่องทางชำระเงิน + QR', price: 'เริ่มคิดราคาเบื้องต้น' }
+const KINDS = { payment: 'ส่งช่องทางชำระเงิน + QR', price: 'เริ่มคิดราคาเบื้องต้น' }
 const EDITORS = ['owner', 'admin']
 const splitKeywords = s => s.split(/[,\n]/).map(x => x.trim()).filter(Boolean)
 
@@ -20,11 +20,11 @@ function Section({ title, hint, children }) {
 }
 
 /** "ลองคุยกับบอท": runs the same engine as the server on the current (even unsaved) settings */
-function Preview({ settings, rules, prices }) {
+function Preview({ settings, rules, prices, kb }) {
   const [log, setLog] = useState([])
   const [text, setText] = useState('')
   const [handoffAt, setHandoffAt] = useState(null)
-  const ctx = { settings: { ...settings, enabled: true }, rules, prices, conv: { botActive: true, handoffAt } }
+  const ctx = { settings: { ...settings, enabled: true }, rules, prices, kb, conv: { botActive: true, handoffAt } }
 
   function run(event, shown) {
     const out = decide(event, ctx)
@@ -66,20 +66,22 @@ export default function BotSettings() {
   const [settings, setSettings] = useState(null)
   const [rules, setRules] = useState([])
   const [prices, setPrices] = useState([])
+  const [kb, setKb] = useState([])
   const [dirty, setDirty] = useState({})
   const [busy, setBusy] = useState(false)
   const [error, setError] = useState(null)
   const canEdit = EDITORS.includes(role)
 
   async function load() {
-    const [r, s, ru, p] = await Promise.all([
+    const [r, s, ru, p, k] = await Promise.all([
       supabase.rpc('app_role'),
       supabase.from('bot_settings').select('*').maybeSingle(),
       supabase.from('bot_rules').select('*').order('sort').order('created_at'),
       supabase.from('bot_prices').select('*').order('product').order('technique').order('min_qty'),
+      supabase.from('kb_articles').select('id, category, title, body, images, keywords, visibility, bot_enabled, in_menu, sort, hits').order('sort'),
     ])
     if (s.error) { setError(s.error.message); return }
-    setRole(r.data); setSettings(s.data); setRules(ru.data || []); setPrices(p.data || []); setDirty({})
+    setRole(r.data); setSettings(s.data); setRules(ru.data || []); setPrices(p.data || []); setKb(k.data || []); setDirty({})
   }
   // first load: async, state is set after the requests finish
   useEffect(() => { let live = true; Promise.resolve().then(() => live && load()); return () => { live = false } }, [])
@@ -93,7 +95,8 @@ export default function BotSettings() {
   const setRule = (id, k, v) => { setRules(rs => rs.map(r => r.id === id ? { ...r, [k]: v } : r)); setDirty(d => ({ ...d, ['r' + id]: true })) }
   const setPrice = (id, k, v) => { setPrices(ps => ps.map(p => p.id === id ? { ...p, [k]: v } : p)); setDirty(d => ({ ...d, ['p' + id]: true })) }
 
-  const menuCount = useMemo(() => rules.filter(r => r.enabled && r.in_menu).length, [rules])
+  const botKb = useMemo(() => kb.filter(a => a.visibility === 'customer' && a.bot_enabled), [kb])
+  const menuCount = useMemo(() => rules.filter(r => r.enabled && r.in_menu).length + botKb.filter(a => a.in_menu).length, [rules, botKb])
 
   async function uploadQr(file) {
     if (!file) return
@@ -161,8 +164,17 @@ export default function BotSettings() {
         )}
       </Section>
 
-      <Section title="ถาม-ตอบ" hint={`บอทหาคำสำคัญในข้อความลูกค้า (ไม่สนช่องว่าง/ตัวพิมพ์) ถ้าเจอหลายข้อ ใช้คำที่ยาวที่สุด · ติ๊ก "ปุ่มเมนู" เพื่อให้ขึ้นเป็นปุ่มให้ลูกค้ากด (ตอนนี้ ${menuCount} ปุ่ม)`}>
-        {rules.map(r => (
+      <Section title="คำตอบจากคลังความรู้" hint={`บอทหาคำสำคัญในข้อความลูกค้า (ไม่สนช่องว่าง/ตัวพิมพ์) ถ้าเจอหลายข้อ ใช้คำที่ยาวที่สุด · ปุ่มเมนูทั้งหมดตอนนี้ ${menuCount} ปุ่ม`}>
+        <p className="bot-hint">หัวข้อถาม-ตอบทั่วไปอยู่ใน <Link href="/knowledge">📚 คลังความรู้</Link> — เปิด &quot;🤖 ให้บอทใช้ตอบลูกค้า&quot; ที่หัวข้อนั้น · หัวข้อ 🔒 ใช้ภายในจะไม่ถูกส่งให้ลูกค้า</p>
+        {botKb.length ? (
+          <ul className="bot-kb-list">
+            {botKb.map(a => <li key={a.id}><b>{a.title}</b> <span className="bot-hint">{a.category} · {(a.keywords || []).join(', ') || 'ไม่มีคำสำคัญ'}{a.in_menu ? ' · ปุ่มเมนู' : ''}{a.images?.length ? ` · 🖼 ${a.images.length}` : ''} · ตอบไปแล้ว {a.hits} ครั้ง</span></li>)}
+          </ul>
+        ) : <p className="bot-hint ib-warn">ยังไม่มีหัวข้อที่เปิดให้บอทใช้</p>}
+      </Section>
+
+      <Section title="คำตอบพิเศษ (ชำระเงิน / ขอราคา)" hint="สองเรื่องนี้บอททำมากกว่าตอบข้อความ: ส่งเลขบัญชี + QR และพาลูกค้าเลือกจนได้ราคาเริ่มต้น">
+        {rules.filter(r => r.kind === 'payment' || r.kind === 'price').map(r => (
           <div key={r.id} className={`bot-rule${r.enabled ? '' : ' off'}`}>
             <div className="bot-row">
               <input type="text" value={r.title} disabled={dis} aria-label="ชื่อหัวข้อ" onChange={e => setRule(r.id, 'title', e.target.value)} style={{ flex: 1, minWidth: 140 }} />
@@ -191,8 +203,6 @@ export default function BotSettings() {
             )}
           </div>
         ))}
-        {canEdit && <button type="button" className="btn btn-outline" disabled={busy}
-          onClick={() => save(() => supabase.from('bot_rules').insert({ title: 'หัวข้อใหม่', kind: 'answer', keywords: [], answer: '', enabled: false, sort: 100 + rules.length }), 'เพิ่มหัวข้อแล้ว (ยังปิดอยู่)')}>+ เพิ่มหัวข้อ</button>}
       </Section>
 
       <Section title="ตารางราคาเริ่มต้น" hint="บอทตอบเป็น &quot;ราคาเริ่มต้น&quot; เสมอ และบอกลูกค้าว่าราคาจริงอยู่ในใบเสนอราคา · จำนวนขั้นต่ำ = เริ่มใช้ราคานี้ตั้งแต่กี่ตัว">
@@ -225,7 +235,7 @@ export default function BotSettings() {
       </Section>
 
       <Section title="ลองคุยกับบอท" hint="ใช้ข้อความในหน้านี้ (รวมที่ยังไม่บันทึก) ไม่ส่งถึงลูกค้าจริง">
-        <Preview settings={settings} rules={rules} prices={prices} />
+        <Preview settings={settings} rules={rules} prices={prices} kb={kb} />
       </Section>
     </div>
   )
