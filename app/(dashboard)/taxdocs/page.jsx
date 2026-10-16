@@ -5,6 +5,8 @@ import { supabase } from '@/lib/supabase'
 import { fmtDate } from '@/lib/shop'
 import { uploadFile, exportJpeg } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import StoredFileLink from '@/components/StoredFileLink'
+import { notify } from '@/lib/feedback'
 
 export default function TaxDocsPage() {
   const [tab, setTab]             = useState('vat-buy')
@@ -29,11 +31,12 @@ export default function TaxDocsPage() {
   async function handleWhtUpload(inv) {
     const file = whtFile[inv.id]; if (!file) return
     setWhtUploading(inv.id)
-    const url = await uploadFile(supabase, 'wht-files', file)
-    await updateInvoice(inv.id, { wht_file_url: url })
-    setWhtFile(f => ({ ...f, [inv.id]: null }))
-    setWhtUploading(null)
-    load()
+    try {
+      const url = await uploadFile(supabase, 'wht-files', file)
+      await updateInvoice(inv.id, { wht_file_url: url })
+      setWhtFile(f => ({ ...f, [inv.id]: null }))
+      load()
+    } catch (e) { notify.error(e.message) } finally { setWhtUploading(null) }
   }
 
   // ── Data ───────────────────────────────────────────────────
@@ -198,7 +201,7 @@ export default function TaxDocsPage() {
                     <td style={{ fontWeight:700, color:'var(--danger)' }}>฿{(inv.wht_amount||0).toLocaleString()}</td>
                     <td>
                       {inv.wht_file_url
-                        ? <a href={inv.wht_file_url} target="_blank" rel="noreferrer" className="badge badge-green" style={{ textDecoration:'none' }}>📎 ดูไฟล์</a>
+                        ? <StoredFileLink url={inv.wht_file_url} className="badge badge-green" style={{ textDecoration:'none' }}>📎 ดูไฟล์</StoredFileLink>
                         : <span className="badge badge-gray">ยังไม่มี</span>}
                     </td>
                     <td style={{ display:'flex', gap:4 }}>
@@ -251,10 +254,10 @@ export default function TaxDocsPage() {
                     <td style={{ fontWeight:600 }}>{d.name}</td>
                     <td style={{ fontSize:12, color:'var(--text-muted)' }}>{fmtDate(d.date)}</td>
                     <td>
-                      <a href={d.url} target="_blank" rel="noreferrer"
+                      <StoredFileLink url={d.url}
                         className="btn btn-outline btn-sm" style={{ textDecoration:'none', fontSize:12 }}>
                         🔗 เปิดไฟล์
-                      </a>
+                      </StoredFileLink>
                     </td>
                   </tr>
                 ))}

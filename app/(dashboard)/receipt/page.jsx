@@ -8,6 +8,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
+import StoredFileLink from '@/components/StoredFileLink'
 
 /* ── Green theme ──────────────────────────────────────────── */
 const C = {
@@ -87,10 +88,11 @@ export default function ReceiptPage() {
   async function handleFileAttach(r, file) {
     if (!file) return
     setFileUploading(true)
-    const url = await uploadFile(supabase, 'wht-files', file)
-    await updateReceipt(r.id, { file_url: url })
-    setFileUploading(false)
-    load()
+    try {
+      const url = await uploadFile(supabase, 'wht-files', file)
+      await updateReceipt(r.id, { file_url: url })
+      load()
+    } catch (e) { notify.error(e.message) } finally { setFileUploading(false) }
   }
 
   async function handleDelete(r) {
@@ -152,7 +154,7 @@ export default function ReceiptPage() {
               )}
             </label>
             {view.file_url && (
-              <a href={view.file_url} target="_blank" rel="noreferrer" className="btn btn-outline">🔗 เปิดไฟล์</a>
+              <StoredFileLink url={view.file_url} className="btn btn-outline">🔗 เปิดไฟล์</StoredFileLink>
             )}
             <button className="btn btn-primary" style={{ background: C.primary, borderColor: C.primary }} onClick={() => printDoc('print-area', `${(cust.name||'').replace(/\s+/g,'_').replace(/[\/\\:*?"<>|]/g,'')}_${view.code}`)}>🖨️ พิมพ์</button>
           </div>
