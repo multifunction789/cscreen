@@ -100,11 +100,12 @@ export default function FinancePage() {
     if (!file) return
     setWhtUploading(inv.id)
     const { updateInvoice } = await import('@/lib/db')
-    const url = await uploadFile(supabase, 'wht-files', file)
-    await updateInvoice(inv.id, { wht_file_url: url })
-    setWhtFile(f => ({ ...f, [inv.id]: null }))
-    setWhtUploading(null)
-    load()
+    try {
+      const url = await uploadFile(supabase, 'wht-files', file)
+      await updateInvoice(inv.id, { wht_file_url: url })
+      setWhtFile(f => ({ ...f, [inv.id]: null }))
+      load()
+    } catch (e) { notify.error(e.message) } finally { setWhtUploading(null) }
   }
 
   const income  = txs.filter(t=>t.type==='รายรับ')
