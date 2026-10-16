@@ -96,6 +96,26 @@ begin
   -- old flow ignores voided receipts too
   if (select count(*) from receipts where invoice_id = inv and voided_at is null) <> 3 then raise exception 'active receipt count'; end if;
 
+  -- slip pictures: taken from the chat message itself; accounting sees only recorded slips
+  declare conv uuid := '40000000-0000-0000-0000-0000000000e1'; img uuid; txt uuid; other uuid; sp payment_submissions;
+  begin
+    insert into contact_identities (id, platform, external_id, customer_id) values ('30000000-0000-0000-0000-0000000000e1', 'line', 'U-pay', cust) on conflict do nothing;
+    insert into conversations (id, identity_id, platform, customer_id) values (conv, '30000000-0000-0000-0000-0000000000e1', 'line', cust) on conflict do nothing;
+    insert into messages (conversation_id, direction, kind, attachment, status) values (conv, 'in', 'image', '{"bucket":"chat-media","path":"in/pay/slip1.jpg"}', 'received') returning id into img;
+    insert into messages (conversation_id, direction, kind, text, status) values (conv, 'in', 'text', 'โอนแล้ว', 'received') returning id into txt;
+    insert into storage.objects (bucket_id, name) values ('chat-media', 'in/pay/slip1.jpg'), ('chat-media', 'in/pay/other.jpg');
+    if pg_temp.run_as('accounting', $q$select 1 from storage.objects where bucket_id = 'chat-media' and name like 'in/pay/%'$q$) <> 0 then raise exception 'accounting saw chat pictures before slip'; end if;
+    perform set_config('request.jwt.claims', json_build_object('sub', pg_temp.uid('sales'), 'role', 'authenticated')::text, true);
+    e := pg_temp.err_as('sales', format($q$select public.submit_payment_slip(%L, 100, null, null, null, %L, %L)$q$, inv, conv, txt));
+    if e not like '%ไม่ใช่รูป%' then raise exception 'text message accepted as slip: %', e; end if;
+    sp := public.submit_payment_slip(inv, 100, null, null, null, conv, img, '{"bucket":"chat-media","path":"in/pay/other.jpg"}');
+    if sp.slip ->> 'path' <> 'in/pay/slip1.jpg' then raise exception 'slip path taken from browser: %', sp.slip; end if;
+    if (public.submit_payment_slip(inv, 100, null, null, null, conv, img)).id <> sp.id then raise exception 'same message recorded twice'; end if;
+    e := pg_temp.err_as('sales', format($q$select public.submit_payment_slip(%L, 100, null, null, null, null, null, '{"bucket":"documents","path":"x.pdf"}')$q$, inv));
+    if e not like '%ไม่ถูกต้อง%' then raise exception 'foreign bucket accepted: %', e; end if;
+    if pg_temp.run_as('accounting', $q$select 1 from storage.objects where bucket_id = 'chat-media' and name like 'in/pay/%'$q$) <> 1 then raise exception 'accounting should see exactly the slip picture'; end if;
+  end;
+
   -- reading
   if pg_temp.run_as('accounting', 'select * from payment_submissions') < 5 then raise exception 'accounting should read slips'; end if;
   if pg_temp.run_as('production', 'select * from payment_submissions') <> 0 then raise exception 'production read slips'; end if;

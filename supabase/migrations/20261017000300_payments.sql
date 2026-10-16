@@ -61,6 +61,12 @@ create policy payment_submissions_read on public.payment_submissions for select 
   using (public.has_role('owner','admin','sales','accounting'));
 -- every change goes through the functions below
 
+-- accounting sees a chat picture only when it was recorded as a slip
+drop policy if exists "accounting read slip pictures" on storage.objects;
+create policy "accounting read slip pictures" on storage.objects for select to authenticated
+  using (bucket_id = 'chat-media' and public.has_role('accounting')
+         and exists (select 1 from public.payment_submissions ps where ps.slip ->> 'bucket' = 'chat-media' and ps.slip ->> 'path' = storage.objects.name));
+
 -- ── balances (no stored copies): paid = confirmed, non-voided receipts
 create or replace view public.invoice_balances with (security_invoker = true) as
   select i.id as invoice_id, i.code, i.customer_id, i.total,
@@ -124,7 +130,7 @@ end $$;
 create or replace function public.submit_payment_slip(p_invoice_id uuid, p_amount numeric, p_transfer_at timestamptz default null,
   p_bank_reference text default null, p_note text default null, p_conversation_id uuid default null, p_message_id uuid default null, p_slip jsonb default null)
 returns payment_submissions language plpgsql security definer set search_path = public, pg_temp as $$
-declare inv invoices; cv conversations; s payment_submissions;
+declare inv invoices; cv conversations; s payment_submissions; m messages; slip jsonb;
 begin
   perform workflow_role(array['owner','admin','sales','accounting']);
   select * into inv from invoices where id = p_invoice_id;
@@ -135,11 +141,20 @@ begin
     if cv.customer_id is distinct from inv.customer_id then raise exception 'ใบแจ้งหนี้นี้เป็นของลูกค้าคนอื่น'; end if;
   end if;
   if p_message_id is not null then
+    -- the picture comes from the chat message itself, never from what the browser says
+    select * into m from messages where id = p_message_id;
+    if not found or m.conversation_id is distinct from p_conversation_id or m.direction <> 'in' or m.kind <> 'image' or m.attachment ->> 'path' is null then
+      raise exception 'ข้อความนี้ไม่ใช่รูปที่ลูกค้าส่งในแชทนี้';
+    end if;
     select * into s from payment_submissions where message_id = p_message_id and status <> 'rejected';
     if found then return s; end if;          -- this slip is already waiting / done
+    slip := jsonb_build_object('bucket', m.attachment ->> 'bucket', 'path', m.attachment ->> 'path');
+  elsif p_slip is not null then
+    if p_slip ->> 'bucket' <> 'payment-slips' or coalesce(p_slip ->> 'path', '') = '' then raise exception 'ไฟล์สลิปไม่ถูกต้อง'; end if;
+    slip := jsonb_build_object('bucket', 'payment-slips', 'path', p_slip ->> 'path');
   end if;
   insert into payment_submissions (invoice_id, customer_id, conversation_id, message_id, slip, amount_claimed, transfer_at, bank_reference, note)
-  values (inv.id, inv.customer_id, p_conversation_id, p_message_id, p_slip, round(p_amount, 2), p_transfer_at,
+  values (inv.id, inv.customer_id, p_conversation_id, p_message_id, slip, round(p_amount, 2), p_transfer_at,
           nullif(trim(coalesce(p_bank_reference, '')), ''), nullif(trim(coalesce(p_note, '')), ''))
   returning * into s;
   insert into audit_log (action, entity, entity_id, detail) values ('submit', 'payment_submissions', s.id::text, jsonb_build_object('invoice', inv.code, 'amount', s.amount_claimed));
