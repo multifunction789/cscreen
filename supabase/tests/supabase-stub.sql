@@ -16,10 +16,10 @@ create table if not exists auth.users (
   created_at timestamptz default now()
 );
 create or replace function auth.uid() returns uuid language sql stable as $$
-  select nullif(current_setting('request.jwt.claims', true)::jsonb ->> 'sub', '')::uuid
+  select nullif(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'sub', '')::uuid
 $$;
 create or replace function auth.role() returns text language sql stable as $$
-  select coalesce(current_setting('request.jwt.claims', true)::jsonb ->> 'role', 'anon')
+  select coalesce(nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role', 'anon')
 $$;
 grant usage on schema auth to anon, authenticated, service_role;
 grant execute on all functions in schema auth to anon, authenticated, service_role;

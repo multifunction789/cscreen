@@ -3,6 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { PLATFORMS, STATUSES, replyWindow, clockTime, newClientKey } from '@/lib/inbox/model'
 import { notify } from '@/lib/feedback'
 import { PlatformTag } from './ConversationList'
+import MessageMedia from './MessageMedia'
 
 export const ACTIONS = [
   { id: 'customer',  label: 'ลูกค้า' },
@@ -52,19 +53,24 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
       await store.send(conv.id, { text: body, clientKey: key })
       setPendingKey(null); setText(''); setConfirmCollision(false); setOpenedAt(new Date().toISOString())
     } catch (err) {
-      setPendingKey(null) // same text can be retried; a new key is made only after success
+      setPendingKey(null)
+      // stored as "ส่งไม่สำเร็จ" with its own retry button → clear the box so it is not sent twice
+      if (store.peekMessages?.(conv.id).some(m => m.clientKey === key)) { setText(''); setConfirmCollision(false) }
       notify.error(err.message)
     }
   }
 
   async function attach(file) {
     if (!file) return
-    const isImage = /^image\//.test(file.type)
-    const asLink = !isImage && !p.sendFile
+    // LINE cannot receive files: anything but a JPEG/PNG goes out as a 30-day download link
     try {
-      await store.send(conv.id, { text: asLink ? `ส่งไฟล์ ${file.name} เป็นลิงก์ (${p.label} ส่งไฟล์ตรงไม่ได้)` : '', clientKey: newClientKey(),
-        attachment: asLink ? undefined : { name: file.name, mime: file.type } })
+      await store.send(conv.id, { text: '', clientKey: newClientKey(), attachment: { name: file.name, mime: file.type, size: file.size, file } })
     } catch (err) { notify.error(err.message) }
+  }
+
+  async function retry(m) {
+    try { await store.send(conv.id, { text: m.text, clientKey: m.clientKey, attachment: null }) }
+    catch (err) { notify.error(err.message) }
   }
 
   return (
@@ -99,17 +105,19 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
       <div className="ib-timeline" role="log" aria-live="polite" ref={logRef}>
         {timeline.map(item => item._t === 'note' ? (
           <div key={item.id} className="ib-note"><b>หมายเหตุภายใน · {nameOf(item.author)}</b> {item.text}<time>{clockTime(item.createdAt)}</time></div>
+        ) : item.kind === 'system' ? (
+          <div key={item.id} className="ib-system">{item.text}<time>{clockTime(item.createdAt)}</time></div>
         ) : (
           <div key={item.id} className={`ib-msg ${item.direction}`}>
             <div className="ib-bubble">
-              {item.kind === 'image' && <div className="ib-attach img">🖼 {item.attachment?.name}{item.slipCandidate && <button type="button" className="ib-link" onClick={() => onAction('payment', item)}>บันทึกเป็นสลิป</button>}</div>}
-              {item.kind === 'file' && item.attachment && <div className="ib-attach">📎 {item.attachment.name}</div>}
+              {['image', 'video', 'audio', 'file'].includes(item.kind) && item.attachment && <MessageMedia kind={item.kind} attachment={item.attachment} />}
+              {item.kind === 'image' && item.direction === 'in' && (item.slipCandidate || !demo) && <button type="button" className="ib-link" onClick={() => onAction('payment', item)}>บันทึกเป็นสลิป</button>}
               {item.kind === 'document' && <div className="ib-attach doc">📄 {item.document.code} v{item.document.version}</div>}
               {item.text && <div>{item.text}</div>}
             </div>
             <div className="ib-msg-meta">
               {item.direction === 'out' && (item.sentBy === 'bot' ? <span className="ib-bot">บอท</span> : nameOf(item.sentBy))}
-              {' '}{clockTime(item.createdAt)}{item.status === 'sending' && ' · กำลังส่ง…'}{item.status === 'failed' && ' · ส่งไม่สำเร็จ'}
+              {' '}{clockTime(item.createdAt)}{item.status === 'sending' && ' · กำลังส่ง…'}{item.status === 'failed' && <> · <span className="ib-warn" title={item.error || ''}>ส่งไม่สำเร็จ</span>{item.clientKey && !item.attachment && <> <button type="button" className="ib-link" onClick={() => retry(item)}>ลองส่งใหม่</button></>}</>}
             </div>
           </div>
         ))}

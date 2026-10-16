@@ -663,6 +663,10 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
 .ib-msg-meta { font-size: 11.5px; color: var(--ib-muted); margin-top: 2px; }
 .ib-attach { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; font-size: 13.5px; }
 .ib-attach.img { padding: 18px 12px; border: 1px dashed var(--ib-line); border-radius: 10px; }
+.ib-media { display: block; max-width: min(260px, 100%); border-radius: 10px; overflow: hidden; }
+.ib-media img, video.ib-media { display: block; width: 100%; height: auto; max-height: 320px; object-fit: cover; }
+.ib-system { align-self: center; max-width: 90%; text-align: center; font-size: 12px; color: var(--ib-muted); background: var(--ib-panel); border: 1px solid var(--ib-line); border-radius: 999px; padding: 3px 12px; }
+.ib-system time { margin-left: 6px; opacity: .8; }
 .ib-card .ib-link { align-self: flex-start; }
 .ib-link { background: none; border: 0; color: var(--ib-accent); text-decoration: underline; cursor: pointer; padding: 0; font: inherit; font-size: 13px; }
 .ib-note { align-self: center; max-width: 88%; background: var(--ib-note); border: 1px dashed var(--ib-note-line); border-radius: 10px; padding: 8px 12px; font-size: 13px; }

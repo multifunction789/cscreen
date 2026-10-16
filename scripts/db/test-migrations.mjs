@@ -20,7 +20,7 @@ const db = new PGlite()
 let failed = 0
 const run = async (label, sql) => {
   try { await db.exec(sql); console.log('ok   ', label) }
-  catch (e) { failed++; console.log('FAIL ', label, '\n      ', e.message, e.position ? `(at ${e.position})` : '') }
+  catch (e) { failed++; console.log('FAIL ', label, '\n      ', e.message, e.position ? `(at ${e.position})` : '', e.where ? '\n       where: ' + e.where.split('\n').slice(0, 3).join(' | ') : '') }
 }
 
 await run('supabase stub', readFileSync(join(tests, 'supabase-stub.sql'), 'utf8'))
