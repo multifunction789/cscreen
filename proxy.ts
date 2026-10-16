@@ -68,6 +68,6 @@ function withCookies(target: NextResponse, source: NextResponse) {
 export const config = {
   matcher: [
     // ทุกเส้นทาง ยกเว้นไฟล์ระบบของ Next และไฟล์ static ใน /public
-    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt)$).*)',
+    '/((?!_next/static|_next/image|favicon\\.ico|manifest\\.json|sw\\.js|.*\\.(?:png|jpg|jpeg|gif|svg|webp|ico|txt)$).*)',
   ],
 }

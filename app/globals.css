@@ -743,3 +743,12 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
   .ib-msg { max-width: 88%; }
   .ib-chat-head select { order: 10; flex: 1 1 calc(50% - 5px); min-width: 0; }
 }
+
+/* chat alerts */
+.nav-badge { background: #E5322D; color: #fff; border-radius: 999px; font-size: 11px; font-weight: 700; min-width: 20px; padding: 1px 6px; text-align: center; line-height: 16px; }
+.nav-badge.dot { position: absolute; top: -2px; right: -4px; min-width: 9px; width: 9px; height: 9px; padding: 0; }
+.ib-title .ib-alerts { margin-left: auto; position: relative; }
+.ib-alerts .ib-icon.on { filter: none; }
+.ib-alerts-pop { position: absolute; right: 0; top: calc(100% + 6px); z-index: 30; width: min(300px, 80vw); background: var(--ib-bg); color: var(--ib-text); border: 1px solid var(--ib-line); border-radius: 12px; box-shadow: 0 10px 30px rgba(0,0,0,.18); padding: 12px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; font-weight: 400; }
+.ib-alerts-pop .ok { color: #15803D; font-weight: 600; }
+@media (prefers-color-scheme: dark) { .ib-alerts-pop .ok { color: #86EFAC; } }

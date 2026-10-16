@@ -42,7 +42,14 @@ p.on('console', m => { if (m.type() === 'error' && !/favicon|404|502|WebSocket|r
 await p.goto(B + '/login')
 await p.fill('input[type=email]', 'staff@cscreen.test'); await p.fill('input[type=password]', 'correct-horse')
 await p.click('button[type=submit]'); await p.waitForURL(/dashboard/)
+await p.waitForSelector('.nav-badge')
+check((await p.locator('.nav-badge').innerText()) === '2', 'เมนูแชทลูกค้ามีตัวเลขข้อความยังไม่อ่าน (ทุกหน้า)')
+await p.waitForFunction(() => document.title.startsWith('(2) '))
+check(true, 'ชื่อแท็บมีจำนวนยังไม่อ่าน (2)')
 await p.goto(B + '/inbox'); await p.waitForSelector('.ib-item')
+await p.getByRole('button', { name: 'ตั้งค่าแจ้งเตือน' }).click()
+check((await p.locator('.ib-alerts-pop').innerText()).includes('เปิดแจ้งเตือนบนเครื่องนี้'), 'ปุ่ม 🔔 เปิดหน้าตั้งค่าแจ้งเตือน')
+await p.getByRole('button', { name: 'ตั้งค่าแจ้งเตือน' }).click()
 check((await p.locator('.ib-item').innerText()).includes('สมใจ ใจดี'), 'แชทจาก LINE ขึ้นในหน้าแชท พร้อมชื่อลูกค้า')
 await p.locator('.ib-item').first().click()
 await p.waitForSelector('.ib-media img')
@@ -86,6 +93,12 @@ L = await line()
 check(L.pushes[2].messages[0].type === 'image' && L.pushes[2].messages[0].originalContentUrl.includes('/sign/chat-media/out/'), 'ส่งรูป → LINE ได้รูปภาพ')
 check(L.pushes[3].messages[0].type === 'text' && /quote\.pdf[\s\S]*sign\/chat-media/.test(L.pushes[3].messages[0].text), 'ส่ง PDF → LINE ได้ลิงก์ดาวน์โหลด (LINE รับไฟล์ไม่ได้)')
 await p.screenshot({ path: OUT + '/line-chat.png' })
+
+// alert link opens that chat directly
+const convId = (await dbs()).conversations[0].id
+await p.goto(B + '/inbox?c=' + convId); await p.waitForSelector('.ib-chat-who')
+check((await p.locator('.ib-chat-who').innerText()).includes('สมใจ'), 'ลิงก์จากแจ้งเตือน (/inbox?c=…) เปิดแชทนั้นทันที')
+check((await fetch(B + '/sw.js')).status === 200, 'service worker โหลดได้โดยไม่ต้องล็อกอิน')
 
 console.log('errors:', errors)
 if (errors.length) process.exitCode = 1

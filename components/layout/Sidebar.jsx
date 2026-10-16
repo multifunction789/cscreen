@@ -1,6 +1,7 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useChatAlerts } from '@/components/inbox/ChatAlerts'
 
 const navItems = [
   { group: 'หลัก / Main', items: [
@@ -35,6 +36,7 @@ const navItems = [
 
 export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, collapsed = false, onToggleCollapse = () => {} }) {
   const pathname = usePathname()
+  const { unread } = useChatAlerts()
   const isActive = href => pathname === href || pathname.startsWith(href + '/')
 
   return (
@@ -82,8 +84,11 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                 className={`nav-link${isActive(item.href) ? ' active' : ''}`}
                 title={collapsed ? item.label : undefined}
                 aria-current={isActive(item.href) ? 'page' : undefined}>
-                <span className="nav-icon">{item.icon}</span>
+                <span className="nav-icon" style={{ position: 'relative' }}>{item.icon}
+                  {item.href === '/inbox' && unread > 0 && collapsed && <span className="nav-badge dot" aria-hidden="true" />}
+                </span>
                 {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
+                {!collapsed && item.href === '/inbox' && unread > 0 && <span className="nav-badge" aria-label={`ยังไม่อ่าน ${unread}`}>{unread > 99 ? '99+' : unread}</span>}
               </Link>
             ))}
           </div>
