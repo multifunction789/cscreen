@@ -25,6 +25,8 @@ const navItems = [
   ]},
   { group: 'การขาย / Sales', items: [
     { href: '/inbox',     icon: '💬', label: 'แชทลูกค้า' },
+    { href: '/sales',     icon: '💼', label: 'งานขาย' },
+    { href: '/sales/dashboard', icon: '📈', label: 'แดชบอร์ดการขาย' },
     { href: '/customers', icon: '👥', label: 'ลูกค้า (Customer)' },
     { href: '/quotation', icon: '📋', label: 'ใบเสนอราคา' },
     { href: '/invoice',   icon: '📄', label: 'ใบแจ้งหนี้ (Invoice)' },
@@ -56,7 +58,7 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
   const { unread } = useChatAlerts()
   const slips = usePendingSlips()
   const badge = href => (href === '/inbox' ? unread : href === '/payments' ? slips : 0)
-  const isActive = href => pathname === href || pathname.startsWith(href + '/')
+  const isActive = href => pathname === href || (href !== '/sales' && pathname.startsWith(href + '/'))
 
   return (
     <aside

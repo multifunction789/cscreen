@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { runTasks } from '@/lib/channels/tasks'
+import { sendFollowUpAlerts } from '@/lib/channels/alerts'
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export const maxDuration = 60
@@ -11,8 +12,10 @@ export const maxDuration = 60
  */
 async function handle() {
   try {
-    const result = await runTasks(supabaseAdmin(), { limit: 20 })
-    return NextResponse.json(result)
+    const db = supabaseAdmin()
+    const result = await runTasks(db, { limit: 20 })
+    const followUps = await sendFollowUpAlerts(db)       // never throws
+    return NextResponse.json({ ...result, followUps })
   } catch (e) {
     console.error('[worker]', e.message)
     return NextResponse.json({ error: e.message }, { status: 500 })
