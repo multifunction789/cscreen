@@ -8,6 +8,7 @@ import ConversationList from './ConversationList'
 import ChatView from './ChatView'
 import CustomerPanel from './CustomerPanel'
 import ActionPanel from './ActionPanel'
+import AlertSettings from './AlertSettings'
 
 const WIDE = '(min-width: 900px)'
 const subscribeWide = fn => { const m = window.matchMedia(WIDE); m.addEventListener('change', fn); return () => m.removeEventListener('change', fn) }
@@ -73,7 +74,7 @@ export default function InboxApp({ initialId = null }) {
   if (mode === 'live' && !all.length) return (
     <div className="ib ib-state">
       <div className="ib-empty-card">
-        <b>ยังไม่มีแชทจากลูกค้า</b>
+        <div className="ib-title">ยังไม่มีแชทจากลูกค้า<AlertSettings /></div>
         <p>แชทจะเข้ามาที่นี่เมื่อเชื่อมต่อ LINE OA แล้ว (เฟส 4) ระหว่างนี้ลองใช้งานด้วยข้อมูลจำลองได้</p>
         <ul className="ib-small">
           {['line', 'facebook', 'tiktok'].map(p => <li key={p}>{p === 'line' ? 'LINE' : p === 'facebook' ? 'Facebook' : 'TikTok'}: {store.channelStatus(p) === 'connected' ? 'เชื่อมต่อแล้ว' : 'ยังไม่เชื่อมต่อ'}</li>)}

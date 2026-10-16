@@ -15,7 +15,7 @@ async function handle() {
     return NextResponse.json(result)
   } catch (e) {
     console.error('[worker]', e.message)
-    return NextResponse.json({ error: 'worker failed' }, { status: 500 })
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
 export const GET = handle
