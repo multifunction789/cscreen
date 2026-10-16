@@ -98,7 +98,7 @@ end $$;
 
 -- public buckets are the only public ones
 do $$ begin
-  if (select array_agg(id order by id) from storage.buckets where public) <> array['job-images','stock-images'] then
+  if (select array_agg(id order by id) from storage.buckets where public) <> array['bot-assets','job-images','stock-images'] then
     raise exception 'unexpected public buckets';
   end if;
 end $$;
