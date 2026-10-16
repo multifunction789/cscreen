@@ -58,7 +58,9 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
       {/* Logo */}
       <div style={{ padding: collapsed ? '20px 12px 16px' : '20px 20px 16px', borderBottom: '1px solid #2A2A2A', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src="/cscreen-logo.png" alt="C-Screen" style={{ width: 36, height: 36, objectFit: 'contain', flexShrink: 0 }} />
+        <div style={{ width: 36, height: 36, borderRadius: 9, background: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+          <img src="/cstyle-mark.png" alt="C Style Apparel" style={{ width: 28, height: 28, objectFit: 'contain' }} />
+        </div>
         {!collapsed && (
           <div style={{ overflow: 'hidden', whiteSpace: 'nowrap', flex: 1 }}>
             <div style={{ color: '#fff', fontWeight: 700, fontSize: 17, letterSpacing: .5 }}>CSCREEN</div>
