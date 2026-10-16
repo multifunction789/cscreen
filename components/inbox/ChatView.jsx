@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { PLATFORMS, STATUSES, replyWindow, clockTime, newClientKey } from '@/lib/inbox/model'
-import { staffName } from '@/lib/inbox/mockStore'
+import { notify } from '@/lib/feedback'
 import { PlatformTag } from './ConversationList'
 
 export const ACTIONS = [
@@ -14,7 +14,7 @@ export const ACTIONS = [
   { id: 'followup',  label: 'ตั้งเตือน' },
 ]
 
-export default function ChatView({ store, conv, messages, notes, typingBy, onBack, onInfo, onAction }) {
+export default function ChatView({ store, conv, messages, notes, typingBy, nameOf, demo, onBack, onInfo, onAction }) {
   const [mode, setMode] = useState('reply')          // reply | note
   const [text, setText] = useState('')
   const [pendingKey, setPendingKey] = useState(null) // one clientKey per message being sent
@@ -34,26 +34,37 @@ export default function ChatView({ store, conv, messages, notes, typingBy, onBac
 
   // someone else answered after I opened this chat → warn before I send
   const colleagueReply = messages.filter(m => m.direction === 'out' && m.sentBy && m.sentBy !== store.me && m.sentBy !== 'bot' && m.createdAt > openedAt).at(-1)
-  const canReply = win.kind !== 'closed'
+  const connected = store.canSend(conv.platform)
+  const canReply = win.kind !== 'closed' && connected
 
   async function submit(e) {
     e?.preventDefault()
     const body = text.trim()
     if (!body) return
-    if (mode === 'note') { await store.addNote(conv.id, body); setText(''); return }
+    if (mode === 'note') {
+      try { await store.addNote(conv.id, body); setText('') } catch (err) { notify.error('บันทึกหมายเหตุไม่สำเร็จ: ' + err.message) }
+      return
+    }
     if (colleagueReply && !confirmCollision) { setConfirmCollision(true); return }
     const key = pendingKey || newClientKey()        // double-click / retry reuses the same key
     setPendingKey(key)
-    await store.send(conv.id, { text: body, clientKey: key })
-    setPendingKey(null); setText(''); setConfirmCollision(false); setOpenedAt(new Date().toISOString())
+    try {
+      await store.send(conv.id, { text: body, clientKey: key })
+      setPendingKey(null); setText(''); setConfirmCollision(false); setOpenedAt(new Date().toISOString())
+    } catch (err) {
+      setPendingKey(null) // same text can be retried; a new key is made only after success
+      notify.error(err.message)
+    }
   }
 
   async function attach(file) {
     if (!file) return
     const isImage = /^image\//.test(file.type)
     const asLink = !isImage && !p.sendFile
-    await store.send(conv.id, { text: asLink ? `ส่งไฟล์ ${file.name} เป็นลิงก์ (${p.label} ส่งไฟล์ตรงไม่ได้)` : '', clientKey: newClientKey(),
-      attachment: asLink ? undefined : { name: file.name, mime: file.type } })
+    try {
+      await store.send(conv.id, { text: asLink ? `ส่งไฟล์ ${file.name} เป็นลิงก์ (${p.label} ส่งไฟล์ตรงไม่ได้)` : '', clientKey: newClientKey(),
+        attachment: asLink ? undefined : { name: file.name, mime: file.type } })
+    } catch (err) { notify.error(err.message) }
   }
 
   return (
@@ -76,17 +87,18 @@ export default function ChatView({ store, conv, messages, notes, typingBy, onBac
       </header>
 
       <div className="ib-banners">
-        {!store.connected && <div className="ib-banner mock">ข้อมูลจำลอง — ยังไม่ได้เชื่อมต่อ {p.label} จริง ข้อความที่ส่งจะไม่ถึงลูกค้า</div>}
+        {demo && <div className="ib-banner mock">ข้อมูลจำลอง — ยังไม่ได้เชื่อมต่อ {p.label} จริง ข้อความที่ส่งจะไม่ถึงลูกค้า</div>}
+        {!demo && !connected && <div className="ib-banner warn">ยังไม่ได้เชื่อมต่อ {p.label} — อ่านแชทและจดหมายเหตุได้ แต่ยังส่งข้อความไม่ได้</div>}
         {win.kind === 'open' && win.hoursLeft != null && <div className={`ib-banner${win.hoursLeft < 4 ? ' warn' : ''}`}>ตอบได้อีก {win.hoursLeft > 0 ? `${win.hoursLeft} ชม.` : `${win.minutesLeft} นาที`} ({p.label} ให้ตอบภายใน {p.windowHours} ชม. หลังลูกค้าทักล่าสุด)</div>}
         {win.kind === 'human_agent' && <div className="ib-banner warn">เกิน {p.windowHours} ชม. แล้ว — ตอบได้แบบ Human Agent อีก {win.daysLeft} วัน (พนักงานตอบเองเท่านั้น)</div>}
         {win.kind === 'closed' && <div className="ib-banner danger">หมดเวลาตอบตามกฎ {p.label} — รอลูกค้าทักกลับก่อน</div>}
-        {conv.platform === 'line' && <div className="ib-banner">LINE: ข้อความที่พนักงานส่งนับโควตา {store.lineQuota.used}/{store.lineQuota.limit} เดือนนี้ · {p.note}</div>}
+        {conv.platform === 'line' && <div className="ib-banner">LINE: {store.lineQuota ? `ข้อความที่พนักงานส่งนับโควตา ${store.lineQuota.used}/${store.lineQuota.limit} เดือนนี้ · ` : ''}{p.note}</div>}
         {conv.platform === 'tiktok' && <div className="ib-banner">{p.note} · ส่งต่อกันได้ไม่เกิน {p.maxConsecutive} ข้อความจนกว่าลูกค้าตอบ</div>}
       </div>
 
       <div className="ib-timeline" role="log" aria-live="polite" ref={logRef}>
         {timeline.map(item => item._t === 'note' ? (
-          <div key={item.id} className="ib-note"><b>หมายเหตุภายใน · {staffName(item.author)}</b> {item.text}<time>{clockTime(item.createdAt)}</time></div>
+          <div key={item.id} className="ib-note"><b>หมายเหตุภายใน · {nameOf(item.author)}</b> {item.text}<time>{clockTime(item.createdAt)}</time></div>
         ) : (
           <div key={item.id} className={`ib-msg ${item.direction}`}>
             <div className="ib-bubble">
@@ -96,12 +108,12 @@ export default function ChatView({ store, conv, messages, notes, typingBy, onBac
               {item.text && <div>{item.text}</div>}
             </div>
             <div className="ib-msg-meta">
-              {item.direction === 'out' && (item.sentBy === 'bot' ? <span className="ib-bot">บอท</span> : staffName(item.sentBy))}
+              {item.direction === 'out' && (item.sentBy === 'bot' ? <span className="ib-bot">บอท</span> : nameOf(item.sentBy))}
               {' '}{clockTime(item.createdAt)}{item.status === 'sending' && ' · กำลังส่ง…'}{item.status === 'failed' && ' · ส่งไม่สำเร็จ'}
             </div>
           </div>
         ))}
-        {typingBy && <div className="ib-typing">{staffName(typingBy)} กำลังพิมพ์…</div>}
+        {typingBy && <div className="ib-typing">{nameOf(typingBy)} กำลังพิมพ์…</div>}
       </div>
 
       <div className="ib-actions" role="toolbar" aria-label="ทางลัด">
@@ -110,7 +122,7 @@ export default function ChatView({ store, conv, messages, notes, typingBy, onBac
 
       {colleagueReply && (
         <div className={`ib-banner ${confirmCollision ? 'danger' : 'warn'} ib-collision`}>
-          {staffName(colleagueReply.sentBy)} ตอบแชทนี้ไปแล้วเมื่อ {clockTime(colleagueReply.createdAt)}{confirmCollision ? ' — กดส่งอีกครั้งเพื่อยืนยัน' : ' — อ่านก่อนส่ง'}
+          {nameOf(colleagueReply.sentBy)} ตอบแชทนี้ไปแล้วเมื่อ {clockTime(colleagueReply.createdAt)}{confirmCollision ? ' — กดส่งอีกครั้งเพื่อยืนยัน' : ' — อ่านก่อนส่ง'}
         </div>
       )}
 
@@ -127,7 +139,7 @@ export default function ChatView({ store, conv, messages, notes, typingBy, onBac
             </>
           )}
           <textarea rows={2} value={text} disabled={mode === 'reply' && !canReply}
-            placeholder={mode === 'note' ? 'ลูกค้าไม่เห็นข้อความนี้' : canReply ? `ตอบผ่าน ${p.label}…` : 'หมดเวลาตอบตามกฎแพลตฟอร์ม'}
+            placeholder={mode === 'note' ? 'ลูกค้าไม่เห็นข้อความนี้' : canReply ? `ตอบผ่าน ${p.label}…` : !connected ? `ยังไม่ได้เชื่อมต่อ ${p.label}` : 'หมดเวลาตอบตามกฎแพลตฟอร์ม'}
             aria-label={mode === 'note' ? 'หมายเหตุภายใน' : 'พิมพ์ข้อความ'}
             onChange={e => setText(e.target.value)}
             onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); submit() } }} />

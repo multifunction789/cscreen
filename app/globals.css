@@ -700,6 +700,21 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
 .ib-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ib-muted); }
 .ib-form .ib-radio { flex-direction: row; align-items: center; gap: 8px; font-size: 14px; color: var(--ib-text); }
 .ib-later { display: flex; flex-direction: column; gap: 10px; line-height: 1.6; }
+.ib.ib-state { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 10px; padding: 24px; text-align: center; }
+.ib-empty-card { max-width: 440px; display: flex; flex-direction: column; gap: 10px; align-items: center; line-height: 1.6; }
+.ib-empty-card ul { list-style: none; padding: 0; margin: 0; }
+.ib-hist { display: flex; flex-direction: column; gap: 2px; margin-top: 6px; }
+.ib-hist-title { font-size: 12px; color: var(--ib-muted); font-weight: 600; }
+.ib-hist-row { display: flex; gap: 8px; justify-content: space-between; font-size: 13px; padding: 3px 0; color: var(--ib-text); text-decoration: none; border-bottom: 1px dashed var(--ib-line); }
+.ib-hist-row:hover b { color: var(--ib-accent); text-decoration: underline; }
+.ib-hist-row span { color: var(--ib-muted); text-align: right; }
+.ib-hr { border: 0; border-top: 1px solid var(--ib-line); margin: 6px 0; width: 100%; }
+.ib-cands { display: flex; flex-direction: column; gap: 6px; }
+.ib-cand { display: grid !important; grid-template-columns: auto 1fr auto; gap: 8px; align-items: center; padding: 8px 10px; border: 1px solid var(--ib-line); border-radius: 8px; cursor: pointer; }
+.ib-cand.on { border-color: var(--ib-accent); background: var(--ib-out); }
+.ib-match { font-size: 11.5px; font-weight: 700; border-radius: 999px; padding: 2px 8px; white-space: nowrap; background: #DCFCE7; color: #166534; }
+.ib-match.name { background: #FEF3C7; color: #92400E; }
+@media (prefers-color-scheme: dark) { .ib-match { background: #12391F; color: #86EFAC; } .ib-match.name { background: #3A2E10; color: #F5D78A; } }
 .ib-steps { margin: 0; padding-left: 20px; display: flex; flex-direction: column; gap: 4px; font-size: 13.5px; }
 .ib-steps li.on { font-weight: 700; color: var(--ib-accent); }
 .ib-only-mobile { display: none; }

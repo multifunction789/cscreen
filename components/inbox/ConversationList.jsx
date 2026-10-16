@@ -1,13 +1,12 @@
 'use client'
 import { PLATFORMS, STATUSES, timeAgo, replyWindow } from '@/lib/inbox/model'
-import { staffName } from '@/lib/inbox/mockStore'
 
 export function PlatformTag({ platform }) {
   const p = PLATFORMS[platform]
   return <span className="ib-ptag" style={{ background: p.color }} title={p.label}>{p.short}</span>
 }
 
-export default function ConversationList({ items, selectedId, onSelect, filters, setFilters, staff, me, unreadTotal }) {
+export default function ConversationList({ items, selectedId, onSelect, filters, setFilters, staff, me, unreadTotal, nameOf }) {
   const set = patch => setFilters(f => ({ ...f, ...patch }))
   return (
     <section className="ib-col ib-list" aria-label="รายการแชท">
@@ -53,7 +52,7 @@ export default function ConversationList({ items, selectedId, onSelect, filters,
                   </span>
                   <span className="ib-snippet">{c.lastMessageText}</span>
                   <span className="ib-meta">
-                    {c.assignedTo ? staffName(c.assignedTo) : <em className="ib-warn">ยังไม่มีคนรับ</em>}
+                    {c.assignedTo ? nameOf(c.assignedTo) : <em className="ib-warn">ยังไม่มีคนรับ</em>}
                     {urgent && <em className="ib-warn"> · เหลือ {w.hoursLeft} ชม.</em>}
                     {w.kind === 'human_agent' && <em className="ib-warn"> · เกิน {PLATFORMS[c.platform].windowHours} ชม.</em>}
                     {c.botActive && <span className="ib-bot"> · บอท</span>}
