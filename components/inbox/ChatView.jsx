@@ -120,8 +120,14 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
             <div className="ib-bubble">
               {['image', 'video', 'audio', 'file'].includes(item.kind) && item.attachment && <MessageMedia kind={item.kind} attachment={item.attachment} />}
               {item.kind === 'image' && item.direction === 'in' && (item.slipCandidate || !demo) && <button type="button" className="ib-link" onClick={() => onAction('payment', item)}>บันทึกเป็นสลิป</button>}
-              {item.kind === 'document' && <div className="ib-attach doc">📄 {item.document.code} v{item.document.version}</div>}
-              {item.text && <div>{item.text}</div>}
+              {item.kind === 'document' && (
+                <div className="ib-doccard">
+                  <b>📄 {item.document?.type === 'quotation' ? 'ใบเสนอราคา' : 'เอกสาร'} {item.document?.code}{item.document?.version > 1 ? ` · ฉบับที่ ${item.document.version}` : ''}</b>
+                  {item.document?.total != null && <span>ยอด {Number(item.document.total).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>}
+                  {item.attachment?.path && <MessageMedia kind="file" attachment={{ ...item.attachment, name: 'เปิด PDF' }} />}
+                </div>
+              )}
+              {item.text && item.kind !== 'document' && <div>{item.text}</div>}
             </div>
             <div className="ib-msg-meta">
               {item.direction === 'out' && (item.sentBy === 'bot' ? <span className="ib-bot">บอท</span> : nameOf(item.sentBy))}

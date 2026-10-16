@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import Link from 'next/link'
 import { notify } from '@/lib/feedback'
+import QuotationPanel from './QuotationPanel'
 
 const TITLES = {
   customer: 'ข้อมูลลูกค้า', quotation: 'ใบเสนอราคา', payment: 'บันทึกการชำระเงิน', receipt: 'ออกใบเสร็จ',
@@ -109,7 +110,7 @@ function LinkCustomer({ store, conv, onDone, onCreate }) {
   )
 }
 
-export default function ActionPanel({ store, conv, action, context, onClose }) {
+export default function ActionPanel({ store, conv, action, context, onClose, onSwitch }) {
   const c = conv.customer
   const [view, setView] = useState(c ? 'edit' : 'find')    // customer: edit | find | create
   const [confirmUnlink, setConfirmUnlink] = useState(false)
@@ -149,12 +150,7 @@ export default function ActionPanel({ store, conv, action, context, onClose }) {
                 onSubmit={form => run(() => store.createCustomer(conv.id, form), `สร้างลูกค้า ${form.name} แล้ว`)} />
             </div>
           )}
-          {action === 'quotation' && (
-            <Later phase={7}>
-              <p>สร้างใบเสนอราคาจากแชทนี้: ดึงข้อมูลลูกค้าอัตโนมัติ เลือกสินค้า/เทคนิค (สกรีน, DTF, Sublimation, ปัก) หลายรายการ คิดส่วนลด/VAT ตามกฎเดิม แล้วส่ง PDF เข้าแชท</p>
-              <p className="ib-small">ระหว่างนี้ใช้หน้าใบเสนอราคาเดิมได้: <Link href="/quotation">เปิดหน้าใบเสนอราคา</Link></p>
-            </Later>
-          )}
+          {action === 'quotation' && <QuotationPanel store={store} conv={conv} onDone={onClose} onNeedCustomer={() => onSwitch?.('customer')} />}
           {action === 'payment' && (
             <Later phase={8}>
               {context?.attachment && <p>สลิป: {context.attachment.name}</p>}

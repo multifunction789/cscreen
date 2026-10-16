@@ -785,3 +785,26 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
 .ib-botbar { display: flex; gap: 10px; align-items: center; justify-content: space-between; }
 .ib-botbar.on { color: #15803D; }
 @media (prefers-color-scheme: dark) { .ib-botbar.on { color: #86EFAC; } }
+
+/* quotation in chat */
+.ib-quote { gap: 12px; }
+.ib-qitems { display: flex; flex-direction: column; gap: 6px; }
+/* each item: description on its own line, then qty · price · amount · remove */
+.ib-qrow { display: grid; grid-template-columns: 72px minmax(0, 1fr) minmax(0, 1fr) 32px; grid-template-areas: "desc desc desc desc" "qty price amt del"; gap: 6px; align-items: center; padding: 8px; border: 1px solid var(--ib-line); border-radius: 10px; }
+.ib-qrow > :nth-child(1) { grid-area: desc; } .ib-qrow > :nth-child(2) { grid-area: qty; } .ib-qrow > :nth-child(3) { grid-area: price; }
+.ib-qrow > :nth-child(4) { grid-area: amt; } .ib-qrow > :nth-child(5) { grid-area: del; }
+.ib-qrow.head { display: none; }
+.ib-qrow input { min-width: 0; width: 100%; }
+.ib-qamt { text-align: right; font-variant-numeric: tabular-nums; font-size: 13px; }
+.ib-qopts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ib-qopts label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: var(--ib-muted); }
+.ib-qtotal { display: grid; grid-template-columns: 1fr auto; gap: 4px 12px; margin: 0; padding: 10px 12px; border-radius: 10px; background: var(--ib-panel); border: 1px solid var(--ib-line); font-size: 13.5px; }
+.ib-qtotal dt { color: var(--ib-muted); } .ib-qtotal dd { margin: 0; text-align: right; font-variant-numeric: tabular-nums; }
+.ib-qtotal .grand { font-weight: 800; font-size: 15px; color: var(--ib-text); }
+.ib-row-btns { display: flex; gap: 8px; flex-wrap: wrap; justify-content: flex-end; }
+.ib-qlist { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--ib-line); padding-top: 10px; }
+.ib-qline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.ib-qline span { flex: 1; }
+.ib-doccard { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--ib-bg); border: 1px solid var(--ib-line); min-width: 200px; }
+@media (max-width: 520px) { .ib-qopts { grid-template-columns: 1fr 1fr; } }
+.ib-hint { font-size: 12.5px; color: var(--ib-muted); margin: 0; line-height: 1.55; }

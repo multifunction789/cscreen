@@ -10,6 +10,12 @@ const securityHeaders = [
 
 const nextConfig: NextConfig = {
   poweredByHeader: false,
+  // PDF rendering runs on the server: keep react-pdf unbundled and ship the Thai fonts + logo with the routes that use them
+  serverExternalPackages: ["@react-pdf/renderer"],
+  outputFileTracingIncludes: {
+    "/api/inbox/send-quotation": ["./assets/fonts/**/*", "./public/cstyle-apparel-logo.png"],
+    "/api/documents/*": ["./assets/fonts/**/*", "./public/cstyle-apparel-logo.png"],
+  },
   async headers() {
     return [{ source: "/:path*", headers: securityHeaders }];
   },
