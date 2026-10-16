@@ -16,3 +16,11 @@
 1. รัน `scripts/db/dump-schema.sql` ใน SQL editor → บันทึกผลเป็น `snapshot.json`
 2. `python3 scripts/db/render-baseline.py snapshot.json > supabase/migrations/<เวลา>_resync.sql`
 3. `npm run test:db`
+
+## Ops scripts (`supabase/ops/`)
+
+Environment-specific SQL that is not replayed by `npm run test:db`:
+
+- `worker_cron.sql` — every minute, Supabase Cron calls `https://cscreen.vercel.app/api/worker`
+  to retry chat background tasks (LINE profile names, customer photos/files). Run once after
+  the phase 4 migration.

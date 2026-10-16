@@ -9,8 +9,11 @@ import { SUPABASE_URL, SUPABASE_KEY } from '@/lib/supabaseConfig'
  * พร้อมต่ออายุ session (refresh token) ให้อัตโนมัติผ่าน cookie
  */
 const PUBLIC_PAGES = ['/login']
+// เรียกจากภายนอก ไม่มี session — ตรวจสิทธิ์เองในแต่ละ route (ลายเซ็น LINE / งานในคิว)
+const PUBLIC_API = ['/api/channels/line', '/api/worker']
 
 export async function proxy(request: NextRequest) {
+  if (PUBLIC_API.includes(request.nextUrl.pathname)) return NextResponse.next()
   let response = NextResponse.next({ request })
 
   const supabase = createServerClient(SUPABASE_URL, SUPABASE_KEY, {
