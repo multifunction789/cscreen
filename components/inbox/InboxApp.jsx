@@ -111,7 +111,7 @@ export default function InboxApp({ initialId = null }) {
       ) : (
         <section className="ib-col ib-chat ib-placeholder"><p>เลือกแชททางซ้ายเพื่อเริ่มตอบ</p></section>
       )}
-      {action && conv && <ActionPanel key={action.id + conv.id} store={store} conv={conv} action={action.id} context={action.context} onClose={() => setAction(null)} />}
+      {action && conv && <ActionPanel key={action.id + conv.id} store={store} conv={conv} action={action.id} context={action.context} onClose={() => setAction(null)} onSwitch={id => setAction({ id })} />}
     </div>
   )
 }

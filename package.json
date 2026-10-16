@@ -8,10 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "test:db": "node scripts/db/test-migrations.mjs",
-    "test:unit": "node lib/pdf/thaiText.test.mjs && node lib/channels/line.test.mjs && node lib/channels/alerts.test.mjs && node lib/bot/engine.test.mjs"
+    "test:unit": "node lib/pdf/thaiText.test.mjs && node lib/channels/line.test.mjs && node lib/channels/alerts.test.mjs && node lib/bot/engine.test.mjs && node lib/docs/quotation.test.mjs && node lib/pdf/quotationPdf.test.mjs"
   },
   "dependencies": {
     "@fontsource/sarabun": "^5.3.0",
+    "@react-pdf/renderer": "^4.3.0",
     "@supabase/ssr": "^0.10.3",
     "@supabase/supabase-js": "^2.106.0",
     "googleapis": "^173.0.0",
