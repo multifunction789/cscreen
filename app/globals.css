@@ -805,6 +805,42 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
 .ib-qlist { display: flex; flex-direction: column; gap: 6px; border-top: 1px solid var(--ib-line); padding-top: 10px; }
 .ib-qline { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
 .ib-qline span { flex: 1; }
+.ib-slipprev { display: flex; gap: 10px; align-items: flex-end; }
+.ib-slipprev img { max-height: 140px; border-radius: 8px; }
+.ib-payrow { display: grid; grid-template-columns: 1fr 1.4fr; gap: 8px; }
+.ib-payrow input { width: 100%; min-width: 0; }
+.ib-paystatus { font-size: 12px; }
+.ib-paystatus.pending { color: #B45309; } .ib-paystatus.approved { color: #047857; } .ib-paystatus.rejected, .ib-paystatus.voided { color: #B91C1C; }
+.ib-doccard.receipt { border-color: #A7F3D0; background: #ECFDF5; }
 .ib-doccard { display: flex; flex-direction: column; gap: 4px; padding: 8px 10px; border-radius: 10px; background: var(--ib-bg); border: 1px solid var(--ib-line); min-width: 200px; }
 @media (max-width: 520px) { .ib-qopts { grid-template-columns: 1fr 1fr; } }
 .ib-hint { font-size: 12.5px; color: var(--ib-muted); margin: 0; line-height: 1.55; }
+
+/* ── ตรวจรับเงิน (phase 8) */
+.pay-page { display: flex; flex-direction: column; gap: 12px; max-width: 1100px; }
+.pay-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.pay-tabs button { border: 1px solid var(--ib-line, #E5E7EB); background: #fff; border-radius: 999px; padding: 6px 14px; font-weight: 600; cursor: pointer; }
+.pay-tabs button.on { background: #047857; color: #fff; border-color: #047857; }
+.pay-intro { color: #4B5563; font-size: 14px; margin: 0; }
+.pay-empty { padding: 28px; text-align: center; color: #6B7280; }
+.pay-list { display: flex; flex-direction: column; gap: 12px; }
+.pay-card { display: grid; grid-template-columns: 220px 1fr; gap: 16px; padding: 14px; }
+.pay-card[data-status="pending"] { border-left: 4px solid #F59E0B; }
+.pay-card[data-status="approved"] { border-left: 4px solid #047857; }
+.pay-card[data-status="rejected"], .pay-card[data-status="voided"] { border-left: 4px solid #B91C1C; opacity: .9; }
+.pay-slip img { width: 100%; max-height: 360px; object-fit: contain; border-radius: 8px; background: #F3F4F6; }
+.pay-noslip { height: 160px; display: grid; place-items: center; background: #F3F4F6; border-radius: 8px; color: #9CA3AF; }
+.pay-body { display: flex; flex-direction: column; gap: 10px; min-width: 0; }
+.pay-body header { display: flex; justify-content: space-between; gap: 8px; align-items: baseline; flex-wrap: wrap; }
+.pay-amt { font-size: 20px; font-weight: 800; color: #047857; }
+.pay-facts { display: grid; grid-template-columns: 130px 1fr; gap: 4px 10px; margin: 0; font-size: 14px; }
+.pay-facts dt { color: #6B7280; } .pay-facts dd { margin: 0; overflow-wrap: anywhere; }
+.pay-form { display: flex; flex-direction: column; gap: 8px; border-top: 1px dashed #E5E7EB; padding-top: 10px; }
+.pay-form label { display: flex; flex-direction: column; gap: 4px; font-size: 13px; color: #374151; }
+.pay-form input, .pay-form select { padding: 8px 10px; border: 1px solid #D1D5DB; border-radius: 8px; font-size: 14px; }
+.pay-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 8px; }
+.pay-check { flex-direction: row !important; align-items: center; gap: 6px !important; }
+.pay-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.pay-warn { margin: 0; font-size: 13px; color: #92400E; background: #FFFBEB; border-radius: 6px; padding: 6px 8px; }
+.pay-err { margin: 0; font-size: 13px; color: #B91C1C; }
+@media (max-width: 720px) { .pay-card { grid-template-columns: 1fr; } .pay-facts { grid-template-columns: 110px 1fr; } }

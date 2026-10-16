@@ -1,7 +1,23 @@
 'use client'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import { useChatAlerts } from '@/components/inbox/ChatAlerts'
+import { supabase } from '@/lib/supabase'
+
+// slips waiting for accounting (0 for roles that cannot see them)
+function usePendingSlips() {
+  const [n, setN] = useState(0)
+  useEffect(() => {
+    let live = true
+    const load = () => supabase.from('payment_submissions').select('id', { count: 'exact', head: true }).eq('status', 'pending')
+      .then(({ count }) => { if (live) setN(count || 0) }, () => {})
+    load()
+    const t = setInterval(load, 60000)
+    return () => { live = false; clearInterval(t) }
+  }, [])
+  return n
+}
 
 const navItems = [
   { group: 'หลัก / Main', items: [
@@ -24,6 +40,7 @@ const navItems = [
     { href: '/supplier', icon: '🏢', label: 'Supplier' },
   ]},
   { group: 'การเงิน / Finance', items: [
+    { href: '/payments', icon: '✅', label: 'ตรวจรับเงิน' },
     { href: '/finance',  icon: '💰', label: 'รายรับ-รายจ่าย' },
     { href: '/taxdocs',  icon: '📑', label: 'เอกสารภาษี / Tax Docs' },
   ]},
@@ -37,6 +54,8 @@ const navItems = [
 export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, collapsed = false, onToggleCollapse = () => {} }) {
   const pathname = usePathname()
   const { unread } = useChatAlerts()
+  const slips = usePendingSlips()
+  const badge = href => (href === '/inbox' ? unread : href === '/payments' ? slips : 0)
   const isActive = href => pathname === href || pathname.startsWith(href + '/')
 
   return (
@@ -85,10 +104,10 @@ export default function Sidebar({ mobileOpen = false, onMobileClose = () => {}, 
                 title={collapsed ? item.label : undefined}
                 aria-current={isActive(item.href) ? 'page' : undefined}>
                 <span className="nav-icon" style={{ position: 'relative' }}>{item.icon}
-                  {item.href === '/inbox' && unread > 0 && collapsed && <span className="nav-badge dot" aria-hidden="true" />}
+                  {badge(item.href) > 0 && collapsed && <span className="nav-badge dot" aria-hidden="true" />}
                 </span>
                 {!collapsed && <span style={{ flex: 1 }}>{item.label}</span>}
-                {!collapsed && item.href === '/inbox' && unread > 0 && <span className="nav-badge" aria-label={`ยังไม่อ่าน ${unread}`}>{unread > 99 ? '99+' : unread}</span>}
+                {!collapsed && badge(item.href) > 0 && <span className="nav-badge" aria-label={item.href === '/inbox' ? `ยังไม่อ่าน ${unread}` : `รอตรวจ ${slips}`}>{badge(item.href) > 99 ? '99+' : badge(item.href)}</span>}
               </Link>
             ))}
           </div>

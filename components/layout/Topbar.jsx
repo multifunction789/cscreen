@@ -15,6 +15,7 @@ const pageTitles = {
   '/stock':     { title: 'สต๊อกวัตถุดิบ',          subtitle: 'Raw Material Stock' },
   '/stock-in':  { title: 'รับสินค้าเข้า',          subtitle: 'Stock In' },
   '/supplier':  { title: 'Supplier',               subtitle: 'จัดการซัพพลายเออร์' },
+  '/payments':  { title: 'ตรวจรับเงิน',            subtitle: 'ยืนยันสลิป → ออกใบเสร็จ' },
   '/finance':   { title: 'รายรับ-รายจ่าย',         subtitle: 'Finance' },
   '/taxdocs':   { title: 'เอกสารภาษี',             subtitle: 'Tax Documents' },
   '/report':    { title: 'รายงานรายเดือน',         subtitle: 'Monthly Report' },

@@ -268,3 +268,12 @@ revoke all on function public.submit_payment_slip(uuid, numeric, timestamptz, te
 grant execute on function public.submit_payment_slip(uuid, numeric, timestamptz, text, text, uuid, uuid, jsonb),
   public.approve_payment_submission(uuid, numeric, timestamptz, text, text, uuid),
   public.reject_payment_submission(uuid, text), public.void_payment(uuid, text) to authenticated, service_role;
+
+-- live updates for the ตรวจรับเงิน page (RLS still applies to what each user receives)
+do $$
+begin
+  if exists (select 1 from pg_publication where pubname = 'supabase_realtime')
+     and not exists (select 1 from pg_publication_tables where pubname = 'supabase_realtime' and schemaname = 'public' and tablename = 'payment_submissions') then
+    alter publication supabase_realtime add table public.payment_submissions;
+  end if;
+end $$;

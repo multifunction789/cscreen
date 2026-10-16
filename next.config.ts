@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
   serverExternalPackages: ["@react-pdf/renderer", "mupdf"],
   outputFileTracingIncludes: {
     "/api/inbox/send-quotation": ["./assets/fonts/**/*", "./public/cstyle-apparel-logo.png", "./node_modules/mupdf/dist/mupdf-wasm.wasm"],
+    "/api/inbox/send-receipt": ["./assets/fonts/**/*", "./public/cstyle-apparel-logo.png", "./node_modules/mupdf/dist/mupdf-wasm.wasm"],
     "/api/documents/*": ["./assets/fonts/**/*", "./public/cstyle-apparel-logo.png"],
   },
   async headers() {
