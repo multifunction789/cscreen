@@ -7,6 +7,7 @@ import { setActiveChat } from '@/lib/inbox/alerts'
 import ConversationList from './ConversationList'
 import ChatView from './ChatView'
 import CustomerPanel from './CustomerPanel'
+import Link from 'next/link'
 import ActionPanel from './ActionPanel'
 import AlertSettings from './AlertSettings'
 
@@ -74,7 +75,7 @@ export default function InboxApp({ initialId = null }) {
   if (mode === 'live' && !all.length) return (
     <div className="ib ib-state">
       <div className="ib-empty-card">
-        <div className="ib-title">ยังไม่มีแชทจากลูกค้า<AlertSettings /></div>
+        <div className="ib-title">ยังไม่มีแชทจากลูกค้า<Link href="/inbox/bot" className="ib-icon ib-botlink" title="ตั้งค่าบอทตอบอัตโนมัติ" aria-label="ตั้งค่าบอทตอบอัตโนมัติ">🤖</Link><AlertSettings /></div>
         <p>แชทจะเข้ามาที่นี่เมื่อเชื่อมต่อ LINE OA แล้ว (เฟส 4) ระหว่างนี้ลองใช้งานด้วยข้อมูลจำลองได้</p>
         <ul className="ib-small">
           {['line', 'facebook', 'tiktok'].map(p => <li key={p}>{p === 'line' ? 'LINE' : p === 'facebook' ? 'Facebook' : 'TikTok'}: {store.channelStatus(p) === 'connected' ? 'เชื่อมต่อแล้ว' : 'ยังไม่เชื่อมต่อ'}</li>)}

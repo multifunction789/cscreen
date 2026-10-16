@@ -98,6 +98,14 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
         {win.kind === 'open' && win.hoursLeft != null && <div className={`ib-banner${win.hoursLeft < 4 ? ' warn' : ''}`}>ตอบได้อีก {win.hoursLeft > 0 ? `${win.hoursLeft} ชม.` : `${win.minutesLeft} นาที`} ({p.label} ให้ตอบภายใน {p.windowHours} ชม. หลังลูกค้าทักล่าสุด)</div>}
         {win.kind === 'human_agent' && <div className="ib-banner warn">เกิน {p.windowHours} ชม. แล้ว — ตอบได้แบบ Human Agent อีก {win.daysLeft} วัน (พนักงานตอบเองเท่านั้น)</div>}
         {win.kind === 'closed' && <div className="ib-banner danger">หมดเวลาตอบตามกฎ {p.label} — รอลูกค้าทักกลับก่อน</div>}
+        {!demo && conv.platform === 'line' && (
+          <div className={`ib-banner ib-botbar${conv.botActive ? ' on' : ''}`}>
+            {conv.botActive ? '🤖 บอทดูแลแชทนี้อยู่ — จะหยุดเองเมื่อคุณตอบ' : '🤖 บอทหยุดในแชทนี้ (พนักงานดูแล)'}
+            <button type="button" className="ib-link" onClick={() => store.update(conv.id, { botActive: !conv.botActive }).catch(e => notify.error(e.message))}>
+              {conv.botActive ? 'ปิดบอทแชทนี้' : 'ให้บอทดูแลต่อ'}
+            </button>
+          </div>
+        )}
         {conv.platform === 'line' && <div className="ib-banner">LINE: {store.lineQuota ? `ข้อความที่พนักงานส่งนับโควตา ${store.lineQuota.used}/${store.lineQuota.limit} เดือนนี้ · ` : ''}{p.note}</div>}
         {conv.platform === 'tiktok' && <div className="ib-banner">{p.note} · ส่งต่อกันได้ไม่เกิน {p.maxConsecutive} ข้อความจนกว่าลูกค้าตอบ</div>}
       </div>

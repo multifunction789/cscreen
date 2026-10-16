@@ -1,5 +1,6 @@
 'use client'
 import { PLATFORMS, STATUSES, timeAgo, replyWindow } from '@/lib/inbox/model'
+import Link from 'next/link'
 import AlertSettings from './AlertSettings'
 
 export function PlatformTag({ platform }) {
@@ -12,7 +13,7 @@ export default function ConversationList({ items, selectedId, onSelect, filters,
   return (
     <section className="ib-col ib-list" aria-label="รายการแชท">
       <div className="ib-list-head">
-        <div className="ib-title">แชทลูกค้า {unreadTotal > 0 && <span className="ib-count">{unreadTotal}</span>}<AlertSettings /></div>
+        <div className="ib-title">แชทลูกค้า {unreadTotal > 0 && <span className="ib-count">{unreadTotal}</span>}<Link href="/inbox/bot" className="ib-icon ib-botlink" title="ตั้งค่าบอทตอบอัตโนมัติ" aria-label="ตั้งค่าบอทตอบอัตโนมัติ">🤖</Link><AlertSettings /></div>
         <input className="ib-search" type="search" placeholder="ค้นชื่อ / เบอร์ / ข้อความ" aria-label="ค้นหาแชท"
           value={filters.q} onChange={e => set({ q: e.target.value })} />
         <div className="ib-chips" role="group" aria-label="ช่องทาง">
