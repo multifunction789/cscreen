@@ -4,6 +4,7 @@ import { PLATFORMS, STATUSES, replyWindow, clockTime, newClientKey } from '@/lib
 import { notify } from '@/lib/feedback'
 import { PlatformTag } from './ConversationList'
 import MessageMedia from './MessageMedia'
+import KbPicker from './KbPicker'
 
 export const ACTIONS = [
   { id: 'customer',  label: 'ลูกค้า' },
@@ -20,6 +21,7 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
   const [text, setText] = useState('')
   const [pendingKey, setPendingKey] = useState(null) // one clientKey per message being sent
   const [confirmCollision, setConfirmCollision] = useState(false)
+  const [kbOpen, setKbOpen] = useState(false)
   const [openedAt, setOpenedAt] = useState(() => new Date().toISOString()) // ChatView is keyed by conversation
   const logRef = useRef(null)
   const fileRef = useRef(null)
@@ -142,6 +144,14 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
         </div>
       )}
 
+      {kbOpen && mode === 'reply' && (
+        <KbPicker canSend={canReply} onClose={() => setKbOpen(false)}
+          onInsert={body => setText(t => (t.trim() ? t.trimEnd() + '\n' : '') + body)}
+          onSendImage={async att => {
+            try { await store.send(conv.id, { text: '', clientKey: newClientKey(), attachment: att }); notify.success('ส่งรูปแล้ว') }
+            catch (err) { notify.error(err.message) }
+          }} />
+      )}
       <form className={`ib-composer${mode === 'note' ? ' note' : ''}`} onSubmit={submit}>
         <div className="ib-modes" role="tablist">
           <button type="button" role="tab" aria-selected={mode === 'reply'} className={mode === 'reply' ? 'on' : ''} onClick={() => setMode('reply')}>ตอบลูกค้า</button>
@@ -151,6 +161,7 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
           {mode === 'reply' && (
             <>
               <button type="button" className="ib-icon" aria-label="แนบไฟล์" disabled={!canReply} onClick={() => fileRef.current?.click()}>📎</button>
+              <button type="button" className={`ib-icon${kbOpen ? ' on' : ''}`} aria-label="คลังความรู้" aria-expanded={kbOpen} onClick={() => setKbOpen(o => !o)}>📚</button>
               <input ref={fileRef} type="file" hidden onChange={e => { attach(e.target.files?.[0]); e.target.value = '' }} />
             </>
           )}

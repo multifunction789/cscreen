@@ -19,8 +19,9 @@ const ICON = { image: '🖼', video: '🎞', audio: '🎵', file: '📎' }
 /** picture / video / voice / file inside a chat bubble */
 export default function MessageMedia({ kind, attachment }) {
   const a = attachment || {}
-  const stored = a.bucket && a.path
-  const [url, setUrl] = useState(a.url || null)
+  const publicFile = a.bucket === 'bot-assets' && a.path   // knowledge-base pictures are public
+  const stored = a.bucket && a.path && !publicFile
+  const [url, setUrl] = useState(a.url || (publicFile ? supabase.storage.from('bot-assets').getPublicUrl(a.path).data.publicUrl : null))
   const [failed, setFailed] = useState(false)
 
   useEffect(() => {

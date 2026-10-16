@@ -31,7 +31,10 @@ export async function POST(req) {
   if (!conversationId || !clientKey || typeof clientKey !== 'string' || clientKey.length > 100) return fail('ข้อมูลไม่ครบ')
   if (!text && !att) return fail('ไม่มีข้อความ')
   if (text.length > 5000) return fail('ข้อความยาวเกิน 5,000 ตัวอักษร (ข้อจำกัดของ LINE)')
-  if (att && (att.bucket !== MEDIA_BUCKET || typeof att.path !== 'string' || !att.path.startsWith(`out/${conversationId}/`))) return fail('ไฟล์แนบไม่ถูกต้อง')
+  // staff uploads (chat-media/out/<chat>/…) or knowledge-base pictures (bot-assets/kb/…)
+  const okUpload = att?.bucket === MEDIA_BUCKET && typeof att.path === 'string' && att.path.startsWith(`out/${conversationId}/`)
+  const okKb = att?.bucket === 'bot-assets' && typeof att.path === 'string' && /^kb\/[\w-]+\.(png|jpe?g)$/i.test(att.path)
+  if (att && !okUpload && !okKb) return fail('ไฟล์แนบไม่ถูกต้อง')
 
   let db
   try { db = supabaseAdmin() } catch (e) { return fail(e.message, 500) }
@@ -42,7 +45,7 @@ export async function POST(req) {
   if (conv.platform !== 'line') return fail('ยังไม่ได้เชื่อมต่อช่องทางนี้ — ส่งข้อความได้เฉพาะ LINE ในตอนนี้')
 
   const kind = att ? (/^image\//.test(att.mime || '') ? 'image' : 'file') : 'text'
-  const attachment = att ? { bucket: MEDIA_BUCKET, path: att.path, name: String(att.name || 'ไฟล์').slice(0, 200), mime: att.mime || null, size: att.size || null } : null
+  const attachment = att ? { bucket: att.bucket, path: att.path, name: String(att.name || 'ไฟล์').slice(0, 200), mime: att.mime || null, size: att.size || null } : null
   const { data: msg, error: rErr } = await db.rpc('reserve_outgoing_message', {
     p_conversation_id: conversationId, p_client_key: clientKey, p_text: text || null, p_kind: kind, p_attachment: attachment, p_sender: me,
   })
@@ -51,7 +54,9 @@ export async function POST(req) {
 
   try {
     let fileUrl = null
-    if (attachment) {
+    if (attachment?.bucket === 'bot-assets') {
+      fileUrl = db.storage.from('bot-assets').getPublicUrl(attachment.path).data.publicUrl
+    } else if (attachment) {
       const { data: signed, error } = await db.storage.from(MEDIA_BUCKET).createSignedUrl(attachment.path, LINK_DAYS * 86400)
       if (error || !signed?.signedUrl) throw new Error('สร้างลิงก์ไฟล์ไม่สำเร็จ')
       fileUrl = signed.signedUrl

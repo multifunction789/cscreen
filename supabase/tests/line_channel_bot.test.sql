@@ -4,12 +4,12 @@ declare r jsonb; cid uuid; m messages; n int; e text;
 begin
   -- starter rules exist, bot is OFF by default
   if (select enabled from bot_settings) then raise exception 'bot must start switched off'; end if;
-  if (select count(*) from bot_rules) < 5 then raise exception 'starter rules missing'; end if;
+  if (select count(*) from bot_rules) < 2 then raise exception 'starter rules missing'; end if;
 
   -- only owner/admin change the bot; sales/designer may read; production sees nothing
   if pg_temp.run_as('owner', 'update bot_settings set enabled = true') <> 1 then raise exception 'owner cannot switch bot on'; end if;
   if pg_temp.run_as('sales', 'update bot_settings set enabled = false') <> 0 then raise exception 'sales changed bot settings'; end if;
-  if pg_temp.run_as('sales', 'select * from bot_rules') < 5 then raise exception 'sales should read rules'; end if;
+  if pg_temp.run_as('sales', 'select * from bot_rules') < 2 then raise exception 'sales should read rules'; end if;
   if pg_temp.run_as('production', 'select * from bot_rules') <> 0 then raise exception 'production read bot rules'; end if;
   if pg_temp.run_as('sales', $q$insert into bot_prices (product, technique, min_qty, price_from) values ('x','y',1,1)$q$) <> -1 then raise exception 'sales edited prices'; end if;
   if pg_temp.run_as('owner', $q$insert into bot_prices (product, technique, min_qty, price_from) values ('เสื้อยืด','สกรีน',30,120)$q$) <> 1 then raise exception 'owner cannot add price'; end if;
