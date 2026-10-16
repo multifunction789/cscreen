@@ -23,3 +23,9 @@ begin
   end if;
   execute replace(src, old_cond, new_cond);
 end $$;
+
+-- unique index เดิมห้าม invoice_id ซ้ำทุกกรณี → จำกัดเฉพาะใบงานแบบเดิม (ไม่มี invoice_item_no)
+-- ใบงานแบบใหม่กันซ้ำด้วย job_orders_invoice_item_uniq (invoice_id, invoice_item_no) แทน
+drop index if exists job_orders_invoice_id_unique;
+create unique index job_orders_invoice_id_unique on public.job_orders (invoice_id)
+  where invoice_id is not null and not legacy_invoice_duplicate and invoice_item_no is null;
