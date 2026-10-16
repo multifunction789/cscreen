@@ -5,6 +5,7 @@ import Topbar from '@/components/layout/Topbar'
 import ErrorBoundary from '@/components/ErrorBoundary'
 import DocFit from '@/components/DocFit'
 import FeedbackHost from '@/components/ui/FeedbackHost'
+import ChatAlerts from '@/components/inbox/ChatAlerts'
 
 export default function DashboardLayout({ children }) {
   const [mobileOpen, setMobileOpen] = useState(false)
@@ -39,6 +40,7 @@ export default function DashboardLayout({ children }) {
       </div>
 
       <FeedbackHost />
+      <ChatAlerts />
     </div>
   )
 }

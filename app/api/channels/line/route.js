@@ -1,6 +1,7 @@
 import { NextResponse, after } from 'next/server'
 import { verifySignature } from '@/lib/channels/line'
 import { runTasks } from '@/lib/channels/tasks'
+import { sendChatAlerts } from '@/lib/channels/alerts'
 import { supabaseAdmin } from '@/lib/server/supabaseAdmin'
 
 export const maxDuration = 30
@@ -29,13 +30,18 @@ export async function POST(req) {
     return NextResponse.json({ error: 'not configured' }, { status: 500 })
   }
   const events = Array.isArray(body.events) ? body.events : []
+  const fresh = []                                      // new customer messages → staff alerts
   for (const ev of events.length ? events : [null]) {   // empty list = LINE "Verify" button
-    const { error } = await db.rpc('ingest_line_event', { p_destination: body.destination, p_event: ev })
+    const { data, error } = await db.rpc('ingest_line_event', { p_destination: body.destination, p_event: ev })
+    if (data?.status === 'processed' && data.message_id && ev?.type === 'message') fresh.push(data.message_id)
     if (error) {
       console.error('[line webhook] ingest failed', error.message)
       return NextResponse.json({ error: 'store failed' }, { status: 500 })
     }
   }
-  after(() => runTasks(db, { limit: 10 }).catch(e => console.error('[line webhook] tasks', e.message)))
+  after(async () => {
+    await sendChatAlerts(db, fresh)
+    await runTasks(db, { limit: 10 }).catch(e => console.error('[line webhook] tasks', e.message))
+  })
   return NextResponse.json({ ok: true })
 }

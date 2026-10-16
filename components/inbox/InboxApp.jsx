@@ -3,6 +3,7 @@ import { useState, useSyncExternalStore, useRef, useEffect } from 'react'
 import { createMockStore } from '@/lib/inbox/mockStore'
 import { createSupabaseStore } from '@/lib/inbox/supabaseStore'
 import { matchesSearch } from '@/lib/inbox/model'
+import { setActiveChat } from '@/lib/inbox/alerts'
 import ConversationList from './ConversationList'
 import ChatView from './ChatView'
 import CustomerPanel from './CustomerPanel'
@@ -11,9 +12,13 @@ import ActionPanel from './ActionPanel'
 const WIDE = '(min-width: 900px)'
 const subscribeWide = fn => { const m = window.matchMedia(WIDE); m.addEventListener('change', fn); return () => m.removeEventListener('change', fn) }
 const stores = {}
-const getStore = mode => (stores[mode] ??= mode === 'demo' ? createMockStore() : createSupabaseStore())
+// stores live in the browser only; the server always renders the loading state
+// (a module-level store on the server would be shared by every request and break hydration)
+const SERVER_STORE = { loaded: false, error: null, staff: [], me: null, listConversations: () => [], peekMessages: () => [], subscribe: () => () => {} }
+const getStore = mode => typeof window === 'undefined' ? SERVER_STORE
+  : (stores[mode] ??= mode === 'demo' ? createMockStore() : createSupabaseStore())
 
-export default function InboxApp() {
+export default function InboxApp({ initialId = null }) {
   const [mode, setMode] = useState('live')           // live = real tables, demo = sample data
   const store = getStore(mode)
   const version = useRef(0)
@@ -22,8 +27,8 @@ export default function InboxApp() {
     () => version.current,
     () => 0,
   )
-  const [selectedId, setSelectedId] = useState(null)
-  const [pane, setPane] = useState('list')            // mobile: list | chat | info
+  const [selectedId, setSelectedId] = useState(initialId)
+  const [pane, setPane] = useState(initialId ? 'chat' : 'list')            // mobile: list | chat | info
   const [infoOpen, setInfoOpen] = useState(false)     // medium screens: customer panel as overlay
   const [filters, setFilters] = useState({ q: '', platform: 'all', status: 'active', assignee: 'all', unreadOnly: false })
   const [action, setAction] = useState(null)          // { id, context }
@@ -45,6 +50,7 @@ export default function InboxApp() {
   const unreadTotal = all.reduce((s, c) => s + (c.unread || 0), 0)
 
   useEffect(() => { if (conv?.unread) store.markRead(conv.id) }, [conv?.id, conv?.unread, store])
+  useEffect(() => { setActiveChat(mode === 'live' && (wide || pane !== 'list') ? conv?.id : null); return () => setActiveChat(null) }, [conv?.id, mode, wide, pane])
 
   function open(id) { setSelectedId(id); setPane('chat') }
   function switchMode(m) { setMode(m); setSelectedId(null); setPane('list'); setAction(null) }
