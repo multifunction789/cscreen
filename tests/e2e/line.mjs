@@ -1,6 +1,6 @@
 // e2e: LINE webhook → chat page → staff reply, against the mock Supabase + mock LINE (port 54321).
 // App must run with LINE_CHANNEL_SECRET=test-secret LINE_CHANNEL_ACCESS_TOKEN=test-line-token
-// LINE_API_BASE=LINE_DATA_API_BASE=http://localhost:54321 SUPABASE_SERVICE_ROLE_KEY=test-service
+// LINE_API_BASE=LINE_DATA_API_BASE=http://localhost:54321 SUPABASE_SERVICE_ROLE_KEY=sb_secret_test
 import { chromium } from 'playwright'
 import crypto from 'node:crypto'
 import { writeFileSync } from 'node:fs'
