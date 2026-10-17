@@ -15,6 +15,8 @@ const pageTitles = {
   '/stock':     { title: 'สต๊อกวัตถุดิบ',          subtitle: 'Raw Material Stock' },
   '/stock-in':  { title: 'รับสินค้าเข้า',          subtitle: 'Stock In' },
   '/supplier':  { title: 'Supplier',               subtitle: 'จัดการซัพพลายเออร์' },
+  '/sales':     { title: 'งานขาย',                subtitle: 'บอร์ด · ตาราง · งานของฉัน' },
+  '/sales/dashboard': { title: 'แดชบอร์ดการขาย', subtitle: 'แชท · เวลาตอบ · ปิดการขาย' },
   '/payments':  { title: 'ตรวจรับเงิน',            subtitle: 'ยืนยันสลิป → ออกใบเสร็จ' },
   '/finance':   { title: 'รายรับ-รายจ่าย',         subtitle: 'Finance' },
   '/taxdocs':   { title: 'เอกสารภาษี',             subtitle: 'Tax Documents' },
