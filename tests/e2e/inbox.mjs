@@ -106,8 +106,9 @@ check((await p.locator('.ib-info').innerText()).includes('ร้านตัว�
 // slip → payment panel (pending, not paid)
 await p.locator('.ib-item', { hasText: 'โรงเรียนสาธิต' }).click()
 await p.getByRole('button', { name: 'บันทึกเป็นสลิป' }).click()
+await p.waitForSelector('.ib-pay')
 const sheet = await p.locator('.ib-sheet').innerText()
-check(sheet.includes('slip.jpg') && sheet.includes('Pending Verification') && sheet.includes('ยังไม่ถือว่าชำระแล้ว'), 'สลิป → สถานะรอตรวจ ไม่นับเป็นเงินจริง')
+check(sheet.includes('รูปจากแชท') && sheet.includes('ยังไม่ถือว่าชำระแล้ว') && sheet.includes('ฝ่ายบัญชี'), 'สลิป → ส่งให้ฝ่ายบัญชีตรวจ ไม่นับเป็นเงินจริง')
 await p.screenshot({ path: OUT + '/03-desktop-slip.png' })
 await p.locator('.ib-sheet').getByLabel('ปิด').click()
 

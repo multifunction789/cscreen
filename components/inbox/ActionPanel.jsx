@@ -3,9 +3,10 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { notify } from '@/lib/feedback'
 import QuotationPanel from './QuotationPanel'
+import { PaymentPanel, ReceiptPanel } from './PaymentPanel'
 
 const TITLES = {
-  customer: 'ข้อมูลลูกค้า', quotation: 'ใบเสนอราคา', payment: 'บันทึกการชำระเงิน', receipt: 'ออกใบเสร็จ',
+  customer: 'ข้อมูลลูกค้า', quotation: 'ใบเสนอราคา', payment: 'บันทึกสลิป / แจ้งชำระ', receipt: 'ส่งใบเสร็จ',
   job: 'ใบงาน', assign: 'มอบหมายพนักงาน', followup: 'ตั้งเตือนติดตามลูกค้า',
 }
 const MATCH = { phone: 'เบอร์ตรง', tax_id: 'เลขภาษีตรง', email: 'อีเมลตรง', name: 'ชื่อคล้ายเท่านั้น' }
@@ -15,15 +16,6 @@ const REASONS = [
   'โทรยืนยันกับลูกค้าแล้ว',
   'ลูกค้าส่งเอกสาร/ใบเสนอราคาเดิมมายืนยัน',
 ]
-
-function Later({ phase, children }) {
-  return (
-    <div className="ib-later">
-      {children}
-      <button type="button" className="btn btn-primary" disabled>เปิดใช้ในเฟส {phase}</button>
-    </div>
-  )
-}
 
 function CustomerForm({ initial, submitLabel, onSubmit }) {
   const [form, setForm] = useState(initial)
@@ -151,22 +143,8 @@ export default function ActionPanel({ store, conv, action, context, onClose, onS
             </div>
           )}
           {action === 'quotation' && <QuotationPanel store={store} conv={conv} onDone={onClose} onNeedCustomer={() => onSwitch?.('customer')} />}
-          {action === 'payment' && (
-            <Later phase={8}>
-              {context?.attachment && <p>สลิป: {context.attachment.name}</p>}
-              <ol className="ib-steps">
-                <li className="on">รอตรวจ (Pending Verification) — ส่งสลิปตรวจกับ API อัตโนมัติ</li>
-                <li>รออนุมัติ — ยอด / บัญชีปลายทาง / เลขอ้างอิงไม่ซ้ำ</li>
-                <li>ยืนยันแล้ว (Verified) — ฝ่ายบัญชีกดเท่านั้น จึงนับเป็นเงินจริง</li>
-              </ol>
-              <p className="ib-small">การส่งรูปสลิปยังไม่ถือว่าชำระแล้ว</p>
-            </Later>
-          )}
-          {action === 'receipt' && (
-            <Later phase={8}>
-              <p>ออกใบเสร็จได้จากการชำระที่ฝ่ายบัญชียืนยันแล้วเท่านั้น แล้วส่ง PDF เข้าแชท</p>
-            </Later>
-          )}
+          {action === 'payment' && <PaymentPanel store={store} conv={conv} slipMessage={context?.attachment ? context : null} onDone={onClose} onNeedCustomer={() => onSwitch?.('customer')} />}
+          {action === 'receipt' && <ReceiptPanel store={store} conv={conv} onDone={onClose} onNeedCustomer={() => onSwitch?.('customer')} />}
           {action === 'job' && (
             <div className="ib-later">
               {c ? <p>เปิดใบงานจาก Invoice ของ {c.name} ได้ที่หน้าใบงาน (1 ใบงานต่อ 1 รายการ)</p> : <p>ผูกแชทกับลูกค้าก่อน แล้วเปิดใบงานจาก Invoice ของลูกค้า</p>}

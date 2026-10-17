@@ -15,6 +15,8 @@ export const ACTIONS = [
   { id: 'followup',  label: 'ตั้งเตือน' },
 ]
 
+const DOC_LABEL = { quotation: 'ใบเสนอราคา', receipt: 'ใบเสร็จรับเงิน', invoice: 'ใบแจ้งหนี้' }
+
 export default function ChatView({ store, conv, messages, notes, typingBy, nameOf, demo, onBack, onInfo, onAction }) {
   const [mode, setMode] = useState('reply')          // reply | note
   const [text, setText] = useState('')
@@ -121,8 +123,8 @@ export default function ChatView({ store, conv, messages, notes, typingBy, nameO
               {['image', 'video', 'audio', 'file'].includes(item.kind) && item.attachment && <MessageMedia kind={item.kind} attachment={item.attachment} />}
               {item.kind === 'image' && item.direction === 'in' && (item.slipCandidate || !demo) && <button type="button" className="ib-link" onClick={() => onAction('payment', item)}>บันทึกเป็นสลิป</button>}
               {item.kind === 'document' && (
-                <div className="ib-doccard">
-                  <b>📄 {item.document?.type === 'quotation' ? 'ใบเสนอราคา' : 'เอกสาร'} {item.document?.code}{item.document?.version > 1 ? ` · ฉบับที่ ${item.document.version}` : ''}</b>
+                <div className={`ib-doccard ${item.document?.type || ''}`}>
+                  <b>{item.document?.type === 'receipt' ? '🧾' : '📄'} {DOC_LABEL[item.document?.type] || 'เอกสาร'} {item.document?.code}{item.document?.version > 1 ? ` · ฉบับที่ ${item.document.version}` : ''}</b>
                   {item.document?.total != null && <span>ยอด {Number(item.document.total).toLocaleString('th-TH', { minimumFractionDigits: 2 })} บาท</span>}
                   {item.attachment?.path && <MessageMedia kind="file" attachment={{ ...item.attachment, name: 'เปิด PDF' }} />}
                 </div>
