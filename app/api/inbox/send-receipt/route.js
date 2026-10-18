@@ -68,7 +68,7 @@ export async function POST(req) {
     return fail('สร้างใบเสร็จไม่สำเร็จ: ' + e.message, 500)
   }
 
-  const caption = `ใบเสร็จรับเงิน ${r.code} · ${money(r.total)} บาท`
+  const caption = `ใบเสร็จรับเงิน/ใบกำกับภาษี ${r.code} · ${money(r.total)} บาท`
   const { data: msg, error: rErr } = await db.rpc('reserve_outgoing_message', {
     p_conversation_id: conversationId, p_client_key: clientKey, p_text: caption, p_kind: 'document',
     p_attachment: { bucket: 'documents', path: pdfPath, name: `${r.code}.pdf`, mime: 'application/pdf' }, p_sender: me,
@@ -80,7 +80,7 @@ export async function POST(req) {
   try {
     const { messages: pictures } = await documentImageMessages(db, pdfPath, pdf)
     const text = [
-      `ใบเสร็จรับเงิน ${r.code}`,
+      `ใบเสร็จรับเงิน/ใบกำกับภาษี ${r.code}`,
       `ได้รับเงิน ${money(r.total)} บาท (${snap.label.replace('รับชำระเงิน', '')}) วันที่ ${thaiDate(r.paid_at)}`,
       `ใบแจ้งหนี้ ${inv.code}: ${snap.invoice.balance > 0 ? `คงเหลือ ${money(snap.invoice.balance)} บาท` : 'ชำระครบแล้ว'}`,
       'ขอบคุณค่ะ 🙏',

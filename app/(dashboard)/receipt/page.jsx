@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getReceipts, updateReceipt, deleteReceipt, insertTransaction } from '@/lib/db'
+import { getReceipts, updateReceipt, deleteReceipt } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -76,13 +76,13 @@ export default function ReceiptPage() {
   }
 
   async function handlePay(r) {
-    await updateReceipt(r.id, { paid: true, payment_method: payMethod })
-    await insertTransaction({
-      description: `รับชำระ ${r.code} – ${r.customers?.name || ''}`,
-      type: 'รายรับ', amount: r.total, transaction_date: todayStr(),
-      invoice_id: r.invoice_id || null,
-    })
-    load()
+    // ต้องผ่าน settle_receipt: ฐานข้อมูลบล็อกการแก้ paid ตรง ๆ (ต้องมีรายการรับเงินคู่กัน)
+    const { data, error } = await supabase.rpc('settle_receipt', { p_receipt_id: r.id, p_method: payMethod })
+    if (error) { notify.error('รับชำระไม่สำเร็จ: ' + error.message); return false }
+    notify.success(`รับชำระ ${r.code} แล้ว`)
+    if (data) setView(v => (v && v.id === r.id ? { ...v, ...data } : v))
+    await load()
+    return true
   }
 
   async function handleFileAttach(r, file) {
@@ -136,11 +136,11 @@ export default function ReceiptPage() {
             {!view.paid && (
               <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
                 <select value={payMethod} onChange={e => setPayMethod(e.target.value)} style={{ width: 120 }}>
-                  {['โอน', 'เงินสด', 'บัตรเครดิต', 'QR Code'].map(m => <option key={m}>{m}</option>)}
+                  {['โอน', 'เงินสด', 'เช็ค', 'บัตรเครดิต'].map(m => <option key={m}>{m}</option>)}
                 </select>
                 <button className="btn btn-primary"
                   style={{ background: C.primary, borderColor: C.primary }}
-                  onClick={() => { handlePay(view); doc.close() }}>
+                  onClick={async () => { if (await handlePay(view)) doc.close() }}>
                   ✓ รับชำระเงิน
                 </button>
               </div>
@@ -209,8 +209,8 @@ export default function ReceiptPage() {
               </div>
               {/* Doc badge */}
               <div style={{ textAlign: 'right' }}>
-                <div style={{ fontSize: 26, fontWeight: 900, color: C.primary, lineHeight: 1 }}>ใบเสร็จรับเงิน</div>
-                <div style={{ fontSize: 10, letterSpacing: 2, color: '#6b7280', fontWeight: 700, marginTop: 2 }}>RECEIPT</div>
+                <div style={{ fontSize: 22, fontWeight: 900, color: C.primary, lineHeight: 1.1, whiteSpace: 'nowrap' }}>ใบเสร็จรับเงิน/ใบกำกับภาษี</div>
+                <div style={{ fontSize: 10, letterSpacing: 2, color: '#6b7280', fontWeight: 700, marginTop: 2 }}>RECEIPT / TAX INVOICE</div>
                 <div style={{
                   display: 'inline-block', marginTop: 6, padding: '3px 10px', borderRadius: 99,
                   background: view.paid ? C.light : '#FFF7ED',
@@ -414,7 +414,7 @@ export default function ReceiptPage() {
 
             {/* ── FOOTER ── */}
             <div style={{ marginTop: 8, textAlign: 'center', color: '#9ca3af', fontSize: 10 }}>
-              เอกสารนี้จัดทำโดยระบบ C-SCREEN · ใบเสร็จรับเงินฉบับนี้ใช้สำหรับยืนยันการชำระเงิน
+              เอกสารนี้จัดทำโดยระบบ C-SCREEN · ใบเสร็จรับเงิน/ใบกำกับภาษีฉบับนี้ใช้สำหรับยืนยันการชำระเงิน
             </div>
           </div>
         </div>
