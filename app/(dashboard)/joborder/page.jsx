@@ -2,7 +2,7 @@
 import ProductionFields from '@/components/ProductionFields'
 import { productionSnapshot, uploadJobImage, PRODUCTION_FIELDS } from '@/lib/jobProduction.mjs'
 import { useState, useEffect, useRef } from 'react'
-import { getJobOrders, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices, getSuppliers } from '@/lib/db'
+import { getJobOrdersList, getJobOrder, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices, getSuppliers } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -217,7 +217,25 @@ export default function JobOrderPage() {
   const [form, setForm]           = useState(emptyForm())
   const [saving, setSaving]       = useState(false)
   const [view, setView]           = useState(null)
-  const doc = useDocView(setView)
+  const [opening, setOpening]     = useState(false)
+  const openSeq = useRef(0)
+  // แถวในรายการเป็นแบบย่อ (__light) — ดึงตัวเต็ม (รูป, รายละเอียด) ตอนเปิดดูเท่านั้น
+  async function fullJob(row) {
+    if (!row?.__light) return row
+    const { data, error } = await getJobOrder(row.id)
+    if (error) { notify.error('เปิดใบงานไม่สำเร็จ: ' + error.message); return null }
+    return data
+  }
+  async function showJob(row) {
+    const seq = ++openSeq.current
+    if (!row?.__light) { setOpening(false); setView(row); return }
+    setOpening(true)
+    const full = await fullJob(row)
+    if (seq !== openSeq.current) return          // ผู้ใช้กดกลับ/เปิดใบอื่นไปแล้ว
+    setOpening(false)
+    if (full) setView(full)
+  }
+  const doc = useDocView(showJob)
   const [monthFilter, setMonthFilter] = useState('')
   const [viewMode, setViewMode]       = useState('table')
   const [calMonth, setCalMonth]       = useState(new Date().toISOString().slice(0, 7))
@@ -247,7 +265,7 @@ export default function JobOrderPage() {
   }, [view])
 
   async function load() {
-    const [jRes, cRes, iRes, sRes] = await Promise.all([getJobOrders(), getCustomers(), getInvoices(), getSuppliers()])
+    const [jRes, cRes, iRes, sRes] = await Promise.all([getJobOrdersList(), getCustomers(), getInvoices(), getSuppliers()])
     setRows(jRes.data || [])
     setCustomers(cRes.data || [])
     setInvoices(iRes.data || [])
@@ -458,7 +476,7 @@ export default function JobOrderPage() {
     // ถ้ากำลัง view ใบงานนี้อยู่ ให้อัพเดท view ด้วยข้อมูลใหม่
     if (savedId && view?.id === savedId) {
       const fresh = res?.find?.(j => j.id === savedId)
-      if (fresh) setView(fresh)
+      if (fresh) showJob(fresh)
     }
   }
 
@@ -471,7 +489,9 @@ export default function JobOrderPage() {
     load()
   }
 
-  function startEdit(j) {
+  async function startEdit(row) {
+    const j = await fullJob(row)
+    if (!j) return
     const m = readMatrix(j)
     setForm({
       customer_id:     j.customer_id,
@@ -913,6 +933,11 @@ export default function JobOrderPage() {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {doc.param}
       {pickerEl}
+      {opening && (
+        <div style={{ position: 'fixed', inset: 0, zIndex: 50, background: 'rgba(255,255,255,.6)', display: 'grid', placeItems: 'center' }}>
+          <LoadingSpinner text="กำลังเปิดใบงาน..." />
+        </div>
+      )}
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 14 }}>
