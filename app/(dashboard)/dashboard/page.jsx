@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getJobOrders, getTransactions, getCustomers, getInvoicesLight, getReceiptsLight } from '@/lib/db'
+import { getJobOrdersList, getTransactions, getCustomers, getInvoicesLight, getReceiptsLight } from '@/lib/db'
 import { computeReceivables } from '@/lib/receivables'
 import { isJobOverdue, daysUntil, byDueDate, DONE_STATUS } from '@/lib/jobStatus'
 import { notify } from '@/lib/feedback'
@@ -40,7 +40,7 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // เดิมดึง job_orders + transactions ซ้ำสองรอบ (getDashboardStats) → คำนวณจากข้อมูลชุดเดียว
-    Promise.all([getJobOrders(), getTransactions(), getCustomers(), getInvoicesLight(), getReceiptsLight()])
+    Promise.all([getJobOrdersList(), getTransactions(), getCustomers(), getInvoicesLight(), getReceiptsLight()])
       .then(([jRes, tRes, cRes, iRes, rRes]) => {
         const err = jRes.error || tRes.error || cRes.error || iRes.error || rRes.error
         if (err) notify.error('โหลดข้อมูลไม่ครบ: ' + err.message)

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getInvoices, getReceipts, getJobOrders } from '@/lib/db'
+import { getInvoices, getReceipts, getJobOrdersList } from '@/lib/db'
 import dynamic from 'next/dynamic'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
@@ -20,7 +20,7 @@ export default function ReportPage() {
   const [year, setYear]         = useState(new Date().getFullYear())
 
   useEffect(() => {
-    Promise.all([getInvoices(), getReceipts(), getJobOrders()]).then(([invRes, recRes, jobRes]) => {
+    Promise.all([getInvoices(), getReceipts(), getJobOrdersList()]).then(([invRes, recRes, jobRes]) => {
       setInvoices(invRes.data || [])
       setReceipts(recRes.data || [])
       setJobs(jobRes.data     || [])

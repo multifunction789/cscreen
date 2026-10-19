@@ -2,7 +2,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { docHref } from '@/lib/docLinks'
-import { getJobOrders, updateJobStatus, getStepsForJobs } from '@/lib/db'
+import { getJobOrdersList, updateJobStatus, getStepsForJobs } from '@/lib/db'
 import { isV2, computeOverall, statusCls } from '@/lib/jobV2'
 import { fmtShort } from '@/lib/shop'
 import { notify } from '@/lib/feedback'
@@ -46,7 +46,7 @@ export default function ProductionPage() {
 
   useEffect(() => {
     let alive = true
-    getJobOrders().then(({ data, error }) => {
+    getJobOrdersList().then(({ data, error }) => {
       if (!alive) return
       if (error) notify.error('โหลดใบงานไม่สำเร็จ: ' + error.message)
       setJobs(data || [])
