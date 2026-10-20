@@ -1,6 +1,6 @@
 'use client'
 import Link from 'next/link'
-import ProductionFields from '@/components/ProductionFields'
+import { INVOICE_CATEGORIES } from '@/lib/invoiceCategories'
 import { useState, useEffect } from 'react'
 import {
   getInvoices, insertInvoice, updateInvoice, deleteInvoice,
@@ -15,7 +15,7 @@ import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
 
-const emptyItem = { desc: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
+const emptyItem = { desc: '', category: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
 /* ── Thai Baht → Words ─────────────────────────────────── */
 function thaiAmountToWords(amount) {
@@ -130,7 +130,9 @@ export default function InvoicePage() {
     if (!form.customer_id) return notify.warn('กรุณาเลือกลูกค้า')
     if (form.items.length === 0) return notify.warn('กรุณาเพิ่มรายการสินค้า')
     setSaving(true)
-    const items = calcItems(form.items)
+    // รายละเอียดผลิต (คอ/ผ้า/สี) อยู่ในใบงาน — ไม่เก็บในใบแจ้งหนี้ (รวมที่ติดมาจากใบเสนอราคา)
+    const items = calcItems(form.items).map(({ production, ...it }) => it) // eslint-disable-line no-unused-vars
+    if (items.some(it => !it.category)) { setSaving(false); return notify.warn('กรุณาเลือกประเภทของทุกรายการ') }
     const payload = {
       customer_id: form.customer_id, items, subtotal, discount: discAmt,
       vat_pct: parseFloat(form.vat_pct)||0, vat_amount: vatAmt,
@@ -698,7 +700,14 @@ export default function InvoicePage() {
                     <td style={{ padding:'3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i,'desc',e.target.value)} style={{ width:'100%' }} />
-<ProductionFields prefix={`รายการ ${i + 1}`} value={it.production || {}} onChange={value => updateItem(i, 'production', value)} />
+                      <label style={{ display:'flex', alignItems:'center', gap:6, marginTop:4, fontSize:11, color:'var(--text-muted)', fontWeight:600 }}>
+                        ประเภท (ไม่แสดงในเอกสาร)
+                        <select aria-label={`ประเภท รายการ ${i + 1}`} value={it.category || ''} onChange={e => updateItem(i, 'category', e.target.value)}
+                          style={{ width:'auto', fontSize:12, padding:'2px 6px', borderColor: it.category ? undefined : 'var(--danger)' }}>
+                          <option value="">— เลือกประเภท —</option>
+                          {INVOICE_CATEGORIES.map(c => <option key={c}>{c}</option>)}
+                        </select>
+                      </label>
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
                         {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (
