@@ -569,7 +569,8 @@ export default function JobOrderPage() {
     const photos = [...(mCur.finish_photos || [])]
     photos.splice(idx, 1)
     const itemsPayload = { ...view.items, finish_photos: photos }
-    await updateJobOrder(view.id, { items: itemsPayload })
+    const { error } = await updateJobOrder(view.id, { items: itemsPayload })
+    if (error) { notify.error(error.message); return }
     setView(v => ({ ...v, items: itemsPayload }))
     load()
   }
@@ -1468,7 +1469,7 @@ export default function JobOrderPage() {
                               const next = ALL_STATUS[idx + 1]
                               return next ? (
                                 <button className="btn btn-primary btn-sm" title={next}
-                                  onClick={() => updateJobStatus(j.id, next).then(() => load())}>▶</button>
+                                  onClick={() => updateJobStatus(j.id, next).then(({ error }) => { if (error) notify.error(error.message); load() })}>▶</button>
                               ) : null
                             })()}
                           </div>
