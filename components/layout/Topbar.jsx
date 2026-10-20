@@ -18,6 +18,7 @@ const pageTitles = {
   '/sales':     { title: 'งานขาย',                subtitle: 'บอร์ด · ตาราง · งานของฉัน' },
   '/sales/dashboard': { title: 'แดชบอร์ดการขาย', subtitle: 'แชท · เวลาตอบ · ปิดการขาย' },
   '/payments':  { title: 'ตรวจรับเงิน',            subtitle: 'ยืนยันสลิป → ออกใบเสร็จ' },
+  '/maintenance/images': { title: 'ย้ายรูปเก่าในใบงาน', subtitle: 'งานครั้งเดียว' },
   '/finance':   { title: 'รายรับ-รายจ่าย',         subtitle: 'Finance' },
   '/taxdocs':   { title: 'เอกสารภาษี',             subtitle: 'Tax Documents' },
   '/report':    { title: 'รายงานรายเดือน',         subtitle: 'Monthly Report' },
