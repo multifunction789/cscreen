@@ -12,6 +12,7 @@ const pageTitles = {
   '/receipt':   { title: 'ใบเสร็จ',               subtitle: 'Receipt' },
   '/joborder':  { title: 'ใบงาน',                 subtitle: 'Job Order' },
   '/production':{ title: 'ติดตามงาน',             subtitle: 'Production Tracking' },
+  '/supplier-po':{ title: 'ใบงาน Supplier',       subtitle: 'PO งานผลิต' },
   '/stock':     { title: 'สต๊อกวัตถุดิบ',          subtitle: 'Raw Material Stock' },
   '/stock-in':  { title: 'รับสินค้าเข้า',          subtitle: 'Stock In' },
   '/supplier':  { title: 'Supplier',               subtitle: 'จัดการซัพพลายเออร์' },

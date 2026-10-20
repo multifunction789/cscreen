@@ -5,7 +5,9 @@ import { supabase } from '@/lib/supabase'
 import {
   updateJobOrder, getJobSteps, insertJobStep, updateJobStep, deleteJobStep,
   getJobLogs, insertJobLog, getJobFiles, insertJobFile, updateJobFile, deleteJobFile, currentUserEmail,
+  getSupplierPosForJob,
 } from '@/lib/db'
+import { poType, statusClass as poStatusClass, baht } from '@/lib/supplierPo'
 import {
   SPEC_FIELDS, TECHNIQUES, QUICK_STEPS, PHASES, STEP_STATUSES, FILE_KINDS, QC_ITEMS, DELIVERY_CHANNELS,
   statusCls, guessPhase, computeOverall, legacyStatus, latestFile, fileKindLabel, sizeTotal, rid, thDate, thDateLong,
@@ -48,6 +50,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   const [steps, setSteps]   = useState([])
   const [logs, setLogs]     = useState([])
   const [files, setFiles]   = useState([])
+  const [pos, setPos]       = useState([])
   const [busyFile, setBusyFile] = useState(false)
   const [upKind, setUpKind] = useState('artwork')
   const [newSize, setNewSize] = useState('')
@@ -60,8 +63,9 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   // โหลดแผนการผลิต / ประวัติ / ไฟล์
   useEffect(() => {
     let alive = true
-    Promise.all([getJobSteps(job.id), getJobLogs(job.id), getJobFiles(job.id), currentUserEmail()]).then(([s, l, f, email]) => {
+    Promise.all([getJobSteps(job.id), getJobLogs(job.id), getJobFiles(job.id), currentUserEmail(), getSupplierPosForJob(job.id)]).then(([s, l, f, email, p]) => {
       if (!alive) return
+      setPos(p.data || [])
       if (s.error || l.error || f.error) notify.error('โหลดแผนการผลิตไม่ครบ: ' + (s.error || l.error || f.error).message)
       setSteps(s.data || []); setLogs(l.data || []); setFiles(f.data || [])
       emailRef.current = email
@@ -476,6 +480,22 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
 
       {/* Plan */}
       <section className="jo-card">
+        <div className="jo-hd" style={{ justifyContent: 'flex-start' }}>ใบงาน Supplier
+          <Link className="jo-hbtn solid" href={`/supplier-po?new=${job.id}`}>+ สร้างใบงาน Supplier</Link>
+          <small style={{ marginLeft: 'auto' }}>ใบงานนี้ปิดได้เมื่อ PO ทุกใบปิดแล้ว</small>
+        </div>
+        <div style={{ padding: '10px 14px', display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          {pos.map(p => (
+            <Link key={p.id} href={docHref('supplierpo', p.id)} className="jo-chip" style={{ display: 'inline-flex', gap: 6, alignItems: 'center', textDecoration: 'none' }}>
+              <b>{p.code}</b> {poType(p.po_type).label} · {p.suppliers?.name || '—'} · นัดรับ {thDate(p.due_date) || '—'} · {baht(p.total_amount)}
+              <span className={`badge ${poStatusClass(p.status)}`}>{p.status}</span>
+            </Link>
+          ))}
+          {!pos.length && <span style={{ fontSize: 13, color: '#9CA3AF' }}>ยังไม่มี — ถ้าทำเองทั้งหมด ไม่ต้องสร้าง</span>}
+        </div>
+      </section>
+
+      <section className="jo-card">
         <div className="jo-hd" style={{ justifyContent: 'flex-start' }}>แผนการผลิต / ผู้รับผิดชอบ
           <button type="button" className="jo-hbtn solid" onClick={() => addStep('')}>+ เพิ่มขั้นตอน</button>
           <small style={{ marginLeft: 'auto' }}>ลาก ⋮⋮ หรือกด ▲▼ เพื่อเรียงลำดับ · บันทึกทันที</small>
@@ -498,6 +518,13 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                     onBlur={e => { const v = e.target.value.trim(); if (v && v !== s.name) patchStep(s, { name: v }) }} /></td>
                   <td><select className="jo-in" aria-label="ช่วงการผลิต" value={s.phase || guessPhase(s.name)} onChange={e => patchStep(s, { phase: e.target.value })} style={{ width: 92 }}>
                     {PHASES.map(p => <option key={p}>{p}</option>)}</select></td>
+                  {s.supplier_po_id ? (<>
+                    <td><b>{s.suppliers?.name || supplierName(s.supplier_id) || '—'}</b><div><Link href={docHref('supplierpo', s.supplier_po_id)} style={{ fontSize: 12 }}>เปิดใบงาน Supplier →</Link></div></td>
+                    <td>{thDate(s.sent_date) || '—'}</td>
+                    <td style={{ fontWeight: 700 }}>{thDate(s.due_date) || '—'}</td>
+                    <td>{thDate(s.received_date) || '—'}</td>
+                    <td><span className={`jo-st ${statusCls(s.status)}`} title="อัปเดตจากใบงาน Supplier">{s.status}</span></td>
+                  </>) : (<>
                   <td><select className="jo-in" aria-label="Supplier" value={s.supplier_id || ''} onChange={e => patchStep(s, { supplier_id: e.target.value || null })} style={{ width: 180 }}>
                     <option value="">— ภายใน / ไม่ระบุ —</option>
                     {suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
@@ -507,9 +534,10 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   <td><input type="date" className="jo-in" aria-label="รับจริง" value={s.received_date || ''} onChange={e => patchStep(s, { received_date: e.target.value || null })} style={{ width: 132 }} /></td>
                   <td><select aria-label="สถานะ" className={`jo-st ${statusCls(s.status)}`} value={s.status} onChange={e => patchStep(s, { status: e.target.value })}>
                     {STEP_STATUSES.map(x => <option key={x.id}>{x.id}</option>)}</select></td>
+                  </>)}
                   <td><input className="jo-in" aria-label="หมายเหตุ" defaultValue={s.note || ''} style={{ minWidth: 140 }}
                     onBlur={e => { if ((e.target.value || '') !== (s.note || '')) patchStep(s, { note: e.target.value }) }} /></td>
-                  <td><button type="button" className="jo-x" aria-label="ลบขั้นตอน" onClick={() => removeStep(s)}>×</button></td>
+                  <td>{!s.supplier_po_id && <button type="button" className="jo-x" aria-label="ลบขั้นตอน" onClick={() => removeStep(s)}>×</button>}</td>
                 </tr>
               ))}
               {!ordered.length && <tr><td colSpan={11} className="empty-state">ยังไม่มีขั้นตอน — กด “+ เพิ่มขั้นตอน” หรือเลือกจากปุ่มด้านล่าง</td></tr>}
