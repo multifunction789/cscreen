@@ -7,6 +7,7 @@ import { notify } from '@/lib/feedback'
 import dynamic from 'next/dynamic'
 import Link from 'next/link'
 import { docHref } from '@/lib/docLinks'
+import SalesByCategory from '@/components/sales/SalesByCategory'
 
 const RevenueChart   = dynamic(() => import('@/components/charts/RevenueChart'),   { ssr: false, loading: () => <div style={{height:200,display:'flex',alignItems:'center',justifyContent:'center',color:'var(--text-muted)',fontSize:13}}>กำลังโหลดกราฟ...</div> })
 const CustomerCharts = dynamic(() => import('@/components/charts/CustomerCharts'), { ssr: false, loading: () => <div style={{height:150}} /> })
@@ -262,6 +263,8 @@ export default function DashboardPage() {
 
       {/* Customer Charts */}
       {loaded && customers.length > 0 && <CustomerCharts customers={customers} />}
+
+      <SalesByCategory />
 
       {/* Best Sellers — derived from invoice items */}
       <div className="card">
