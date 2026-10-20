@@ -35,6 +35,7 @@ const navItems = [
   { group: 'การผลิต / Production', items: [
     { href: '/joborder',   icon: '📝', label: 'ใบงาน (Job Order)' },
     { href: '/production', icon: '🖨️', label: 'ติดตามงาน' },
+    { href: '/supplier-po', icon: '🏭', label: 'ใบงาน Supplier' },
   ]},
   { group: 'คลังสินค้า / Stock', items: [
     { href: '/stock',    icon: '📦', label: 'สต๊อกวัตถุดิบ' },
