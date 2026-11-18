@@ -9,6 +9,7 @@ import {
 import {
   SPEC_FIELDS, TECHNIQUES, QUICK_STEPS, PHASES, STEP_STATUSES, FILE_KINDS, QC_ITEMS, DELIVERY_CHANNELS,
   statusCls, guessPhase, computeOverall, legacyStatus, latestFile, fileKindLabel, sizeTotal, rid, thDate, thDateLong,
+  jobVariants, jobItemNos, aggregateSizes, orderSizes, itemNosLabel, mockSide, sideLabel,
 } from '@/lib/jobV2'
 import { uploadJobImage } from '@/lib/jobProduction.mjs'
 import { uploadFileClient } from '@/lib/driveClient'
@@ -18,6 +19,17 @@ import { todayStr, printDoc } from '@/lib/docUtils'
 import JobPrint from './JobPrint'
 
 const clone = o => JSON.parse(JSON.stringify(o || {}))
+
+/** ข้อมูลใบงานพร้อมแก้ไข: ใบงานรุ่นแรก (1 รายการ) แปลงเป็น variants ให้หน้าจอใช้รูปแบบเดียวกัน */
+function normalize(items) {
+  const d = clone(items)
+  d.variants = clone(jobVariants(d))
+  const used = d.variants.flatMap(v => Object.keys(v.qtys || {}))
+  d.sizes = orderSizes([...(d.sizes || []), ...used])
+  if (!d.sizes.length) d.sizes = ['S', 'M', 'L', 'XL', '2XL', '3XL']
+  d.decorations = d.decorations || []
+  return d
+}
 const isImage = f => /^image\//.test(f?.mime || '') || /\.(png|jpe?g|webp|gif)$/i.test(f?.name || '')
 const fmtTime = t => {
   if (!t) return ''
@@ -40,7 +52,7 @@ async function uploadAny(job, file, name) {
 }
 
 export default function JobEditor({ job, invoice, siblings, suppliers, onBack, onSaved, onCreateFromInvoice }) {
-  const [d, setD]           = useState(() => clone(job.items))
+  const [d, setD]           = useState(() => normalize(job.items))
   const [due, setDue]       = useState(job.due_date || '')
   const [urgent, setUrgent] = useState(!!job.urgent)
   const [dirty, setDirty]   = useState(false)
@@ -78,8 +90,10 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   }, [dirty])
 
   const overall = useMemo(() => computeOverall(steps), [steps])
-  const total = sizeTotal(d.qtys)
+  const variants = d.variants || []
+  const total = variants.reduce((t, v) => t + sizeTotal(v.qtys), 0)
   const src = d.source || {}
+  const myItems = jobItemNos({ ...job, items: d })
 
   const set = (path, value) => {
     setDirty(true)
@@ -93,10 +107,21 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
     })
   }
 
+  const removeSize = s => {
+    set('sizes', (d.sizes || []).filter(x => x !== s))
+    set('variants', variants.map(v => { const { [s]: _, ...rest } = v.qtys || {}; void _; return { ...v, qtys: rest } }))
+  }
+  const addSize = () => {
+    const s = newSize.trim().toUpperCase()
+    if (!s || (d.sizes || []).includes(s)) return
+    set('sizes', orderSizes([...(d.sizes || []), s])); setNewSize('')
+  }
+
   async function save() {
     setSaving(true)
+    const items = { ...d, ...aggregateSizes(d.sizes || [], variants) }
     const payload = {
-      items: d, due_date: due || null, urgent,
+      items, due_date: due || null, urgent,
       item_desc: d.product?.name || job.item_desc,
     }
     const { error } = await updateJobOrder(job.id, payload)
@@ -193,7 +218,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         const sameKind = files.filter(f => f.kind === kind && (f.side || null) === side)
         const version = sameKind.reduce((m, f) => Math.max(m, f.version || 0), 0) + 1
         const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
-        const name = `${job.code}_${fileKindLabel(kind)}${side ? '-' + (side === 'front' ? 'หน้า' : 'หลัง') : ''}_v${version}${ext}`
+        const name = `${job.code}_${fileKindLabel(kind)}${side ? '-' + sideLabel(side).replace(/\s·\s/g, '-') : ''}_v${version}${ext}`
         const up = await uploadAny(job, file, name)
         const { data, error } = await insertJobFile({ job_order_id: job.id, kind, side, name: file.name, url: up.url, thumb_url: up.thumb, mime: file.type || null, version, approved: false, uploaded_by: emailRef.current })
         if (error) throw new Error(error.message)
@@ -230,8 +255,6 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   }
 
   const ordered = [...steps].sort((a, b) => a.seq - b.seq)
-  const mockFront = latestFile(files, 'mockup', 'front')
-  const mockBack  = latestFile(files, 'mockup', 'back')
   const supplierName = id => suppliers.find(s => s.id === id)?.name || ''
 
   if (printing) {
@@ -270,7 +293,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
             <span className={`jo-badge ${overall.tone}`} style={{ fontSize: 13 }}>สถานะรวม: {overall.label}</span>
           </div>
           <div style={{ fontSize: 15.5, fontWeight: 800 }}>
-            อ้างอิง {invoice ? <Link href={docHref('invoice', invoice.id)} style={{ color: '#B8860B' }}>{invoice.code}</Link> : src.invoice_code || '—'} · รายการที่ {src.item_no || '—'} จาก {src.item_count || '—'}
+            อ้างอิง {invoice ? <Link href={docHref('invoice', invoice.id)} style={{ color: '#B8860B' }}>{invoice.code}</Link> : src.invoice_code || '—'} · {itemNosLabel({ ...src, item_nos: myItems }) || '—'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <input className="jo-in" aria-label="ชื่อสินค้า" value={d.product?.name || ''} onChange={e => set('product.name', e.target.value)}
@@ -311,8 +334,8 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
               <tbody>
                 {(invoice?.items || []).map((it, i) => {
                   const n = i + 1
-                  const me = n === src.item_no
-                  const other = siblings.find(s => s.invoice_item_no === n && s.id !== job.id)
+                  const me = myItems.includes(n)
+                  const other = siblings.find(s => s.id !== job.id && s.invoice_item_no && jobItemNos(s).includes(n))
                   return (
                     <tr key={n} style={me ? { background: '#FDF6E3', fontWeight: 800 } : undefined}>
                       <td style={{ textAlign: 'center', color: '#8A6500', fontSize: 16 }}>{me ? '◉' : '○'}</td>
@@ -330,9 +353,9 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         </div>
       </section>
 
-      {/* Product detail */}
+      {/* Spec + sizes per item */}
       <section className="jo-card">
-        <div className="jo-hd" style={{ justifyContent: 'flex-start' }}>รายละเอียดสินค้า <small>(ตามรายการที่เลือก)</small></div>
+        <div className="jo-hd" style={{ justifyContent: 'flex-start' }}>สเปกสินค้า <small>(ใช้ร่วมกันทุกรายการในใบงานนี้)</small></div>
         <div className="jo-spec" style={{ padding: '12px 14px' }}>
           {SPEC_FIELDS.map(f => (
             <label key={f.key} className="jo-lbl">{f.label}
@@ -341,82 +364,119 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
             </label>
           ))}
         </div>
-        <div className="jo-grid2" style={{ padding: '0 14px 14px', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
-          <div style={{ border: '1px solid #E9D9A6', borderRadius: 8, overflow: 'hidden' }}>
-            <div className="table-wrap">
-              <table className="jo-tbl" style={{ textAlign: 'center' }}>
-                <thead><tr><th style={{ width: 92 }}>ไซส์</th>{(d.sizes || []).map(s => (
-                  <th key={s} style={{ textAlign: 'center' }}>{s}<button type="button" aria-label={`ลบไซส์ ${s}`} onClick={() => { const { [s]: _, ...rest } = d.qtys || {}; void _; set('sizes', d.sizes.filter(x => x !== s)); set('qtys', rest) }} style={{ border: 'none', background: 'none', color: '#B91C1C', fontSize: 12, padding: '0 0 0 3px' }}>×</button></th>
-                ))}<th style={{ textAlign: 'center' }}>รวม</th></tr></thead>
-                <tbody><tr>
-                  <td style={{ fontWeight: 800, fontSize: 13, textAlign: 'left' }}>จำนวน (ตัว)</td>
-                  {(d.sizes || []).map(s => (
-                    <td key={s} style={{ padding: '6px 3px' }}><input className="jo-in" inputMode="numeric" aria-label={`จำนวนไซส์ ${s}`} value={d.qtys?.[s] || ''} onChange={e => set(`qtys.${s}`, e.target.value.replace(/[^\d]/g, ''))} style={{ width: 50, textAlign: 'center', padding: 0, fontWeight: 700 }} /></td>
-                  ))}
-                  <td style={{ background: '#F7E7B4', fontWeight: 800, fontSize: 17 }}>{total}</td>
-                </tr></tbody>
-              </table>
-            </div>
-            <div style={{ padding: '6px 10px', fontSize: 12.5, borderTop: '1px solid #F1E8CC', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
-              {d.product?.qty ? (total === d.product.qty
-                ? <b style={{ color: '#166534' }}>✓ ตรงกับ Invoice ({d.product.qty} ตัว)</b>
-                : <b style={{ color: '#B45309' }}>Invoice {d.product.qty} ตัว · ต่างกัน {total - d.product.qty > 0 ? '+' : ''}{total - d.product.qty}</b>) : null}
-              <span style={{ display: 'flex', gap: 4, alignItems: 'center', marginLeft: 'auto' }}>
-                <input className="jo-in" aria-label="เพิ่มไซส์" placeholder="ไซส์" value={newSize} onChange={e => setNewSize(e.target.value)} style={{ width: 70, height: 30 }} />
-                <button type="button" className="jo-chip" onClick={() => { const s = newSize.trim(); if (s && !(d.sizes || []).includes(s)) { set('sizes', [...(d.sizes || []), s]); setNewSize('') } }}>+ เพิ่มไซส์</button>
-              </span>
-            </div>
-          </div>
-          <label className="jo-lbl">หมายเหตุการผลิต / ตัดเย็บ<textarea className="jo-in" rows={4} value={d.sew_note || ''} onChange={e => set('sew_note', e.target.value)} placeholder="เช่น ผ่าข้าง 1.5 นิ้ว · ปกขลิบขาว 2 เส้น" /></label>
+      </section>
+
+      <section className="jo-card">
+        <div className="jo-hd">รายละเอียดสินค้า &amp; จำนวนตามไซซ์ <small>อ้างอิงจาก {src.invoice_code || 'Invoice'} · แก้ในใบงานได้ ไม่กระทบ Invoice</small></div>
+        <div className="table-wrap">
+          <table className="jo-tbl" style={{ minWidth: 640 }}>
+            <thead><tr>
+              <th style={{ width: 34 }}>#</th><th style={{ minWidth: 220 }}>รายการ / สี</th>
+              {(d.sizes || []).map(s => (
+                <th key={s} style={{ textAlign: 'center' }}>{s}<button type="button" aria-label={`ลบไซส์ ${s}`} onClick={() => removeSize(s)} style={{ border: 'none', background: 'none', color: '#B91C1C', fontSize: 12, padding: '0 0 0 3px' }}>×</button></th>
+              ))}
+              <th style={{ textAlign: 'center' }}>รวม</th><th>เทียบ Invoice</th>
+            </tr></thead>
+            <tbody>
+              {variants.map((v, vi) => {
+                const t = sizeTotal(v.qtys)
+                return (
+                  <tr key={v.id || vi}>
+                    <td style={{ fontWeight: 800, color: '#8A6500' }}>{v.item_no || vi + 1}</td>
+                    <td>
+                      <input className="jo-in" aria-label={`ชื่อรายการ ${vi + 1}`} value={v.name || ''} onChange={e => set(`variants.${vi}.name`, e.target.value)} style={{ fontWeight: 700, marginBottom: 4 }} />
+                      <input className="jo-in" aria-label={`สี รายการ ${vi + 1}`} value={v.color || ''} onChange={e => set(`variants.${vi}.color`, e.target.value)} placeholder="สีที่แสดงในใบงาน เช่น สีดำ (Black)" style={{ height: 32, fontSize: 13 }} />
+                    </td>
+                    {(d.sizes || []).map(s => (
+                      <td key={s} style={{ padding: '6px 3px', textAlign: 'center' }}><input className="jo-in" inputMode="numeric" aria-label={`จำนวนไซส์ ${s} รายการ ${vi + 1}`} value={v.qtys?.[s] || ''} onChange={e => set(`variants.${vi}.qtys.${s}`, e.target.value.replace(/[^\d]/g, ''))} style={{ width: 50, textAlign: 'center', padding: 0, fontWeight: 700 }} /></td>
+                    ))}
+                    <td style={{ background: '#F7E7B4', fontWeight: 800, fontSize: 17, textAlign: 'center' }}>{t}</td>
+                    <td style={{ fontSize: 12.5 }}>{v.inv_qty ? (t === v.inv_qty
+                      ? <b style={{ color: '#166534' }}>✓ ตรง ({v.inv_qty})</b>
+                      : <b style={{ color: '#B45309' }}>Invoice {v.inv_qty} · {t - v.inv_qty > 0 ? '+' : ''}{t - v.inv_qty}</b>) : '—'}</td>
+                  </tr>
+                )
+              })}
+            </tbody>
+            <tfoot><tr style={{ background: '#FDF6E3', fontWeight: 800 }}>
+              <td></td><td style={{ textAlign: 'right' }}>รวมทุกรายการ</td>
+              {(d.sizes || []).map(s => <td key={s} style={{ textAlign: 'center' }}>{variants.reduce((t, v) => t + (parseInt(v.qtys?.[s]) || 0), 0) || '—'}</td>)}
+              <td style={{ background: '#F7E7B4', fontSize: 17, textAlign: 'center' }}>{total}</td><td></td>
+            </tr></tfoot>
+          </table>
+        </div>
+        <div style={{ padding: '8px 14px', borderTop: '1px solid #F1E8CC', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+            <input className="jo-in" aria-label="เพิ่มไซส์" placeholder="ไซส์" value={newSize} onChange={e => setNewSize(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') addSize() }} style={{ width: 70, height: 30 }} />
+            <button type="button" className="jo-chip" onClick={addSize}>+ เพิ่มไซส์</button>
+          </span>
+        </div>
+        <div style={{ padding: '0 14px 14px' }}>
+          <label className="jo-lbl">หมายเหตุการผลิต / ตัดเย็บ<textarea className="jo-in" rows={3} value={d.sew_note || ''} onChange={e => set('sew_note', e.target.value)} placeholder="เช่น ผ่าข้าง 1.5 นิ้ว · ปกขลิบขาว 2 เส้น" /></label>
         </div>
       </section>
 
-      {/* Mockup + decorations */}
-      <section className="jo-grid2">
-        <div className="jo-card" style={{ display: 'flex', flexDirection: 'column' }}>
-          <div className="jo-hd">แบบเสื้อ (Mockup) <small>แสดงฉบับอนุมัติล่าสุด</small></div>
-          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: 12 }}>
-            {[['front', 'ด้านหน้า', mockFront], ['back', 'ด้านหลัง', mockBack]].map(([side, label, f]) => (
-              <div key={side} style={{ position: 'relative', background: '#FBF8EE', border: '1.5px dashed #E9D9A6', borderRadius: 8, padding: '34px 10px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 230 }}>
-                <span style={{ position: 'absolute', top: 8, left: 8, background: '#D7141A', color: '#fff', fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 4 }}>{label}</span>
-                {f ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <a href={f.url} target="_blank" rel="noreferrer"><img src={f.thumb_url || f.url} alt={`Mockup ${label}`} style={{ maxWidth: '100%', maxHeight: 220, objectFit: 'contain', display: 'block' }} /></a>
-                ) : <span style={{ color: '#9CA3AF', fontSize: 13 }}>ยังไม่มีรูป</span>}
-                <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  {f && <span className={`jo-badge ${f.approved ? 'done' : 'doing'}`}>v{f.version} {f.approved ? 'อนุมัติ' : 'รออนุมัติ'}</span>}
-                  <label className="jo-chip" style={{ display: 'inline-flex', alignItems: 'center', cursor: busyFile ? 'wait' : 'pointer' }}>
-                    {f ? 'อัปโหลดเวอร์ชันใหม่' : 'อัปโหลดรูป'}
-                    <input type="file" accept="image/*" hidden disabled={busyFile} onChange={e => { uploadFiles(e.target.files, 'mockup', side); e.target.value = '' }} />
-                  </label>
-                </div>
+      {/* Mockup per item */}
+      <section className="jo-card">
+        <div className="jo-hd">แบบเสื้อ (Mockup) แยกตามสี <small>แสดงฉบับอนุมัติล่าสุด · รูปจากใบแจ้งหนี้อยู่ที่รายการแรก</small></div>
+        <div style={{ display: 'grid', gridTemplateColumns: `repeat(${Math.min(variants.length, 2)}, minmax(0,1fr))`, gap: 12, padding: 12 }}>
+          {variants.map((v, vi) => (
+            <div key={v.id || vi} style={{ border: '1px solid #E9D9A6', borderRadius: 8, padding: 10, display: 'flex', flexDirection: 'column', gap: 8 }}>
+              <b style={{ color: '#8A6500' }}>{v.item_no || vi + 1} · {v.color || v.name || `รายการที่ ${vi + 1}`} <span style={{ color: '#6B6250', fontWeight: 600 }}>— {sizeTotal(v.qtys)} ตัว</span></b>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {[['front', 'ด้านหน้า'], ['back', 'ด้านหลัง']].map(([face, label]) => {
+                  const side = mockSide(face, vi)
+                  const f = latestFile(files, 'mockup', side)
+                  return (
+                    <div key={face} style={{ position: 'relative', background: '#FBF8EE', border: '1.5px dashed #E9D9A6', borderRadius: 8, padding: '30px 8px 8px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 200 }}>
+                      <span style={{ position: 'absolute', top: 6, left: 6, background: '#B8860B', color: '#fff', fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 4 }}>{label}</span>
+                      {f ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <a href={f.url} target="_blank" rel="noreferrer"><img src={f.thumb_url || f.url} alt={`Mockup ${label}`} style={{ maxWidth: '100%', maxHeight: 180, objectFit: 'contain', display: 'block' }} /></a>
+                      ) : <span style={{ color: '#9CA3AF', fontSize: 13 }}>ยังไม่มีรูป</span>}
+                      <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+                        {f && <span className={`jo-badge ${f.approved ? 'done' : 'doing'}`}>v{f.version} {f.approved ? 'อนุมัติ' : 'รออนุมัติ'}</span>}
+                        <label className="jo-chip" style={{ display: 'inline-flex', alignItems: 'center', cursor: busyFile ? 'wait' : 'pointer' }}>
+                          {f ? 'เวอร์ชันใหม่' : 'อัปโหลดรูป'}
+                          <input type="file" accept="image/*" hidden disabled={busyFile} onChange={e => { uploadFiles(e.target.files, 'mockup', side); e.target.value = '' }} />
+                        </label>
+                      </div>
+                    </div>
+                  )
+                })}
               </div>
-            ))}
-          </div>
-        </div>
-        <div className="jo-card">
-          <div className="jo-hd">รายละเอียดงานตกแต่ง
-            <button type="button" className="jo-hbtn" onClick={() => set('decorations', [...(d.decorations || []), { id: rid(), technique: '', position: '', size: '', colors: '', image_url: '' }])}>+ เพิ่ม</button>
-          </div>
-          {(d.decorations || []).map((x, i) => (
-            <div key={x.id || i} style={{ display: 'grid', gridTemplateColumns: '64px minmax(0,1fr) 28px', gap: 10, padding: '10px 12px', borderTop: i ? '1px solid #F1E8CC' : 'none' }}>
-              <label style={{ width: 64, height: 64, borderRadius: 6, background: x.image_url ? '#fff' : '#8A6500', border: '1px solid #E9D9A6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', color: '#fff', fontSize: 11, textAlign: 'center' }} title="แนบรูปลาย">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                {x.image_url ? <img src={x.image_url} alt="ลาย" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : '+ รูปลาย'}
-                <input type="file" accept="image/*" hidden onChange={e => { decoImage(i, e.target.files?.[0]); e.target.value = '' }} />
-              </label>
-              <div style={{ display: 'grid', gridTemplateColumns: '1.3fr 1fr 1fr', gap: 6 }}>
-                <label className="jo-lbl">เทคนิค<input className="jo-in" list="jo-opt-tech" value={x.technique} onChange={e => set(`decorations.${i}.technique`, e.target.value)} placeholder="เลือก / พิมพ์" /></label>
-                <label className="jo-lbl">ตำแหน่ง<input className="jo-in" value={x.position} onChange={e => set(`decorations.${i}.position`, e.target.value)} placeholder="อกซ้าย" /></label>
-                <label className="jo-lbl">ขนาด (ซม.)<input className="jo-in" value={x.size} onChange={e => set(`decorations.${i}.size`, e.target.value)} placeholder="7 × 7" /></label>
-                <label className="jo-lbl" style={{ gridColumn: '1/-1' }}>จำนวนสี / สีด้าย<input className="jo-in" value={x.colors} onChange={e => set(`decorations.${i}.colors`, e.target.value)} placeholder="3 สี: ขาว ทอง แดง" /></label>
-              </div>
-              <button type="button" className="jo-x" aria-label="ลบงานตกแต่ง" onClick={() => set('decorations', d.decorations.filter((_, k) => k !== i))}>×</button>
             </div>
           ))}
-          {!(d.decorations || []).length && <div className="empty-state">ยังไม่มีงานตกแต่ง — กด “+ เพิ่ม”</div>}
-          <datalist id="jo-opt-tech">{TECHNIQUES.map(t => <option key={t} value={t} />)}</datalist>
         </div>
+      </section>
+
+      {/* Decorations */}
+      <section className="jo-card">
+        <div className="jo-hd">รายละเอียดงานตกแต่ง <small>สำหรับช่างสกรีน / ปัก — ใส่ขนาดและระยะวางเป็นนิ้ว</small>
+          <button type="button" className="jo-hbtn" onClick={() => set('decorations', [...(d.decorations || []), { id: rid(), name: '', technique: '', position: '', size_in: '', placement: '', placement_note: '', colors: '', image_url: '' }])}>+ เพิ่ม</button>
+        </div>
+        {(d.decorations || []).map((x, i) => (
+          <div key={x.id || i} style={{ display: 'grid', gridTemplateColumns: '28px 64px minmax(0,1fr) 28px', gap: 10, padding: '10px 12px', borderTop: i ? '1px solid #F1E8CC' : 'none', alignItems: 'start' }}>
+            <span style={{ background: '#B8860B', color: '#fff', borderRadius: '50%', width: 24, height: 24, textAlign: 'center', lineHeight: '24px', fontWeight: 800, marginTop: 22 }}>{i + 1}</span>
+            <label style={{ width: 64, height: 64, marginTop: 4, borderRadius: 6, background: x.image_url ? '#fff' : '#8A6500', border: '1px solid #E9D9A6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', color: '#fff', fontSize: 11, textAlign: 'center' }} title="แนบรูปลาย">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              {x.image_url ? <img src={x.image_url} alt="ลาย" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : '+ รูปลาย'}
+              <input type="file" accept="image/*" hidden onChange={e => { decoImage(i, e.target.files?.[0]); e.target.value = '' }} />
+            </label>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 6 }}>
+              <label className="jo-lbl" style={{ gridColumn: 'span 2' }}>ลาย / ไฟล์<input className="jo-in" value={x.name || ''} onChange={e => set(`decorations.${i}.name`, e.target.value)} placeholder="โลโก้บริษัท, ตัวอักษรชื่อทีม" /></label>
+              <label className="jo-lbl">ตำแหน่ง<input className="jo-in" value={x.position || ''} onChange={e => set(`decorations.${i}.position`, e.target.value)} placeholder="หน้าอกซ้าย" /></label>
+              <label className="jo-lbl">เทคนิค<input className="jo-in" list="jo-opt-tech" value={x.technique || ''} onChange={e => set(`decorations.${i}.technique`, e.target.value)} placeholder="เลือก / พิมพ์" /></label>
+              <label className="jo-lbl">สีหมึก / สีด้าย<input className="jo-in" value={x.colors || ''} onChange={e => set(`decorations.${i}.colors`, e.target.value)} placeholder="ขาว 1 สี" /></label>
+              <label className="jo-lbl">ขนาดลาย (นิ้ว)<input className="jo-in" value={x.size_in || ''} onChange={e => set(`decorations.${i}.size_in`, e.target.value)} placeholder={x.size ? `เดิม ${x.size} ซม.` : 'กว้าง × สูง เช่น 3.5 × 3'} /></label>
+              <label className="jo-lbl">ระยะวาง (นิ้ว)<input className="jo-in" value={x.placement || ''} onChange={e => set(`decorations.${i}.placement`, e.target.value)} placeholder="ใต้คอ 3 นิ้ว" /></label>
+              <label className="jo-lbl">อ้างอิงเพิ่ม<input className="jo-in" value={x.placement_note || ''} onChange={e => set(`decorations.${i}.placement_note`, e.target.value)} placeholder="ห่างกลางอก 4 นิ้ว" /></label>
+            </div>
+            <button type="button" className="jo-x" aria-label="ลบงานตกแต่ง" onClick={() => set('decorations', d.decorations.filter((_, k) => k !== i))}>×</button>
+          </div>
+        ))}
+        {!(d.decorations || []).length && <div className="empty-state">ยังไม่มีงานตกแต่ง — กด “+ เพิ่ม”</div>}
+        <datalist id="jo-opt-tech">{TECHNIQUES.map(t => <option key={t} value={t} />)}</datalist>
       </section>
 
       {/* Files */}
@@ -442,7 +502,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   const isLatestApproved = f.approved && latest?.id === f.id
                   return (
                     <tr key={f.id} style={!f.approved && latest?.id !== f.id ? { color: '#9CA3AF' } : undefined}>
-                      <td><b>{fileKindLabel(f.kind)}</b>{f.side ? <span style={{ fontSize: 12, color: '#6B6250' }}> · {f.side === 'front' ? 'หน้า' : 'หลัง'}</span> : null}</td>
+                      <td><b>{fileKindLabel(f.kind)}</b>{f.side ? <span style={{ fontSize: 12, color: '#6B6250' }}> · {sideLabel(f.side)}</span> : null}</td>
                       <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isImage(f) ? '🖼 ' : '📄 '}{f.name}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>v{f.version}</td>
                       <td>

@@ -2,7 +2,8 @@
 import ProductionFields from '@/components/ProductionFields'
 import { productionSnapshot, uploadJobImage, PRODUCTION_FIELDS } from '@/lib/jobProduction.mjs'
 import { useState, useEffect, useRef } from 'react'
-import { getJobOrdersList, getJobOrder, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices, getSuppliers } from '@/lib/db'
+import { getJobOrdersList, getJobOrder, insertJobOrder, updateJobOrder, updateJobStatus, deleteJobOrder, getCustomers, getInvoices, getSuppliers, getStepsForJobs } from '@/lib/db'
+import StageFilter, { EMPTY_STAGE, matchStage } from '@/components/joborder/StageFilter'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -15,7 +16,7 @@ import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 import JobPicker from '@/components/joborder/JobPicker'
 import JobEditor from '@/components/joborder/JobEditor'
-import { isV2, sizeTotal } from '@/lib/jobV2'
+import { isV2, sizeTotal, itemNosLabel, computeOverall } from '@/lib/jobV2'
 import { SIZES } from '@/lib/sizes'
 
 const STATUS_BADGE = {
@@ -207,6 +208,8 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
 
 export default function JobOrderPage() {
   const [rows, setRows]           = useState([])
+  const [stepsBy, setStepsBy]     = useState({})   // แผนการผลิตของใบงานแบบใหม่ → สถานะใบงาน
+  const [stage, setStage]         = useState(EMPTY_STAGE)
   const [customers, setCustomers] = useState([])
   const [suppliers, setSuppliers] = useState([])
   const [invoices, setInvoices]   = useState([])
@@ -265,9 +268,20 @@ export default function JobOrderPage() {
     return () => { document.title = prev }
   }, [view])
 
+  /** แผนการผลิตของใบงานแบบใหม่ — ใช้แสดงสถานะใบงานและตัวกรอง */
+  function loadSteps(list) {
+    const v2ids = list.filter(isV2).map(j => j.id)
+    getStepsForJobs(v2ids).then(res => {
+      const by = Object.fromEntries(v2ids.map(id => [id, []]))
+      ;(res.data || []).forEach(st => { (by[st.job_order_id] ||= []).push(st) })
+      setStepsBy(by)
+    })
+  }
+
   async function load() {
     const [jRes, cRes, iRes, sRes] = await Promise.all([getJobOrdersList(), getCustomers(), getInvoices(), getSuppliers()])
     setRows(jRes.data || [])
+    loadSteps(jRes.data || [])
     setCustomers(cRes.data || [])
     setInvoices(iRes.data || [])
     setSuppliers(sRes.data || [])
@@ -518,7 +532,7 @@ export default function JobOrderPage() {
   const filtered = rows.filter(j => {
     const ms = j.code?.includes(search) || j.customers?.name?.includes(search) || j.item_desc?.includes(search)
     const dm = !monthFilter || (j.document_date || j.created_at || '').startsWith(monthFilter)
-    return ms && (!filterStatus || j.status === filterStatus) && dm
+    return ms && (!filterStatus || (!isV2(j) && j.status === filterStatus)) && dm && matchStage(stage, stepsBy[j.id])
   })
   const isOverdue = isJobOverdue  // เทียบเฉพาะวันที่ — งานที่กำหนดส่งวันนี้ยังไม่นับว่าเลย
   const monthCount = filtered.length
@@ -595,7 +609,7 @@ export default function JobOrderPage() {
         {doc.param}
         <JobEditor key={view.id} job={view} invoice={inv} suppliers={suppliers}
           siblings={rows.filter(r => r.invoice_id && r.invoice_id === view.invoice_id)}
-          onBack={doc.close}
+          onBack={() => { doc.close(); loadSteps(rows) }}
           onSaved={(j) => { setRows(rs => rs.map(r => r.id === j.id ? { ...r, ...j } : r)) }}
           onCreateFromInvoice={id => setPicker({ invoiceId: id })} />
         {pickerEl}
@@ -976,7 +990,7 @@ export default function JobOrderPage() {
             )}
           </div>
           {ALL_STATUS.map(s => {
-            const count = rows.filter(j => j.status === s).length
+            const count = rows.filter(j => !isV2(j) && j.status === s).length
             return count > 0 && (
               <span key={s} onClick={() => setFilter(filterStatus === s ? '' : s)}
                 className={filterStatus === s ? 'badge badge-blue' : 'badge badge-gray'}
@@ -1417,6 +1431,9 @@ export default function JobOrderPage() {
         </div>
       )}
 
+      {/* ตัวกรองตามแผนการผลิต (ใบงานแบบใหม่) */}
+      {!showForm && <StageFilter jobs={rows.filter(isV2)} stepsBy={stepsBy} value={stage} onChange={setStage} />}
+
       {/* ──── CALENDAR VIEW ─────────────────────────────────── */}
       {viewMode === 'calendar' && (
         <CalendarView
@@ -1445,7 +1462,7 @@ export default function JobOrderPage() {
                     return (
                       <tr key={j.id} className="row-link" style={{ background: isOverdue(j) ? '#FFF5F5' : undefined }}>
                         <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}
-                          {isV2(j) && j.items.source?.invoice_code && <div style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {j.items.source.item_no}/{j.items.source.item_count}</div>}
+                          {isV2(j) && j.items.source?.invoice_code && <div style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {itemNosLabel(j.items.source)}</div>}
                         </td>
                         <td style={{ fontWeight: 600 }}>{j.customers?.name || '—'}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>
@@ -1457,7 +1474,10 @@ export default function JobOrderPage() {
                         <td style={{ fontSize: 12, color: isOverdue(j) ? 'var(--danger)' : 'var(--text-muted)', fontWeight: isOverdue(j) ? 700 : 400 }}>
                           {fmtDate(j.due_date)}
                         </td>
-                        <td><span className={STATUS_BADGE[j.status] || 'badge badge-gray'}>{j.status}</span></td>
+                        <td>{isV2(j)
+                          ? (() => { const ov = stepsBy[j.id] ? computeOverall(stepsBy[j.id]) : null
+                              return ov ? <span className={`jo-badge ${ov.tone}`}>{ov.label}</span> : <span className="badge badge-gray">…</span> })()
+                          : <span className={STATUS_BADGE[j.status] || 'badge badge-gray'}>{j.status}</span>}</td>
                         <td>
                           <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                             <button className="btn btn-outline btn-sm" onClick={() => doc.open(j)}>ดู</button>

@@ -1,15 +1,16 @@
 'use client'
 import { useMemo, useState } from 'react'
 import { insertJobOrder, updateJobOrder, insertJobFile, currentUserEmail } from '@/lib/db'
-import { buildFromInvoice, nextJobCodes, sizeTotal } from '@/lib/jobV2'
+import { buildFromInvoice, nextJobCodes, sizeTotal, jobItemNos } from '@/lib/jobV2'
 import { createJobFolderClient } from '@/lib/driveClient'
 import { notify } from '@/lib/feedback'
 import { todayStr } from '@/lib/docUtils'
 import { mockupList } from '@/components/MockupAttach'
 
 /**
- * เลือก Invoice → ติ๊กรายการ → สร้างใบงาน 1 ใบต่อ 1 รายการ
- * รายการที่มีใบงานแล้วติ๊กไม่ได้ (ฐานข้อมูลกันซ้ำอีกชั้นด้วย unique index)
+ * เลือก Invoice → ติ๊กรายการ (ค่าเริ่มต้น = ทุกรายการที่ยังไม่มีใบงาน) → สร้างใบงาน 1 ใบครอบคลุมรายการที่เลือก
+ * ต้องการแยกใบงาน: ติ๊กบางรายการ แล้วค่อยกลับมาสร้างใบงานเพิ่มสำหรับรายการที่เหลือ
+ * invoice_item_no = รายการแรกของใบงาน (ฐานข้อมูลกันซ้ำด้วย unique index (invoice_id, invoice_item_no))
  */
 export default function JobPicker({ invoices, customers, jobs, initialInvoiceId = '', onClose, onCreated }) {
   const [invId, setInvId]   = useState(initialInvoiceId)
@@ -21,7 +22,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
   const items = Array.isArray(inv?.items) ? inv.items : []
   const existing = useMemo(() => {
     const m = {}
-    jobs.filter(j => j.invoice_id === invId && j.invoice_item_no).forEach(j => { m[j.invoice_item_no] = j })
+    jobs.filter(j => j.invoice_id === invId && j.invoice_item_no).forEach(j => { jobItemNos(j).forEach(n => { m[n] = j }) })
     return m
   }, [jobs, invId])
   const legacyJobs = jobs.filter(j => j.invoice_id === invId && !j.invoice_item_no)
@@ -35,8 +36,8 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
     setInvId(id); setPicked([])
     const it = invoices.find(i => i.id === id)
     const hasLegacy = jobs.some(j => j.invoice_id === id && !j.invoice_item_no)
-    const free = (it?.items || []).map((_, i) => i + 1).filter(n => !jobs.some(j => j.invoice_id === id && j.invoice_item_no === n))
-    if (free.length === 1 && !hasLegacy) setPicked(free)
+    const free = (it?.items || []).map((_, i) => i + 1).filter(n => !jobs.some(j => j.invoice_id === id && j.invoice_item_no && jobItemNos(j).includes(n)))
+    if (!hasLegacy) setPicked(free)
   }
   const toggle = n => setPicked(p => p.includes(n) ? p.filter(x => x !== n) : [...p, n].sort((a, b) => a - b))
 
@@ -45,43 +46,36 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
     setBusy(true)
     const cust = customers.find(c => c.id === inv.customer_id) || {}
     const email = await currentUserEmail()
-    const codes = nextJobCodes(jobs, inv.id, picked.length)
-    const created = []
-    for (let k = 0; k < picked.length; k++) {
-      const n = picked[k]
-      const detail = { ...buildFromInvoice(inv, n, cust), created_by_email: email || '' }
-      // created_by / status ไม่ต้องส่ง — ฐานข้อมูลตั้งให้เอง (trigger guard_job_workflow)
-      const { data, error } = await insertJobOrder({
-        code: codes[k], customer_id: inv.customer_id, invoice_id: inv.id, invoice_item_no: n,
-        item_desc: detail.product.name || `รายการที่ ${n}`, items: detail,
-        document_date: todayStr(), urgent: false,
-      })
-      if (error) {
-        const dup = error.code === '23505' || /duplicate|unique/i.test(error.message)
-        notify.error(dup ? `รายการที่ ${n} มีใบงานแล้ว (มีคนสร้างไปก่อน)` : `สร้างใบงานรายการที่ ${n} ไม่สำเร็จ: ${error.message}`)
-        continue
-      }
-      // โฟลเดอร์ Drive ของใบงาน (ไม่สำเร็จก็ยังใช้ใบงานได้ — ไฟล์จะเก็บใน Supabase แทน)
-      if (cust.drive_folder_id) {
-        try {
-          const { folderId } = await createJobFolderClient(cust.drive_folder_id, `${codes[k]}_${detail.product.name || ''}`.slice(0, 120))
-          if (folderId) { await updateJobOrder(data.id, { drive_folder_id: folderId }); data.drive_folder_id = folderId }
-        } catch { /* ข้ามได้ */ }
-      }
-      // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → รูป 1 = ด้านหน้า, รูป 2 = ด้านหลังของใบงาน (ไม่สำเร็จก็ข้ามได้ แนบใหม่ในใบงานได้)
-      const mocks = mockupList(inv)
-      for (let m = 0; m < mocks.length; m++) {
-        try {
-          await insertJobFile({ job_order_id: data.id, kind: 'mockup', side: m === 0 ? 'front' : 'back', name: `mockup${m + 1}_${inv.code || ''}`, url: mocks[m], thumb_url: mocks[m], version: 1, approved: false, uploaded_by: email || null })
-        } catch { /* ข้ามได้ */ }
-      }
-      created.push(data)
+    const [code] = nextJobCodes(jobs, inv.id, 1)
+    const detail = { ...buildFromInvoice(inv, picked, cust), created_by_email: email || '' }
+    // created_by / status ไม่ต้องส่ง — ฐานข้อมูลตั้งให้เอง (trigger guard_job_workflow)
+    const { data, error } = await insertJobOrder({
+      code, customer_id: inv.customer_id, invoice_id: inv.id, invoice_item_no: picked[0],
+      item_desc: detail.product.name || `รายการที่ ${picked.join(', ')}`, items: detail,
+      document_date: todayStr(), urgent: false,
+    })
+    if (error) {
+      const dup = error.code === '23505' || /duplicate|unique/i.test(error.message)
+      setBusy(false)
+      return notify.error(dup ? 'รายการที่เลือกมีใบงานแล้ว (มีคนสร้างไปก่อน) — กรุณาโหลดหน้าใหม่' : `สร้างใบงานไม่สำเร็จ: ${error.message}`)
+    }
+    // โฟลเดอร์ Drive ของใบงาน (ไม่สำเร็จก็ยังใช้ใบงานได้ — ไฟล์จะเก็บใน Supabase แทน)
+    if (cust.drive_folder_id) {
+      try {
+        const { folderId } = await createJobFolderClient(cust.drive_folder_id, `${code}_${detail.product.name || ''}`.slice(0, 120))
+        if (folderId) { await updateJobOrder(data.id, { drive_folder_id: folderId }); data.drive_folder_id = folderId }
+      } catch { /* ข้ามได้ */ }
+    }
+    // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → รูป 1 = ด้านหน้า, รูป 2 = ด้านหลัง ของรายการแรก (แนบรูปสีอื่นได้ในหน้าแก้ไขใบงาน)
+    const mocks = mockupList(inv)
+    for (let m = 0; m < mocks.length; m++) {
+      try {
+        await insertJobFile({ job_order_id: data.id, kind: 'mockup', side: m === 0 ? 'front' : 'back', name: `mockup${m + 1}_${inv.code || ''}`, url: mocks[m], thumb_url: mocks[m], version: 1, approved: false, uploaded_by: email || null })
+      } catch { /* ข้ามได้ */ }
     }
     setBusy(false)
-    if (created.length) {
-      notify.success(`สร้าง ${created.map(c => c.code).join(', ')} แล้ว`)
-      onCreated(created)
-    }
+    notify.success(`สร้าง ${code} แล้ว`)
+    onCreated([data])
   }
 
   return (
@@ -119,7 +113,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
                 <div><b style={{ fontSize: 16 }}>{inv.code}</b> · {inv.customers?.name}</div>
                 {!initialInvoiceId && <button className="jo-chip" onClick={() => { setInvId(''); setPicked([]) }}>เปลี่ยน Invoice</button>}
               </div>
-              <div style={{ fontSize: 13, color: '#6B6250' }}>เลือกรายการที่จะเปิดใบงาน — <b style={{ color: '#1F1A1A' }}>1 ใบงานต่อ 1 รายการ</b></div>
+              <div style={{ fontSize: 13, color: '#6B6250' }}>รายการที่ติ๊กจะอยู่ใน <b style={{ color: '#1F1A1A' }}>ใบงานเดียวกัน</b> — ต้องการแยกใบงาน ให้ติ๊กบางรายการแล้วค่อยสร้างใบงานเพิ่มทีหลัง</div>
               {items.map((it, idx) => {
                 const n = idx + 1
                 const has = existing[n]
@@ -149,7 +143,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
           )}
         </div>
         <div style={{ padding: '12px 18px', borderTop: '1px solid #F1E8CC', background: '#FCFAF2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13.5 }}>{inv && picked.length ? <>จะสร้าง <b>{picked.length} ใบงาน</b>: {nextJobCodes(jobs, inv.id, picked.length).join(', ')}</> : 'ยังไม่ได้เลือกรายการ'}</span>
+          <span style={{ fontSize: 13.5 }}>{inv && picked.length ? <>จะสร้าง <b>1 ใบงาน</b> ({nextJobCodes(jobs, inv.id, 1)[0]}) · {picked.length} รายการ</> : 'ยังไม่ได้เลือกรายการ'}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-outline" onClick={onClose} disabled={busy}>ยกเลิก</button>
             <button className="btn btn-primary" onClick={create} disabled={!inv || !picked.length || busy}>{busy ? 'กำลังสร้าง…' : 'สร้างใบงาน'}</button>
