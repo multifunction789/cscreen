@@ -15,7 +15,7 @@ import FileDropZone from '@/components/ui/FileDropZone'
 import { createJobFoldersClient, uploadFileClient, uploadDataUrlClient } from '@/lib/driveClient'
 import JobPicker from '@/components/joborder/JobPicker'
 import JobEditor from '@/components/joborder/JobEditor'
-import { isV2, sizeTotal } from '@/lib/jobV2'
+import { isV2, sizeTotal, itemNosLabel } from '@/lib/jobV2'
 import { SIZES } from '@/lib/sizes'
 
 const STATUS_BADGE = {
@@ -1445,7 +1445,7 @@ export default function JobOrderPage() {
                     return (
                       <tr key={j.id} className="row-link" style={{ background: isOverdue(j) ? '#FFF5F5' : undefined }}>
                         <td style={{ color: 'var(--primary)', fontFamily: 'monospace', fontWeight: 700 }}>{j.code}
-                          {isV2(j) && j.items.source?.invoice_code && <div style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {j.items.source.item_no}/{j.items.source.item_count}</div>}
+                          {isV2(j) && j.items.source?.invoice_code && <div style={{ fontFamily: 'inherit', fontSize: 11.5, fontWeight: 600, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {itemNosLabel(j.items.source)}</div>}
                         </td>
                         <td style={{ fontWeight: 600 }}>{j.customers?.name || '—'}</td>
                         <td style={{ color: 'var(--text-muted)', fontSize: 13 }}>

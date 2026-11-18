@@ -3,7 +3,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import { docHref } from '@/lib/docLinks'
 import { getJobOrdersList, updateJobStatus, getStepsForJobs } from '@/lib/db'
-import { isV2, computeOverall, statusCls } from '@/lib/jobV2'
+import { isV2, computeOverall, statusCls, itemNosLabel } from '@/lib/jobV2'
 import { fmtShort } from '@/lib/shop'
 import { notify } from '@/lib/feedback'
 import {
@@ -258,7 +258,7 @@ export default function ProductionPage() {
                   return (
                     <tr key={j.id} style={{ background: isJobOverdue(j) ? '#FFF5F5' : undefined }}>
                       <td><Link href={docHref('joborder', j.id)} style={{ fontFamily: 'monospace', fontWeight: 700, color: 'var(--primary)', textDecoration: 'none' }}>{j.code}</Link>
-                        {v2 && j.items.source?.invoice_code && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {j.items.source.item_no}/{j.items.source.item_count}</div>}</td>
+                        {v2 && j.items.source?.invoice_code && <div style={{ fontSize: 12, color: 'var(--text-muted)' }}>{j.items.source.invoice_code} · {itemNosLabel(j.items.source)}</div>}</td>
                       <td><b>{j.customers?.name || j.items?.customer?.name || '—'}</b><div style={{ fontSize: 13, color: 'var(--text-muted)' }}>{j.item_desc || '—'}</div></td>
                       <td>
                         {v2 ? (
