@@ -14,7 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
-import { MockupPanel, MockupImage } from '@/components/MockupAttach'
+import { MockupPanel, MockupImage, mockupList, mockupPayload } from '@/components/MockupAttach'
 import { SIZES } from '@/lib/sizes'
 
 const emptyItem = { desc: '', category: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
@@ -54,7 +54,7 @@ const emptyForm = () => ({
   customer_id:'', due_date:'', document_date:todayStr(),
   notes:'', vat_pct:0, discount:0, wht_pct:0,
   deposit_amount: '',
-  mockup_url: '',
+  mockup_urls: [],
   items:[{ ...emptyItem }],
 })
 
@@ -143,7 +143,7 @@ export default function InvoicePage() {
       total, due_date: form.due_date||null,
       document_date: form.document_date||todayStr(), notes: form.notes,
       deposit_pct: depositPct, deposit_amount: depositAmt,
-      mockup_url: form.mockup_url || null,
+      ...mockupPayload(form.mockup_urls),
     }
     if (editId) {
       const { error } = await updateInvoice(editId, payload)
@@ -184,7 +184,7 @@ export default function InvoicePage() {
         ? inv.deposit_amount
         : (inv.deposit_pct > 0 ? Math.round((inv.total||0) * (inv.deposit_pct||0) / 100) : ''),
       items: (inv.items||[{...emptyItem}]).map(it => ({ ...it, sizes: it.sizes || {} })),
-      mockup_url: inv.mockup_url || '',
+      mockup_urls: mockupList(inv),
     })
     setCustSearch('')
     setShowForm(true)
@@ -228,13 +228,6 @@ export default function InvoicePage() {
     const relJO  = jobs.find(j => j.invoice_id===view.id)
     const relRec = receipts.find(r => r.invoice_id===view.id)
     const viewJobs = jobs.filter(j => j.invoice_id===view.id)
-    const saveViewMockup = async (u) => {
-      const { error } = await updateInvoice(view.id, { mockup_url: u || null })
-      if (error) return notify.error('บันทึกรูปไม่สำเร็จ: ' + error.message)
-      setView(v => ({ ...v, mockup_url: u || null }))
-      setRows(rs => rs.map(r => r.id === view.id ? { ...r, mockup_url: u || null } : r))
-      notify.success(u ? 'แนบรูป Mockup แล้ว' : 'ลบรูป Mockup แล้ว')
-    }
     const vDepAmt = view.deposit_amount != null && view.deposit_amount > 0
       ? view.deposit_amount
       : (view.total||0) * (view.deposit_pct || 0) / 100
@@ -284,10 +277,6 @@ export default function InvoicePage() {
         </div>
 
         <DocChain current="invoice" doc={view} version={`${jobs.length}:${receipts.length}`} />
-
-        <div style={{ marginBottom: 12 }}>
-          <MockupPanel url={view.mockup_url} jobs={viewJobs} onChange={saveViewMockup} />
-        </div>
 
         {/* ── PRINT AREA ── */}
         <div id="print-area" style={{
@@ -474,7 +463,7 @@ export default function InvoicePage() {
                     </>
                 }
               </div>
-              <MockupImage url={view.mockup_url} jobs={viewJobs} />
+              <MockupImage urls={mockupList(view)} jobs={viewJobs} />
               </div>
               {/* Totals */}
               <div style={{ border:'1px solid #e5e7eb', borderRadius:10, overflow:'hidden', fontSize:12 }}>
@@ -805,7 +794,7 @@ export default function InvoicePage() {
 
           {/* Mockup */}
           <div style={{ marginTop:10 }}>
-            <MockupPanel url={form.mockup_url} onChange={u => setForm(f => ({ ...f, mockup_url: u || '' }))} />
+            <MockupPanel urls={form.mockup_urls} onChange={urls => setForm(f => ({ ...f, mockup_urls: urls }))} />
           </div>
 
           {/* Notes */}

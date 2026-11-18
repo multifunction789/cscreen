@@ -5,6 +5,7 @@ import { buildFromInvoice, nextJobCodes, sizeTotal } from '@/lib/jobV2'
 import { createJobFolderClient } from '@/lib/driveClient'
 import { notify } from '@/lib/feedback'
 import { todayStr } from '@/lib/docUtils'
+import { mockupList } from '@/components/MockupAttach'
 
 /**
  * เลือก Invoice → ติ๊กรายการ → สร้างใบงาน 1 ใบต่อ 1 รายการ
@@ -67,10 +68,11 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
           if (folderId) { await updateJobOrder(data.id, { drive_folder_id: folderId }); data.drive_folder_id = folderId }
         } catch { /* ข้ามได้ */ }
       }
-      // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → เป็น Mockup ด้านหน้าของใบงาน (ไม่สำเร็จก็ข้ามได้ แนบใหม่ในใบงานได้)
-      if (inv.mockup_url) {
+      // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → รูป 1 = ด้านหน้า, รูป 2 = ด้านหลังของใบงาน (ไม่สำเร็จก็ข้ามได้ แนบใหม่ในใบงานได้)
+      const mocks = mockupList(inv)
+      for (let m = 0; m < mocks.length; m++) {
         try {
-          await insertJobFile({ job_order_id: data.id, kind: 'mockup', side: 'front', name: `mockup_${inv.code || ''}`, url: inv.mockup_url, thumb_url: inv.mockup_url, version: 1, approved: false, uploaded_by: email || null })
+          await insertJobFile({ job_order_id: data.id, kind: 'mockup', side: m === 0 ? 'front' : 'back', name: `mockup${m + 1}_${inv.code || ''}`, url: mocks[m], thumb_url: mocks[m], version: 1, approved: false, uploaded_by: email || null })
         } catch { /* ข้ามได้ */ }
       }
       created.push(data)
