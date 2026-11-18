@@ -14,6 +14,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
+import { SIZES } from '@/lib/sizes'
 
 const emptyItem = { desc: '', category: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
@@ -710,7 +711,7 @@ export default function InvoicePage() {
                       </label>
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
-                        {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (
+                        {SIZES.map(s => (
                           <label key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
                             <span style={{ fontSize:9, color:'var(--text-muted)', fontWeight:600 }}>{s}</span>
                             <input type="number" min="0" placeholder="0"
