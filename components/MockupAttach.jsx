@@ -7,9 +7,25 @@ import { docHref } from '@/lib/docLinks'
 import { notify } from '@/lib/feedback'
 
 /**
- * รูป Mockup 1 รูป ของใบแจ้งหนี้ (invoices.mockup_url)
- * ใบเสร็จใช้รูปเดียวกันของใบแจ้งหนี้ที่ผูกอยู่ · ใบงานที่สร้างจากใบแจ้งหนี้จะได้รูปนี้ไปด้วย
+ * รูป Mockup ของใบแจ้งหนี้ (สูงสุด 2 รูป) — แนบได้ที่ฟอร์มแก้ไขใบแจ้งหนี้เท่านั้น
+ * เก็บที่ invoices.mockup_urls (text[]) · invoices.mockup_url = รูปแรก (ของเดิม ยังเขียนไว้ให้เข้ากันได้)
+ * ใบเสร็จแสดงรูปของใบแจ้งหนี้ที่ผูกอยู่ · ใบงานที่สร้างจากใบแจ้งหนี้ได้รูป 1 = หน้า, รูป 2 = หลัง
  */
+export const MOCKUP_MAX = 2
+
+/** รูป Mockup ของใบแจ้งหนี้ เป็น array (รองรับข้อมูลเก่าที่มีแค่ mockup_url) */
+export function mockupList(inv) {
+  if (!inv) return []
+  const list = Array.isArray(inv.mockup_urls) ? inv.mockup_urls.filter(Boolean) : []
+  if (list.length) return list.slice(0, MOCKUP_MAX)
+  return inv.mockup_url ? [inv.mockup_url] : []
+}
+
+/** ค่าที่ต้องบันทึกลงใบแจ้งหนี้ */
+export const mockupPayload = urls => {
+  const list = (urls || []).filter(Boolean).slice(0, MOCKUP_MAX)
+  return { mockup_urls: list, mockup_url: list[0] || null }
+}
 
 /** ใบงานของใบแจ้งหนี้ — ใช้ทำลิงก์จากรูป Mockup ไปใบงาน */
 export function useInvoiceJobs(invoiceId) {
@@ -24,60 +40,63 @@ export function useInvoiceJobs(invoiceId) {
   return invoiceId && state.id === invoiceId ? state.jobs : []
 }
 
-/** ปุ่มแนบ / เปลี่ยน / ลบรูป + ลิงก์ไปใบงาน (ไม่พิมพ์ออกเอกสาร) */
-export function MockupPanel({ url, onChange, jobs = [], color = '#B80F0B', disabled = false }) {
+/** ช่องแนบรูปในฟอร์มแก้ไขใบแจ้งหนี้ (สูงสุด 2 รูป) */
+export function MockupPanel({ urls = [], onChange, color = '#B80F0B' }) {
   const [busy, setBusy] = useState(false)
   const input = useRef(null)
+  const list = urls.filter(Boolean).slice(0, MOCKUP_MAX)
 
-  async function pick(file) {
-    if (!file) return
+  async function pick(files) {
+    const room = MOCKUP_MAX - list.length
+    const chosen = Array.from(files || []).slice(0, room)
+    if (!chosen.length) return
+    if ((files?.length || 0) > room) notify.warn(`แนบได้สูงสุด ${MOCKUP_MAX} รูป`)
     setBusy(true)
     try {
-      const u = await uploadJobImage(supabase, 'job-images', file)
-      await onChange(u)
+      const added = []
+      for (const f of chosen) added.push(await uploadJobImage(supabase, 'job-images', f))
+      onChange([...list, ...added])
     } catch (e) { notify.error(e.message) } finally { setBusy(false) }
   }
 
   return (
-    <div className="no-print" style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 12px', border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--card)', fontSize: 13 }}>
+    <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap', padding: '8px 12px', border: '1px dashed var(--border)', borderRadius: 10, background: 'var(--card)', fontSize: 13 }}>
       <b style={{ color }}>🖼️ Mockup</b>
-      {url ? (
-        <a href={url} target="_blank" rel="noreferrer" title="เปิดรูปเต็ม">
-          <img src={url} alt="mockup" style={{ height: 48, width: 48, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)' }} />
-        </a>
-      ) : <span style={{ color: 'var(--text-muted)' }}>ยังไม่มีรูป</span>}
-      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" hidden
-        onChange={e => { pick(e.target.files?.[0]); e.target.value = '' }} />
-      <button type="button" className="btn btn-outline btn-sm" disabled={busy || disabled} onClick={() => input.current?.click()}>
-        {busy ? 'กำลังอัปโหลด...' : url ? 'เปลี่ยนรูป' : '📎 แนบรูป'}
-      </button>
-      {url && !busy && (
-        <button type="button" className="btn btn-outline btn-sm" disabled={disabled} style={{ color: '#B91C1C' }} onClick={() => onChange(null)}>ลบรูป</button>
-      )}
-      {jobs.length > 0 && (
-        <span style={{ display: 'flex', gap: 6, alignItems: 'center', marginLeft: 'auto', flexWrap: 'wrap' }}>
-          <span style={{ color: 'var(--text-muted)' }}>ใบงาน:</span>
-          {jobs.map(j => (
-            <Link key={j.id} href={docHref('joborder', j.id)} style={{ fontWeight: 700, color }}>📝 {j.code}</Link>
-          ))}
+      <span style={{ color: 'var(--text-muted)', fontSize: 12 }}>({list.length}/{MOCKUP_MAX} รูป)</span>
+      {list.map((u, i) => (
+        <span key={u} style={{ position: 'relative', display: 'inline-block' }}>
+          <a href={u} target="_blank" rel="noreferrer" title="เปิดรูปเต็ม">
+            <img src={u} alt={`mockup ${i + 1}`} style={{ height: 56, width: 56, objectFit: 'cover', borderRadius: 6, border: '1px solid var(--border)', display: 'block' }} />
+          </a>
+          <button type="button" aria-label={`ลบรูป ${i + 1}`} disabled={busy} onClick={() => onChange(list.filter((_, j) => j !== i))}
+            style={{ position: 'absolute', top: -7, right: -7, width: 20, height: 20, borderRadius: '50%', border: 'none', background: '#B91C1C', color: '#fff', fontSize: 12, lineHeight: '20px', padding: 0, cursor: 'pointer' }}>×</button>
         </span>
+      ))}
+      <input ref={input} type="file" accept="image/jpeg,image/png,image/webp" multiple hidden
+        onChange={e => { pick(e.target.files); e.target.value = '' }} />
+      {list.length < MOCKUP_MAX && (
+        <button type="button" className="btn btn-outline btn-sm" disabled={busy} onClick={() => input.current?.click()}>
+          {busy ? 'กำลังอัปโหลด...' : '📎 แนบรูป'}
+        </button>
       )}
     </div>
   )
 }
 
 /** รูป Mockup ในตัวเอกสาร (พิมพ์ออกด้วย) — คลิกแล้วไปใบงาน ถ้ามีใบงานเดียว */
-export function MockupImage({ url, jobs = [], color = '#8B0000' }) {
-  if (!url) return null
-  const img = (
-    <img src={url} alt="mockup" crossOrigin="anonymous"
-      style={{ display: 'block', width: '100%', maxHeight: 220, objectFit: 'contain', background: '#fff' }} />
-  )
+export function MockupImage({ urls = [], jobs = [], color = '#8B0000' }) {
+  const list = urls.filter(Boolean).slice(0, MOCKUP_MAX)
+  if (!list.length) return null
+  const wrap = (img, key) => jobs.length === 1
+    ? <Link key={key} href={docHref('joborder', jobs[0].id)} title={`ไปใบงาน ${jobs[0].code}`}>{img}</Link>
+    : <div key={key}>{img}</div>
   return (
     <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', marginTop: 8 }}>
       <div style={{ fontSize: 10, fontWeight: 900, color, padding: '4px 10px', borderBottom: '1px solid #f0f0f0', letterSpacing: .5 }}>MOCKUP</div>
-      <div style={{ padding: 6 }}>
-        {jobs.length === 1 ? <Link href={docHref('joborder', jobs[0].id)} title={`ไปใบงาน ${jobs[0].code}`}>{img}</Link> : img}
+      <div style={{ padding: 6, display: 'grid', gridTemplateColumns: list.length > 1 ? '1fr 1fr' : '1fr', gap: 6 }}>
+        {list.map((u, i) => wrap(
+          <img src={u} alt={`mockup ${i + 1}`} crossOrigin="anonymous"
+            style={{ display: 'block', width: '100%', maxHeight: list.length > 1 ? 160 : 220, objectFit: 'contain', background: '#fff' }} />, u))}
       </div>
     </div>
   )
