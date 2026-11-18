@@ -11,6 +11,7 @@ import {
   isJobOverdue, dueLabel, TONE_STYLE, byDueDate,
 } from '@/lib/jobStatus'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
+import StageFilter, { EMPTY_STAGE, matchStage } from '@/components/joborder/StageFilter'
 
 // คอลัมน์พิเศษ: งานที่สถานะไม่ตรงกับขั้นตอนใด (เช่น "เลยกำหนด" ที่ตั้งเองในหน้าใบงาน)
 // เดิมงานพวกนี้หายไปจากบอร์ดเฉย ๆ
@@ -43,6 +44,7 @@ export default function ProductionPage() {
   const [showDone, setShowDone] = useState(false)
   const [dragId, setDragId]     = useState(null)
   const [dragOver, setDragOver] = useState(null)
+  const [stage, setStage]       = useState(EMPTY_STAGE)
 
   useEffect(() => {
     let alive = true
@@ -55,7 +57,7 @@ export default function ProductionPage() {
       const ids = (data || []).filter(isV2).map(j => j.id)
       getStepsForJobs(ids).then(res => {
         if (!alive) return
-        const by = {}
+        const by = Object.fromEntries(ids.map(id => [id, []]))   // ใบงานที่ยังไม่มีแผน = [] (ยังไม่วางแผน)
         ;(res.data || []).forEach(st => { (by[st.job_order_id] ||= []).push(st) })
         setStepsBy(by)
       })
@@ -103,8 +105,8 @@ export default function ProductionPage() {
 
   const q = query.trim().toLowerCase()
   const visible = useMemo(
-    () => jobs.filter(j => matches(j, q) && (!onlyUrgent || (dueLabel(j).tone !== 'muted'))),
-    [jobs, q, onlyUrgent],
+    () => jobs.filter(j => matches(j, q) && (!onlyUrgent || (dueLabel(j).tone !== 'muted')) && matchStage(stage, stepsBy[j.id])),
+    [jobs, q, onlyUrgent, stage, stepsBy],
   )
   const unsorted = visible.filter(j => !STAGE_IDS.includes(j.status))
   const columns  = unsorted.length ? [UNSORTED, ...BOARD_STAGES] : BOARD_STAGES
@@ -140,6 +142,9 @@ export default function ProductionPage() {
           ))}
         </div>
       </div>
+
+      {/* ตัวกรองตามแผนการผลิต */}
+      <StageFilter jobs={jobs.filter(isV2)} stepsBy={stepsBy} value={stage} onChange={v => { setStage(v); if (v.now || v.pending) setView('plan') }} showDone={showDone} />
 
       {/* Summary */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
