@@ -266,17 +266,17 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         <div style={{ display: 'flex', flexDirection: 'column', gap: 7, minWidth: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 25, fontWeight: 800, lineHeight: 1, whiteSpace: 'nowrap' }}>ใบงานผลิต</span>
-            <span style={{ background: '#8B0B08', color: '#fff', fontWeight: 800, fontSize: 16, padding: '3px 12px', borderRadius: 6, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{job.code}</span>
+            <span style={{ background: '#8A6500', color: '#fff', fontWeight: 800, fontSize: 16, padding: '3px 12px', borderRadius: 6, fontFamily: 'monospace', whiteSpace: 'nowrap' }}>{job.code}</span>
             <span className={`jo-badge ${overall.tone}`} style={{ fontSize: 13 }}>สถานะรวม: {overall.label}</span>
           </div>
           <div style={{ fontSize: 15.5, fontWeight: 800 }}>
-            อ้างอิง {invoice ? <Link href={docHref('invoice', invoice.id)} style={{ color: '#B80F0B' }}>{invoice.code}</Link> : src.invoice_code || '—'} · รายการที่ {src.item_no || '—'} จาก {src.item_count || '—'}
+            อ้างอิง {invoice ? <Link href={docHref('invoice', invoice.id)} style={{ color: '#B8860B' }}>{invoice.code}</Link> : src.invoice_code || '—'} · รายการที่ {src.item_no || '—'} จาก {src.item_count || '—'}
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <input className="jo-in" aria-label="ชื่อสินค้า" value={d.product?.name || ''} onChange={e => set('product.name', e.target.value)}
-              style={{ width: 'auto', minWidth: 220, flex: '0 1 320px', background: '#F8E1E0', borderColor: '#F8E1E0', fontWeight: 800, fontSize: 16, color: '#8B0B08' }} />
+              style={{ width: 'auto', minWidth: 220, flex: '0 1 320px', background: '#F7E7B4', borderColor: '#F7E7B4', fontWeight: 800, fontSize: 16, color: '#8A6500' }} />
             <span style={{ fontWeight: 800, fontSize: 16 }}>— {total || d.product?.qty || 0} ตัว</span>
-            <span style={{ fontSize: 12.5, color: '#6B5B5A' }}>สร้าง {thDateLong(job.document_date || job.created_at?.slice(0, 10))}{d.created_by_email ? ` โดย ${d.created_by_email}` : ''}</span>
+            <span style={{ fontSize: 12.5, color: '#6B6250' }}>สร้าง {thDateLong(job.document_date || job.created_at?.slice(0, 10))}{d.created_by_email ? ` โดย ${d.created_by_email}` : ''}</span>
           </div>
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -314,8 +314,8 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   const me = n === src.item_no
                   const other = siblings.find(s => s.invoice_item_no === n && s.id !== job.id)
                   return (
-                    <tr key={n} style={me ? { background: '#FBEDEC', fontWeight: 800 } : undefined}>
-                      <td style={{ textAlign: 'center', color: '#8B0B08', fontSize: 16 }}>{me ? '◉' : '○'}</td>
+                    <tr key={n} style={me ? { background: '#FDF6E3', fontWeight: 800 } : undefined}>
+                      <td style={{ textAlign: 'center', color: '#8A6500', fontSize: 16 }}>{me ? '◉' : '○'}</td>
                       <td>{n}</td><td>{it.desc || '—'}</td><td>{Number(it.qty) || sizeTotal(it.sizes)} ตัว</td>
                       <td>{me ? 'ใบงานนี้'
                         : other ? <Link href={docHref('joborder', other.id)} style={{ fontWeight: 700, color: '#1E40AF', textDecoration: 'none' }}>{other.code} ›</Link>
@@ -342,7 +342,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
           ))}
         </div>
         <div className="jo-grid2" style={{ padding: '0 14px 14px', gridTemplateColumns: 'minmax(0,1.5fr) minmax(0,1fr)' }}>
-          <div style={{ border: '1px solid #EBD3D1', borderRadius: 8, overflow: 'hidden' }}>
+          <div style={{ border: '1px solid #E9D9A6', borderRadius: 8, overflow: 'hidden' }}>
             <div className="table-wrap">
               <table className="jo-tbl" style={{ textAlign: 'center' }}>
                 <thead><tr><th style={{ width: 92 }}>ไซส์</th>{(d.sizes || []).map(s => (
@@ -353,11 +353,11 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   {(d.sizes || []).map(s => (
                     <td key={s} style={{ padding: '6px 3px' }}><input className="jo-in" inputMode="numeric" aria-label={`จำนวนไซส์ ${s}`} value={d.qtys?.[s] || ''} onChange={e => set(`qtys.${s}`, e.target.value.replace(/[^\d]/g, ''))} style={{ width: 50, textAlign: 'center', padding: 0, fontWeight: 700 }} /></td>
                   ))}
-                  <td style={{ background: '#F8E1E0', fontWeight: 800, fontSize: 17 }}>{total}</td>
+                  <td style={{ background: '#F7E7B4', fontWeight: 800, fontSize: 17 }}>{total}</td>
                 </tr></tbody>
               </table>
             </div>
-            <div style={{ padding: '6px 10px', fontSize: 12.5, borderTop: '1px solid #F1E4E3', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+            <div style={{ padding: '6px 10px', fontSize: 12.5, borderTop: '1px solid #F1E8CC', display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
               {d.product?.qty ? (total === d.product.qty
                 ? <b style={{ color: '#166534' }}>✓ ตรงกับ Invoice ({d.product.qty} ตัว)</b>
                 : <b style={{ color: '#B45309' }}>Invoice {d.product.qty} ตัว · ต่างกัน {total - d.product.qty > 0 ? '+' : ''}{total - d.product.qty}</b>) : null}
@@ -377,7 +377,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
           <div className="jo-hd">แบบเสื้อ (Mockup) <small>แสดงฉบับอนุมัติล่าสุด</small></div>
           <div style={{ flex: 1, display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, padding: 12 }}>
             {[['front', 'ด้านหน้า', mockFront], ['back', 'ด้านหลัง', mockBack]].map(([side, label, f]) => (
-              <div key={side} style={{ position: 'relative', background: '#FAF6F6', border: '1.5px dashed #EBD3D1', borderRadius: 8, padding: '34px 10px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 230 }}>
+              <div key={side} style={{ position: 'relative', background: '#FBF8EE', border: '1.5px dashed #E9D9A6', borderRadius: 8, padding: '34px 10px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 8, minHeight: 230 }}>
                 <span style={{ position: 'absolute', top: 8, left: 8, background: '#D7141A', color: '#fff', fontSize: 12, fontWeight: 800, padding: '2px 8px', borderRadius: 4 }}>{label}</span>
                 {f ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -399,8 +399,8 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
             <button type="button" className="jo-hbtn" onClick={() => set('decorations', [...(d.decorations || []), { id: rid(), technique: '', position: '', size: '', colors: '', image_url: '' }])}>+ เพิ่ม</button>
           </div>
           {(d.decorations || []).map((x, i) => (
-            <div key={x.id || i} style={{ display: 'grid', gridTemplateColumns: '64px minmax(0,1fr) 28px', gap: 10, padding: '10px 12px', borderTop: i ? '1px solid #F1E4E3' : 'none' }}>
-              <label style={{ width: 64, height: 64, borderRadius: 6, background: x.image_url ? '#fff' : '#8B0B08', border: '1px solid #EBD3D1', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', color: '#fff', fontSize: 11, textAlign: 'center' }} title="แนบรูปลาย">
+            <div key={x.id || i} style={{ display: 'grid', gridTemplateColumns: '64px minmax(0,1fr) 28px', gap: 10, padding: '10px 12px', borderTop: i ? '1px solid #F1E8CC' : 'none' }}>
+              <label style={{ width: 64, height: 64, borderRadius: 6, background: x.image_url ? '#fff' : '#8A6500', border: '1px solid #E9D9A6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', color: '#fff', fontSize: 11, textAlign: 'center' }} title="แนบรูปลาย">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 {x.image_url ? <img src={x.image_url} alt="ลาย" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : '+ รูปลาย'}
                 <input type="file" accept="image/*" hidden onChange={e => { decoImage(i, e.target.files?.[0]); e.target.value = '' }} />
@@ -442,7 +442,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   const isLatestApproved = f.approved && latest?.id === f.id
                   return (
                     <tr key={f.id} style={!f.approved && latest?.id !== f.id ? { color: '#9CA3AF' } : undefined}>
-                      <td><b>{fileKindLabel(f.kind)}</b>{f.side ? <span style={{ fontSize: 12, color: '#6B5B5A' }}> · {f.side === 'front' ? 'หน้า' : 'หลัง'}</span> : null}</td>
+                      <td><b>{fileKindLabel(f.kind)}</b>{f.side ? <span style={{ fontSize: 12, color: '#6B6250' }}> · {f.side === 'front' ? 'หน้า' : 'หลัง'}</span> : null}</td>
                       <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isImage(f) ? '🖼 ' : '📄 '}{f.name}</td>
                       <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>v{f.version}</td>
                       <td>
@@ -451,7 +451,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                           : <span className="jo-badge doing">รออนุมัติ</span>}
                         {' '}<button type="button" className="jo-chip" style={{ height: 26, fontSize: 12 }} onClick={() => toggleApprove(f)}>{f.approved ? 'ยกเลิกอนุมัติ' : 'อนุมัติ'}</button>
                       </td>
-                      <td style={{ fontSize: 12.5, color: '#6B5B5A' }}>{f.uploaded_by || '—'} · {fmtTime(f.created_at)}</td>
+                      <td style={{ fontSize: 12.5, color: '#6B6250' }}>{f.uploaded_by || '—'} · {fmtTime(f.created_at)}</td>
                       <td style={{ whiteSpace: 'nowrap' }}><a href={f.url} target="_blank" rel="noreferrer" style={{ fontWeight: 700 }}>เปิดดู</a> <button type="button" className="jo-x" aria-label="ลบไฟล์" onClick={() => removeFile(f)}>×</button></td>
                     </tr>
                   )
@@ -460,7 +460,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
               </tbody>
             </table>
           </div>
-          <div style={{ textAlign: 'center', fontSize: 12.5, color: '#6B5B5A' }}>
+          <div style={{ textAlign: 'center', fontSize: 12.5, color: '#6B6250' }}>
             {job.drive_folder_id
               ? <a href={`https://drive.google.com/drive/folders/${job.drive_folder_id}`} target="_blank" rel="noreferrer" style={{ fontWeight: 800 }}>📁 เปิดโฟลเดอร์ Drive<br />ของใบงานนี้</a>
               : 'ลูกค้ายังไม่มีโฟลเดอร์ Drive — ไฟล์เก็บในระบบแทน'}
@@ -490,8 +490,8 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   onDragLeave={() => setOverIdx(null)} onDrop={() => { moveStep(dragIdx, i); setDragIdx(null); setOverIdx(null) }}>
                   <td style={{ whiteSpace: 'nowrap' }}>
                     <span className="jo-drag" aria-hidden>⋮⋮</span>
-                    <button type="button" aria-label="เลื่อนขึ้น" disabled={i === 0} onClick={() => moveStep(i, i - 1)} style={{ border: 'none', background: 'none', padding: '0 2px', color: '#8B0B08' }}>▲</button>
-                    <button type="button" aria-label="เลื่อนลง" disabled={i === ordered.length - 1} onClick={() => moveStep(i, i + 1)} style={{ border: 'none', background: 'none', padding: '0 2px', color: '#8B0B08' }}>▼</button>
+                    <button type="button" aria-label="เลื่อนขึ้น" disabled={i === 0} onClick={() => moveStep(i, i - 1)} style={{ border: 'none', background: 'none', padding: '0 2px', color: '#8A6500' }}>▲</button>
+                    <button type="button" aria-label="เลื่อนลง" disabled={i === ordered.length - 1} onClick={() => moveStep(i, i + 1)} style={{ border: 'none', background: 'none', padding: '0 2px', color: '#8A6500' }}>▼</button>
                   </td>
                   <td style={{ fontWeight: 700 }}>{i + 1}</td>
                   <td><input className="jo-in" list="jo-opt-steps" aria-label="ชื่อขั้นตอน" defaultValue={s.name} style={{ width: 120, fontWeight: 700 }}
@@ -517,19 +517,19 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
           </table>
           <datalist id="jo-opt-steps">{QUICK_STEPS.map(t => <option key={t} value={t} />)}</datalist>
         </div>
-        <div style={{ padding: '10px 14px', borderTop: '1px solid #F1E4E3', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 13, color: '#6B5B5A', fontWeight: 700 }}>เพิ่มเร็ว:</span>
+        <div style={{ padding: '10px 14px', borderTop: '1px solid #F1E8CC', display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 13, color: '#6B6250', fontWeight: 700 }}>เพิ่มเร็ว:</span>
           {QUICK_STEPS.map(t => <button key={t} type="button" className="jo-chip" onClick={() => addStep(t)}>+ {t}</button>)}
         </div>
-        <div style={{ padding: '10px 14px 14px', borderTop: '1px solid #F1E4E3' }}>
+        <div style={{ padding: '10px 14px 14px', borderTop: '1px solid #F1E8CC' }}>
           <div style={{ fontWeight: 800, marginBottom: 6 }}>ประวัติการเปลี่ยนแปลง</div>
           {logs.length ? (
             <div style={{ display: 'grid', gridTemplateColumns: 'auto auto 1fr', gap: '4px 14px', fontSize: 13.5 }}>
               {logs.slice(0, 30).map(l => (
                 <div key={l.id} style={{ display: 'contents' }}>
-                  <span style={{ color: '#6B5B5A', whiteSpace: 'nowrap' }}>{fmtTime(l.changed_at)}</span>
+                  <span style={{ color: '#6B6250', whiteSpace: 'nowrap' }}>{fmtTime(l.changed_at)}</span>
                   <b style={{ whiteSpace: 'nowrap' }}>{l.changed_by}</b>
-                  <span>{l.step_name && l.to_status ? <>{l.step_name}: {l.from_status} → <b className={`jo-badge ${statusCls(l.to_status)}`}>{l.to_status}</b></> : l.step_name ? `${l.step_name}: ` : null}{l.detail ? <span style={{ color: '#6B5B5A' }}> {l.detail}</span> : null}</span>
+                  <span>{l.step_name && l.to_status ? <>{l.step_name}: {l.from_status} → <b className={`jo-badge ${statusCls(l.to_status)}`}>{l.to_status}</b></> : l.step_name ? `${l.step_name}: ` : null}{l.detail ? <span style={{ color: '#6B6250' }}> {l.detail}</span> : null}</span>
                 </div>
               ))}
             </div>
@@ -544,7 +544,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
           <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 14px' }}>
             {QC_ITEMS.map(q => (
               <label key={q.key} style={{ display: 'flex', gap: 8, alignItems: 'center', minHeight: 36, fontSize: 14 }}>
-                <input type="checkbox" checked={!!d.qc?.[q.key]} onChange={e => set(`qc.${q.key}`, e.target.checked)} style={{ width: 18, height: 18, accentColor: '#8B0B08' }} />
+                <input type="checkbox" checked={!!d.qc?.[q.key]} onChange={e => set(`qc.${q.key}`, e.target.checked)} style={{ width: 18, height: 18, accentColor: '#8A6500' }} />
                 {q.label}{q.key === 'qty' ? ` (${total} ตัว)` : ''}
               </label>
             ))}

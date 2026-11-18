@@ -43,14 +43,14 @@ export default function JobPrint({ job, d, steps, files, invoice, siblings = [],
             <img src="/cscreen-logo.png" alt="CSCREEN" style={{ height: 62, width: 'auto' }} />
             <div style={{ display: 'flex', flexDirection: 'column', gap: 2, minWidth: 0 }}>
               <b style={{ fontSize: 10, letterSpacing: 2.4 }}>C STYLE APPAREL</b>
-              <span style={{ fontSize: 8.5, color: '#6B5B5A', lineHeight: 1.25 }}>{SHOP.name}<br />โทร {SHOP.tel}</span>
+              <span style={{ fontSize: 8.5, color: '#6B6250', lineHeight: 1.25 }}>{SHOP.name}<br />โทร {SHOP.tel}</span>
             </div>
           </div>
           <div style={{ textAlign: 'center', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 3 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}><span style={{ fontSize: 24, fontWeight: 800, lineHeight: 1 }}>ใบงานผลิต</span><span className="a4-code">{job.code}</span></div>
             <b style={{ fontSize: 13 }}>อ้างอิง {src.invoice_code || '—'} · รายการที่ {src.item_no || '—'} จาก {src.item_count || '—'}</b>
             <span className="a4-pill">{d.product?.name || '—'} — {total || d.product?.qty || 0} ตัว</span>
-            <span style={{ fontSize: 8.5, color: '#6B5B5A' }}>1 ใบงาน = 1 แบบสินค้า · INV เดียวสร้างได้หลายใบงาน</span>
+            <span style={{ fontSize: 8.5, color: '#6B6250' }}>1 ใบงาน = 1 แบบสินค้า · INV เดียวสร้างได้หลายใบงาน</span>
           </div>
           <div style={{ fontSize: 10, textAlign: 'center', lineHeight: 1.5 }}>วันที่สร้างใบงาน<br /><b style={{ fontSize: 11.5 }}>{thDateLong(job.document_date || String(job.created_at || '').slice(0, 10)) || '—'}</b></div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
@@ -128,7 +128,7 @@ export default function JobPrint({ job, d, steps, files, invoice, siblings = [],
                 </div>
               ))}
               {!(d.decorations || []).length && <div style={{ padding: 8, color: '#9CA3AF' }}>ไม่มีงานตกแต่ง</div>}
-              {(d.decorations || []).length > 3 && <div style={{ padding: '2px 8px', fontSize: 10, color: '#6B5B5A' }}>+ อีก {(d.decorations || []).length - 3} จุด (ดูในระบบ)</div>}
+              {(d.decorations || []).length > 3 && <div style={{ padding: '2px 8px', fontSize: 10, color: '#6B6250' }}>+ อีก {(d.decorations || []).length - 3} จุด (ดูในระบบ)</div>}
             </div>
             <div className="a4-card" style={{ flex: 1 }}><div className="a4-hd">ไฟล์งานที่ใช้</div>
               <div className="a4-files">
@@ -167,7 +167,7 @@ export default function JobPrint({ job, d, steps, files, invoice, siblings = [],
                   <td><span className={`a4-st ${statusCls(s.status)}`}>{s.status}</span></td></tr>
               ))}
               {!rows.length && <tr><td colSpan={7} style={{ color: '#9CA3AF', padding: 8 }}>ยังไม่มีแผนการผลิต</td></tr>}
-              {steps.length > rows.length && <tr><td colSpan={7} style={{ fontSize: 10, color: '#6B5B5A' }}>+ อีก {steps.length - rows.length} ขั้นตอน (ดูในระบบ)</td></tr>}
+              {steps.length > rows.length && <tr><td colSpan={7} style={{ fontSize: 10, color: '#6B6250' }}>+ อีก {steps.length - rows.length} ขั้นตอน (ดูในระบบ)</td></tr>}
             </tbody>
           </table>
         </section>

@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getReceipts, updateReceipt, deleteReceipt } from '@/lib/db'
+import { getReceipts, updateReceipt, deleteReceipt, updateInvoice } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { fmtDate, SHOP } from '@/lib/shop'
 import { todayStr, exportJpeg, shareDoc, uploadFile, printDoc } from '@/lib/docUtils'
@@ -9,6 +9,7 @@ import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
 import StoredFileLink from '@/components/StoredFileLink'
+import { MockupPanel, MockupImage, useInvoiceJobs } from '@/components/MockupAttach'
 
 /* ── Green theme ──────────────────────────────────────────── */
 const C = {
@@ -53,6 +54,18 @@ export default function ReceiptPage() {
   const [filterPaid, setFilter]       = useState('')
   const [view, setView]               = useState(null)
   const doc = useDocView(setView)
+  const viewJobs = useInvoiceJobs(view?.invoice_id)
+
+  // รูป Mockup เก็บที่ใบแจ้งหนี้ — ใบเสร็จใช้รูปเดียวกัน
+  async function saveMockup(r, u) {
+    if (!r.invoice_id) return notify.warn('ใบเสร็จนี้ไม่ได้ผูกกับใบแจ้งหนี้')
+    const { error } = await updateInvoice(r.invoice_id, { mockup_url: u || null })
+    if (error) return notify.error('บันทึกรูปไม่สำเร็จ: ' + error.message)
+    const patch = x => x.invoice_id === r.invoice_id ? { ...x, invoices: { ...(x.invoices || {}), mockup_url: u || null } } : x
+    setView(v => v && patch(v))
+    setRows(rs => rs.map(patch))
+    notify.success(u ? 'แนบรูป Mockup แล้ว' : 'ลบรูป Mockup แล้ว')
+  }
   const [payMethod, setPayMethod]     = useState('โอน')
   const [fileUploading, setFileUploading] = useState(false)
   const [monthFilter, setMonthFilter] = useState(new Date().toISOString().slice(0, 7))
@@ -161,6 +174,12 @@ export default function ReceiptPage() {
         </div>
 
         <DocChain current="receipt" doc={view} />
+
+        {view.invoice_id && (
+          <div style={{ marginBottom: 12 }}>
+            <MockupPanel url={view.invoices?.mockup_url} jobs={viewJobs} color={C.primary} onChange={u => saveMockup(view, u)} />
+          </div>
+        )}
 
         {/* ── PRINT AREA ── */}
         <div id="print-area" style={{
@@ -339,7 +358,8 @@ export default function ReceiptPage() {
 
             {/* ── SUMMARY + NOTES ── */}
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 272px', gap: 10, marginTop: 8, alignItems: 'start' }}>
-              {/* Notes */}
+              {/* Notes + Mockup */}
+              <div>
               <div style={{ border: '1px dashed #cbd5e1', borderRadius: 10, padding: 10, background: '#fcfcfc', fontSize: 11, color: '#374151', lineHeight: 1.8 }}>
                 <div style={{ fontWeight: 900, color: C.dark, marginBottom: 4, fontSize: 11 }}>หมายเหตุ / เงื่อนไขการรับเงิน</div>
                 <>
@@ -347,6 +367,8 @@ export default function ReceiptPage() {
                   2) กรุณาเก็บใบเสร็จนี้ไว้เป็นหลักฐานการชำระเงิน<br />
                   3) ขอบคุณที่ใช้บริการ C-SCREEN
                 </>
+              </div>
+              <MockupImage url={view.invoices?.mockup_url} jobs={viewJobs} color={C.dark} />
               </div>
               {/* Totals */}
               <div style={{ border: '1px solid #e5e7eb', borderRadius: 10, overflow: 'hidden', fontSize: 12 }}>

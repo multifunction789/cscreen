@@ -166,7 +166,7 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
             const dayJobs = jobsByDay[day] || []
             const dateObj = new Date(year, m - 1, day)
             return (
-              <div key={di} style={{ minHeight: 90, padding: '4px 6px', borderLeft: di > 0 ? '1px solid var(--border)' : 'none', background: isToday ? 'rgba(184,15,11,0.05)' : 'transparent' }}>
+              <div key={di} style={{ minHeight: 90, padding: '4px 6px', borderLeft: di > 0 ? '1px solid var(--border)' : 'none', background: isToday ? 'rgba(184,134,11,0.08)' : 'transparent' }}>
                 <div style={{
                   fontSize: 12, fontWeight: isToday ? 900 : 400, marginBottom: 3,
                   width: 22, height: 22, display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
@@ -179,9 +179,9 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
                   return (
                     <div key={j.id} onClick={() => onView(j)} style={{
                       fontSize: 10, padding: '2px 5px', borderRadius: 4, marginBottom: 2, cursor: 'pointer',
-                      background: done ? '#D1FAE5' : overdue ? '#FEE2E2' : '#EFF6FF',
+                      background: done ? '#D1FAE5' : overdue ? '#FEE2E2' : '#FDF6E3',
                       color:      done ? '#065f46' : overdue ? '#991B1B' : '#1E40AF',
-                      border: `1px solid ${done ? '#A7F3D0' : overdue ? '#FECACA' : '#BFDBFE'}`,
+                      border: `1px solid ${done ? '#A7F3D0' : overdue ? '#FECACA' : '#EBD58F'}`,
                       fontWeight: 600, overflow: 'hidden', whiteSpace: 'nowrap', textOverflow: 'ellipsis',
                     }}>
                       {j.code} {j.customers?.name || ''}
@@ -195,7 +195,7 @@ function CalendarView({ jobs, month, onMonthChange, onView }) {
       ))}
       {/* Legend */}
       <div style={{ padding: '8px 16px', display: 'flex', gap: 14, fontSize: 11, color: 'var(--text-muted)' }}>
-        {[['#EFF6FF','#BFDBFE','ปกติ'],['#FEE2E2','#FECACA','เลยกำหนด'],['#D1FAE5','#A7F3D0','ส่งแล้ว']].map(([bg, border, label]) => (
+        {[['#FDF6E3','#EBD58F','ปกติ'],['#FEE2E2','#FECACA','เลยกำหนด'],['#D1FAE5','#A7F3D0','ส่งแล้ว']].map(([bg, border, label]) => (
           <span key={label} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
             <span style={{ width: 10, height: 10, borderRadius: 2, background: bg, border: `1px solid ${border}`, display: 'inline-block' }} />{label}
           </span>
@@ -591,7 +591,7 @@ export default function JobOrderPage() {
   if (view && isV2(view)) {
     const inv = invoices.find(i => i.id === view.invoice_id) || null
     return (
-      <div>
+      <div className="jo-theme">
         {doc.param}
         <JobEditor key={view.id} job={view} invoice={inv} suppliers={suppliers}
           siblings={rows.filter(r => r.invoice_id && r.invoice_id === view.invoice_id)}
@@ -649,7 +649,7 @@ export default function JobOrderPage() {
     )
 
     return (
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
+      <div className="jo-theme" style={{ maxWidth: 960, margin: '0 auto', padding: 24 }}>
         {doc.param}
         {/* Toolbar */}
         <div className="no-print" style={{ display: 'flex', justifyContent: 'space-between', marginBottom: 16 }}>
@@ -705,7 +705,7 @@ export default function JobOrderPage() {
               <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', marginBottom: 12 }}>
                 {[{ l: 'ประเภทผ้า', v: fabric_type }, { l: 'สีเสื้อ', v: shirt_color }, { l: 'สีสกรีน', v: screen_color }]
                   .filter(f => f.v).map(f => (
-                    <div key={f.l} style={{ background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
+                    <div key={f.l} style={{ background: '#FDF6E3', border: '1px solid #EBD58F', borderRadius: 6, padding: '5px 12px', fontSize: 12 }}>
                       <span style={{ color: '#666' }}>{f.l}: </span><span style={{ fontWeight: 700 }}>{f.v}</span>
                     </div>
                   ))}
@@ -782,7 +782,7 @@ export default function JobOrderPage() {
             {/* Mockup images */}
             {mockup_images?.length > 0 && (
               <div style={{ marginBottom: 12 }}>
-                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#1D4ED8', padding: '4px 10px', letterSpacing: .5, borderRadius: '8px 8px 0 0' }}>MOCKUP ({mockup_images.length} รูป)</div>
+                <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: '#9A6F00', padding: '4px 10px', letterSpacing: .5, borderRadius: '8px 8px 0 0' }}>MOCKUP ({mockup_images.length} รูป)</div>
                 <div style={{ display: 'grid', gridTemplateColumns: mockup_images.length === 1 ? '1fr' : 'repeat(2,1fr)', gap: 8, border: '1px solid var(--border)', borderTop: 'none', borderRadius: '0 0 8px 8px', padding: 8 }}>
                   {mockup_images.map((url, i) => (
                     <img key={i} src={url} alt={`mockup-${i+1}`} crossOrigin="anonymous"
@@ -806,7 +806,7 @@ export default function JobOrderPage() {
             {/* Fallback สำหรับข้อมูลเก่าที่ยังไม่ migrate */}
             {(!mockup_images?.length && !artwork_images?.length) && (mockup_url || view.image_url) && (
               <div style={{ display: 'grid', gridTemplateColumns: mockup_url && view.image_url ? '1fr 1fr' : '1fr', gap: 12 }}>
-                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#1D4ED8' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
+                {[mockup_url && { url: mockup_url, label: 'MOCKUP', bg: '#9A6F00' }, view.image_url && { url: view.image_url, label: 'ARTWORK', bg: '#374151' }].filter(Boolean).map(({ url, label, bg }) => (
                   <div key={label} style={{ border: '1px solid var(--border)', borderRadius: 8, overflow: 'hidden' }}>
                     <div style={{ fontSize: 10, fontWeight: 700, color: '#fff', background: bg, padding: '4px 10px', letterSpacing: .5 }}>{label}</div>
                     <img src={url} alt={label} crossOrigin="anonymous"
@@ -850,18 +850,18 @@ export default function JobOrderPage() {
               {Object.keys(viewQcPreviews).filter(k => viewQcPreviews[k]).length > 0 && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:12, marginBottom:12 }}>
                   {Object.entries(viewQcPreviews).filter(([,v]) => v).map(([k, src]) => (
-                    <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #6366F1', background:'#fff' }}>
+                    <div key={k} style={{ borderRadius:10, overflow:'hidden', border:'2px solid #C99A1E', background:'#fff' }}>
                       <div style={{ position:'relative' }}>
                         <img src={src} alt={`new-${k}`}
                           style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                        <div style={{ position:'absolute', top:6, left:6, background:'#6366F1', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>รอบันทึก</div>
+                        <div style={{ position:'absolute', top:6, left:6, background:'#C99A1E', color:'#fff', fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20 }}>รอบันทึก</div>
                       </div>
-                      <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#EEF2FF' }}>
+                      <div style={{ display:'flex', alignItems:'center', padding:'6px 10px', background:'#FBF1D3' }}>
                         <input
                           placeholder="ชื่อรูป เช่น เสื้อแบบ A"
                           value={viewQcFiles[k]?.label || ''}
                           onChange={e => setViewQcFiles(f => ({ ...f, [k]: { ...f[k], label: e.target.value } }))}
-                          style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5' }}
+                          style={{ flex:1, fontSize:11, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#8A6500' }}
                         />
                         <button onClick={() => { setViewQcFiles(f=>{const n={...f};delete n[k];return n}); setViewQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
                           style={{ fontSize:11, padding:'3px 8px', borderRadius:6, border:'1.5px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700 }}>ลบ</button>
@@ -877,7 +877,7 @@ export default function JobOrderPage() {
                 cursor:'pointer', fontSize:13, fontWeight:700, color:'#64748B',
                 transition:'border-color .15s, background .15s',
               }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.background='#EFF6FF' }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor='var(--primary)'; e.currentTarget.style.background='#FDF6E3' }}
                 onMouseLeave={e => { e.currentTarget.style.borderColor='#CBD5E1'; e.currentTarget.style.background='#F8FAFC' }}
               >
                 <span style={{ fontSize:18 }}>📎</span> เพิ่มรูป QC
@@ -932,7 +932,7 @@ export default function JobOrderPage() {
 
   // ──── LIST VIEW ─────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+    <div className="jo-theme" style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
       {doc.param}
       {pickerEl}
       {opening && (
@@ -1197,9 +1197,9 @@ export default function JobOrderPage() {
             {referenceFiles.length > 0 && (
               <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:8, marginBottom:8 }}>
                 {referenceFiles.map((item, i) => (
-                  <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                  <div key={i} style={{ position:'relative', borderRadius:8, overflow:'hidden', border:'2px solid #C99A1E' }}>
                     <img src={item.preview} alt={`new-ref-${i}`} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                    <div style={{ position:'absolute', top:4, left:4, background:'#6366F1', color:'#fff', fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10 }}>ใหม่</div>
+                    <div style={{ position:'absolute', top:4, left:4, background:'#C99A1E', color:'#fff', fontSize:9, fontWeight:700, padding:'1px 6px', borderRadius:10 }}>ใหม่</div>
                     <button onClick={() => setReferenceFiles(f => f.filter((_,j)=>j!==i))}
                       style={{ position:'absolute', top:4, right:4, width:20, height:20, borderRadius:'50%', background:'rgba(0,0,0,.55)', border:'none', color:'#fff', fontSize:11, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center' }}>✕</button>
                   </div>
@@ -1213,7 +1213,7 @@ export default function JobOrderPage() {
               background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B',
               transition:'all .15s',
             }}
-              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+              onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#FDF6E3'}}
               onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
             >
               <span>🖼️</span> เพิ่มรูป Reference (เลือกได้หลายรูปพร้อมกัน)
@@ -1254,9 +1254,9 @@ export default function JobOrderPage() {
               {artworkFiles.length > 0 && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
                   {artworkFiles.map((item, i) => (
-                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #C99A1E' }}>
                       <img src={item.preview} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#EEF2FF' }}>
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#FBF1D3' }}>
                         <button onClick={() => setArtworkFiles(f => f.filter((_,j)=>j!==i))}
                           style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
                       </div>
@@ -1265,7 +1265,7 @@ export default function JobOrderPage() {
                 </div>
               )}
               <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B' }}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#FDF6E3'}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
                 🎨 เพิ่มรูป Artwork
                 <input type="file" accept="image/*" multiple style={{ display:'none' }}
@@ -1311,9 +1311,9 @@ export default function JobOrderPage() {
               {mockupFiles.length > 0 && (
                 <div style={{ display:'grid', gridTemplateColumns:'repeat(2,1fr)', gap:8 }}>
                   {mockupFiles.map((item, i) => (
-                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                    <div key={i} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #C99A1E' }}>
                       <img src={item.preview} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#EEF2FF' }}>
+                      <div style={{ display:'flex', justifyContent:'flex-end', padding:'3px 6px', background:'#FBF1D3' }}>
                         <button onClick={() => setMockupFiles(f => f.filter((_,j)=>j!==i))}
                           style={{ fontSize:10, padding:'2px 6px', borderRadius:4, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer' }}>ลบ</button>
                       </div>
@@ -1322,7 +1322,7 @@ export default function JobOrderPage() {
                 </div>
               )}
               <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:8, padding:'10px', borderRadius:10, border:'2px dashed #CBD5E1', background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700, color:'#64748B' }}
-                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+                onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#FDF6E3'}}
                 onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}>
                 👕 เพิ่มรูป Mockup
                 <input type="file" accept="image/*" multiple style={{ display:'none' }}
@@ -1370,12 +1370,12 @@ export default function JobOrderPage() {
           {Object.keys(qcPreviews).filter(k => qcPreviews[k]).length > 0 && (
             <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:12 }}>
               {Object.entries(qcPreviews).filter(([,v])=>v).map(([k, src]) => (
-                <div key={k} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #6366F1' }}>
+                <div key={k} style={{ borderRadius:8, overflow:'hidden', border:'2px solid #C99A1E' }}>
                   <img src={src} alt={k} style={{ width:'100%', aspectRatio:'4/3', objectFit:'cover', display:'block' }} />
-                  <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#EEF2FF', gap:4 }}>
+                  <div style={{ display:'flex', alignItems:'center', padding:'4px 8px', background:'#FBF1D3', gap:4 }}>
                     <input placeholder="ชื่อรูป" value={qcFiles[k]?.label||''}
                       onChange={e => setQcFiles(f=>({...f,[k]:{...f[k],label:e.target.value}}))}
-                      style={{ flex:1, fontSize:10, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#4F46E5', minWidth:0 }} />
+                      style={{ flex:1, fontSize:10, border:'none', background:'transparent', outline:'none', fontWeight:600, color:'#8A6500', minWidth:0 }} />
                     <button onClick={() => { setQcFiles(f=>{const n={...f};delete n[k];return n}); setQcPreviews(p=>{const n={...p};delete n[k];return n}) }}
                       style={{ fontSize:10, padding:'2px 6px', borderRadius:5, border:'1px solid #FCA5A5', background:'#fff', color:'#EF4444', cursor:'pointer', fontWeight:700, flexShrink:0 }}>ลบ</button>
                   </div>
@@ -1389,7 +1389,7 @@ export default function JobOrderPage() {
             background:'#F8FAFC', cursor:'pointer', fontSize:12, fontWeight:700,
             color:'#64748B', marginBottom:20, transition:'all .15s',
           }}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#EFF6FF'}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--primary)';e.currentTarget.style.background='#FDF6E3'}}
             onMouseLeave={e=>{e.currentTarget.style.borderColor='#CBD5E1';e.currentTarget.style.background='#F8FAFC'}}
           >
             <span>📎</span> เพิ่มรูป QC (เลือกได้หลายรูปพร้อมกัน)
