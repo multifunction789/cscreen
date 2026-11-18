@@ -1,6 +1,6 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { insertJobOrder, updateJobOrder, currentUserEmail } from '@/lib/db'
+import { insertJobOrder, updateJobOrder, insertJobFile, currentUserEmail } from '@/lib/db'
 import { buildFromInvoice, nextJobCodes, sizeTotal } from '@/lib/jobV2'
 import { createJobFolderClient } from '@/lib/driveClient'
 import { notify } from '@/lib/feedback'
@@ -67,6 +67,12 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
           if (folderId) { await updateJobOrder(data.id, { drive_folder_id: folderId }); data.drive_folder_id = folderId }
         } catch { /* ข้ามได้ */ }
       }
+      // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → เป็น Mockup ด้านหน้าของใบงาน (ไม่สำเร็จก็ข้ามได้ แนบใหม่ในใบงานได้)
+      if (inv.mockup_url) {
+        try {
+          await insertJobFile({ job_order_id: data.id, kind: 'mockup', side: 'front', name: `mockup_${inv.code || ''}`, url: inv.mockup_url, thumb_url: inv.mockup_url, version: 1, approved: false, uploaded_by: email || null })
+        } catch { /* ข้ามได้ */ }
+      }
       created.push(data)
     }
     setBusy(false)
@@ -95,10 +101,10 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
                   const made = jobs.filter(j => j.invoice_id === i.id && j.invoice_item_no).length
                   return (
                     <button key={i.id} type="button" onClick={() => chooseInvoice(i.id)}
-                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1.5px solid #EBD3D1', borderRadius: 8, background: '#fff', textAlign: 'left', fontSize: 14 }}>
-                      <b style={{ fontFamily: 'monospace', color: '#8B0B08', minWidth: 90 }}>{i.code}</b>
+                      style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 12px', border: '1.5px solid #E9D9A6', borderRadius: 8, background: '#fff', textAlign: 'left', fontSize: 14 }}>
+                      <b style={{ fontFamily: 'monospace', color: '#8A6500', minWidth: 90 }}>{i.code}</b>
                       <span style={{ flex: 1 }}>{i.customers?.name || '—'}</span>
-                      <span style={{ fontSize: 12.5, color: '#6B5B5A' }}>{n} รายการ · มีใบงาน {made}</span>
+                      <span style={{ fontSize: 12.5, color: '#6B6250' }}>{n} รายการ · มีใบงาน {made}</span>
                     </button>
                   )
                 })}
@@ -111,7 +117,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
                 <div><b style={{ fontSize: 16 }}>{inv.code}</b> · {inv.customers?.name}</div>
                 {!initialInvoiceId && <button className="jo-chip" onClick={() => { setInvId(''); setPicked([]) }}>เปลี่ยน Invoice</button>}
               </div>
-              <div style={{ fontSize: 13, color: '#6B5B5A' }}>เลือกรายการที่จะเปิดใบงาน — <b style={{ color: '#1F1A1A' }}>1 ใบงานต่อ 1 รายการ</b></div>
+              <div style={{ fontSize: 13, color: '#6B6250' }}>เลือกรายการที่จะเปิดใบงาน — <b style={{ color: '#1F1A1A' }}>1 ใบงานต่อ 1 รายการ</b></div>
               {items.map((it, idx) => {
                 const n = idx + 1
                 const has = existing[n]
@@ -119,15 +125,15 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
                 const sz = Object.entries(it.sizes || {}).filter(([, v]) => Number(v) > 0).map(([s, v]) => `${s} ${v}`).join(' · ')
                 return (
                   <label key={n} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '11px 12px', borderRadius: 9, cursor: has ? 'default' : 'pointer',
-                    border: on ? '2px solid #B80F0B' : '1.5px solid #EBD3D1', background: has ? '#FAFAFA' : on ? '#FDF3F2' : '#fff' }}>
-                    <input type="checkbox" disabled={!!has || busy || legacyJobs.length > 0} checked={on} onChange={() => toggle(n)} style={{ width: 20, height: 20, accentColor: '#B80F0B' }} />
+                    border: on ? '2px solid #B8860B' : '1.5px solid #E9D9A6', background: has ? '#FAFAFA' : on ? '#FDF8E8' : '#fff' }}>
+                    <input type="checkbox" disabled={!!has || busy || legacyJobs.length > 0} checked={on} onChange={() => toggle(n)} style={{ width: 20, height: 20, accentColor: '#B8860B' }} />
                     <span style={{ flex: 1, minWidth: 0 }}>
                       <b style={{ color: has ? '#6B7280' : '#1F1A1A' }}>{n} · {it.desc || '(ไม่มีชื่อรายการ)'}</b>
-                      <span style={{ display: 'block', fontSize: 12.5, color: '#6B5B5A' }}>{Number(it.qty) || sizeTotal(it.sizes)} ตัว{sz ? ` · ${sz}` : ''}</span>
+                      <span style={{ display: 'block', fontSize: 12.5, color: '#6B6250' }}>{Number(it.qty) || sizeTotal(it.sizes)} ตัว{sz ? ` · ${sz}` : ''}</span>
                     </span>
                     {has
                       ? <span className="jo-badge done">มีใบงานแล้ว · {has.code}</span>
-                      : <span style={{ fontSize: 12.5, color: '#6B5B5A' }}>ยังไม่มีใบงาน</span>}
+                      : <span style={{ fontSize: 12.5, color: '#6B6250' }}>ยังไม่มีใบงาน</span>}
                   </label>
                 )
               })}
@@ -140,7 +146,7 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
             </>
           )}
         </div>
-        <div style={{ padding: '12px 18px', borderTop: '1px solid #F1E4E3', background: '#FCF8F8', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        <div style={{ padding: '12px 18px', borderTop: '1px solid #F1E8CC', background: '#FCFAF2', display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
           <span style={{ fontSize: 13.5 }}>{inv && picked.length ? <>จะสร้าง <b>{picked.length} ใบงาน</b>: {nextJobCodes(jobs, inv.id, picked.length).join(', ')}</> : 'ยังไม่ได้เลือกรายการ'}</span>
           <div style={{ display: 'flex', gap: 8 }}>
             <button className="btn btn-outline" onClick={onClose} disabled={busy}>ยกเลิก</button>

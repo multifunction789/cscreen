@@ -1,5 +1,4 @@
 'use client'
-import ProductionFields from '@/components/ProductionFields'
 import { useState, useEffect } from 'react'
 import {
   getQuotations, insertQuotation, updateQuotation, deleteQuotation,
@@ -11,6 +10,7 @@ import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
+import { SIZES } from '@/lib/sizes'
 
 /* ── Blue theme ───────────────────────────────────────────── */
 const C = {
@@ -123,7 +123,8 @@ export default function QuotationPage() {
   async function handleSave() {
     if (!form.customer_id || form.items.length === 0) return notify.warn('กรุณาเลือกลูกค้าและเพิ่มรายการ')
     setSaving(true)
-    const items   = calcItems(form.items)
+    // รายละเอียดผลิต (คอ/ผ้า/สี) อยู่ในใบงาน — ใบเสนอราคาเก็บแค่ไซซ์ เหมือนใบแจ้งหนี้
+    const items   = calcItems(form.items).map(({ production, ...it }) => it) // eslint-disable-line no-unused-vars
     const payload = {
       customer_id: form.customer_id, valid_until: form.valid_until || null,
       document_date: form.document_date || todayStr(),
@@ -177,8 +178,9 @@ export default function QuotationPage() {
       const n = parseInt(r.code?.replace('INV-', '') || '0'); return n > max ? n : max
     }, 0)
     const code  = 'INV-' + String(Math.max(maxNum + 1, 1001)).padStart(4, '0')
-    const items = qt.items && qt.items.length ? qt.items
-      : [{ desc: qt.item_desc || '', qty: 1, price: qt.total || 0, amount: qt.total || 0 }]
+    const items = (qt.items && qt.items.length ? qt.items
+      : [{ desc: qt.item_desc || '', qty: 1, price: qt.total || 0, amount: qt.total || 0 }])
+      .map(({ production, ...it }) => it) // eslint-disable-line no-unused-vars
     const sub = items.reduce((s, it) => s + (it.amount || 0), 0)
     await insertInvoice({
       code, customer_id: qt.customer_id, quotation_id: qt.id,
@@ -589,10 +591,9 @@ export default function QuotationPage() {
                     <td style={{ padding: '3px 5px' }}>
                       <input type="text" placeholder="รายละเอียด" value={it.desc}
                         onChange={e => updateItem(i, 'desc', e.target.value)} style={{ width: '100%' }} />
-<ProductionFields prefix={`รายการ ${i + 1}`} value={it.production || {}} onChange={value => updateItem(i, 'production', value)} />
                       <div style={{ display:'flex', gap:4, marginTop:4, flexWrap:'wrap', alignItems:'center' }}>
                         <span style={{ fontSize:10, color:'var(--text-muted)', fontWeight:600 }}>ไซซ์:</span>
-                        {['SS','S','M','L','XL','2XL','3XL','4XL','5XL','6XL'].map(s => (
+                        {SIZES.map(s => (
                           <label key={s} style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:1 }}>
                             <span style={{ fontSize:9, color:'var(--text-muted)', fontWeight:600 }}>{s}</span>
                             <input type="number" min="0" placeholder="0"
