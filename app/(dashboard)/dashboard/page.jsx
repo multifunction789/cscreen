@@ -1,6 +1,7 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getJobOrdersList, getTransactions, getCustomers, getInvoicesLight, getReceiptsLight } from '@/lib/db'
+import { getJobOrdersList, getTransactions, getCustomers, getInvoicesLight, getReceiptsLight, getPaidReceipts, getPurchases } from '@/lib/db'
+import { isPaid } from '@/lib/purchases.mjs'
 import { computeReceivables } from '@/lib/receivables'
 import { isJobOverdue, daysUntil, byDueDate, DONE_STATUS } from '@/lib/jobStatus'
 import { notify } from '@/lib/feedback'
@@ -30,6 +31,26 @@ const todayTH = (() => {
   return `${d.getDate()} ${thMonthsFull[d.getMonth()]} ${d.getFullYear() + 543}`
 })()
 
+/** วันที่ (เวลาไทย) ของ timestamp → "YYYY-MM-DD" */
+const bkkDate = t => (t ? new Date(new Date(t).getTime() + 7 * 3600e3).toISOString().slice(0, 10) : null)
+
+/**
+ * รายการเงินเข้า-ออกสำหรับ Dashboard
+ *  • รายรับ = ใบเสร็จที่รับเงินแล้ว (ตามวันที่รับเงิน) + รายรับที่กรอกเองในหน้ารายรับ-รายจ่าย (ไม่ได้มาจากใบเสร็จ)
+ *  • รายจ่าย = หน้าจัดซื้อ ที่จ่ายแล้ว (ตามวันที่จ่ายจริง) — รายจ่ายเก่าถูกย้ายเข้าหน้าจัดซื้อแล้ว
+ *    (ถ้ายังไม่ได้รัน SQL หน้าจัดซื้อ → ใช้รายจ่ายจากหน้ารายรับ-รายจ่ายเหมือนเดิม)
+ */
+function ledger(txs, paidReceipts, purchases) {
+  const income = [
+    ...paidReceipts.map(r => ({ id: 'r-' + r.id, type: 'รายรับ', amount: Number(r.total) || 0, transaction_date: bkkDate(r.paid_at || r.created_at), description: `รับชำระ ${r.code}${r.invoices?.customers?.name ? ' · ' + r.invoices.customers.name : ''}` })),
+    ...txs.filter(t => t.type === 'รายรับ' && !t.receipt_id && !t.payment_submission_id && !String(t.code || '').startsWith('TX-VOID-')),
+  ]
+  const expense = purchases
+    ? purchases.filter(isPaid).map(p => ({ id: 'p-' + p.id, type: 'รายจ่าย', amount: Number(p.total) || 0, transaction_date: p.paid_at, description: `${p.code} · ${p.category || ''} ${p.items?.[0]?.desc || ''}`.trim() }))
+    : txs.filter(t => t.type === 'รายจ่าย')
+  return [...income, ...expense].sort((a, b) => String(b.transaction_date).localeCompare(String(a.transaction_date)))
+}
+
 export default function DashboardPage() {
   const [jobs, setJobs]       = useState([])
   const [txs, setTxs]         = useState([])
@@ -41,12 +62,12 @@ export default function DashboardPage() {
 
   useEffect(() => {
     // เดิมดึง job_orders + transactions ซ้ำสองรอบ (getDashboardStats) → คำนวณจากข้อมูลชุดเดียว
-    Promise.all([getJobOrdersList(), getTransactions(), getCustomers(), getInvoicesLight(), getReceiptsLight()])
-      .then(([jRes, tRes, cRes, iRes, rRes]) => {
-        const err = jRes.error || tRes.error || cRes.error || iRes.error || rRes.error
+    Promise.all([getJobOrdersList(), getTransactions(), getCustomers(), getInvoicesLight(), getReceiptsLight(), getPaidReceipts(), getPurchases()])
+      .then(([jRes, tRes, cRes, iRes, rRes, prRes, puRes]) => {
+        const err = jRes.error || tRes.error || cRes.error || iRes.error || rRes.error || prRes.error
         if (err) notify.error('โหลดข้อมูลไม่ครบ: ' + err.message)
         setJobs(jRes.data || [])
-        setTxs(tRes.data || [])
+        setTxs(ledger(tRes.data || [], prRes.data || [], puRes.error ? null : (puRes.data || [])))
         setCusts(cRes.data || [])
         setInvoices(iRes.data || [])
         setReceipts(rRes.data || [])
@@ -319,7 +340,7 @@ export default function DashboardPage() {
         <div className="card">
           <div style={{ padding: '16px 20px', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
             <h2 style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)' }}>💰 รายรับ-จ่ายล่าสุด</h2>
-            <Link href="/finance" className="btn btn-outline btn-sm">ดูทั้งหมด →</Link>
+            <Link href="/purchase" className="btn btn-outline btn-sm">ดูรายจ่ายทั้งหมด →</Link>
           </div>
           <div style={{ overflowX: 'auto' }}>
             <table>

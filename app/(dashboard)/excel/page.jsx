@@ -1,7 +1,7 @@
 'use client'
 import { notify } from '@/lib/feedback'
 import { useState } from 'react'
-import { getJobOrders, getQuotations, getReceipts, getCustomers, getMaterials, getStockIn, getTransactions, getSuppliers } from '@/lib/db'
+import { getJobOrders, getQuotations, getReceipts, getCustomers, getMaterials, getStockIn, getTransactions, getSuppliers, getPurchases } from '@/lib/db'
 import DateInput from '@/components/ui/DateInput'
 import { fmtDate } from '@/lib/shop'
 
@@ -14,6 +14,7 @@ const salesReports = [
 const stockReports = [
   { id: 'stock',      icon: '📦', label: 'สต๊อกวัตถุดิบ',         desc: 'Export สต๊อกคงเหลือ ณ วันปัจจุบัน' },
   { id: 'stock_in',   icon: '📥', label: 'ประวัติรับเข้าสต๊อก',   desc: 'Export รายการรับเข้าวัตถุดิบทั้งหมด' },
+  { id: 'purchase',   icon: '🛒', label: 'จัดซื้อ / ค่าใช้จ่าย',  desc: 'Export การซื้อ งานลูกค้า · เข้าสต๊อก · ค่าใช้จ่ายทั่วไป' },
   { id: 'finance',    icon: '💰', label: 'รายรับ-รายจ่าย',        desc: 'Export รายการเงินตามช่วงเวลา + สรุปกำไร' },
   { id: 'supplier',   icon: '🏢', label: 'Supplier',               desc: 'Export รายชื่อซัพพลายเออร์ทั้งหมด' },
 ]
@@ -77,6 +78,18 @@ async function fetchData(id) {
         rows: (data || []).map(r => [
           r.code, fmt(r.received_at), r.materials?.name, r.suppliers?.name,
           r.qty, r.materials?.unit, r.cost_per_unit, r.total,
+        ])
+      }
+    }
+    case 'purchase': {
+      const { data, error } = await getPurchases()
+      if (error) throw new Error(error.message)
+      const P = { job: 'งานลูกค้า', stock: 'เข้าสต๊อก', general: 'ค่าใช้จ่ายทั่วไป' }
+      return {
+        headers: ['เลขที่', 'วันที่จ่าย', 'ประเภท', 'หมวด', 'รายการ', 'Supplier', 'INV', 'ใบงาน', 'ยอดก่อน VAT', 'VAT', 'ค่าส่ง', 'ยอดสุทธิ (฿)', 'สถานะ', 'วิธีจ่าย', 'หมายเหตุ'],
+        rows: (data || []).map(r => [
+          r.code, fmt(r.paid_at), P[r.purpose] || r.purpose, r.category, (r.items || []).map(i => `${i.desc} ×${i.qty}`).join(', '),
+          r.suppliers?.name, r.invoices?.code, r.job_orders?.code, r.subtotal, r.vat_amount, r.shipping, r.total, r.status, r.payment_method, r.note,
         ])
       }
     }
