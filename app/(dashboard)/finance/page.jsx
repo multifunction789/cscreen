@@ -8,6 +8,7 @@ import dynamic from 'next/dynamic'
 const ExpenseChart = dynamic(() => import('@/components/charts/ExpenseChart'), { ssr: false, loading: () => <div style={{height:280}} /> })
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify, ask } from '@/lib/feedback'
+import DateInput from '@/components/ui/DateInput'
 
 const DEFAULT_EXP_TYPES = ['ค่าผลิต','ค่าแรง','ค่าส่ง','ค่าผ้า','ค่าเสื้อยืด','ค่าเสื้อคนงาน','ค่าหมึก','ค่าอุปกรณ์','อื่น ๆ']
 const DEFAULT_INC_TYPES = ['เสื้อยืด','เสื้อโปโล','เสื้อคนงาน','ผ้ากีฬา','งานสกรีน','เสื้อพิมพ์ลาย','ปัก','อื่น ๆ']
@@ -217,7 +218,7 @@ export default function FinancePage() {
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:4 }}>
               <label>วันที่</label>
-              <input type="date" value={form.transaction_date}
+              <DateInput value={form.transaction_date}
                 onChange={e=>setForm({...form,transaction_date:e.target.value})} />
             </div>
             {form.type==='รายจ่าย' && (

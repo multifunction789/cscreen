@@ -5,6 +5,7 @@ import { calcQuotation, money, thaiDate, DEFAULT_TERMS } from '@/lib/docs/quotat
 import { newClientKey } from '@/lib/inbox/model'
 import { docHref } from '@/lib/docLinks'
 import { notify } from '@/lib/feedback'
+import DateInput from '@/components/ui/DateInput'
 
 const blank = () => ({ desc: '', qty: '', price: '' })
 const plusDays = n => { const d = new Date(Date.now() + n * 86400e3 + 7 * 3600e3); return d.toISOString().slice(0, 10) }
@@ -71,7 +72,7 @@ export default function QuotationPanel({ store, conv, onDone, onNeedCustomer }) 
       <div className="ib-qopts">
         <label>ส่วนลด (บาท)<input type="number" min="0" value={discount} onChange={e => setDiscount(e.target.value)} /></label>
         <label>VAT<select value={vat} onChange={e => setVat(Number(e.target.value))}><option value={0}>ไม่มี VAT</option><option value={7}>VAT 7%</option></select></label>
-        <label>ใช้ได้ถึง<input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} /></label>
+        <label>ใช้ได้ถึง<DateInput value={validUntil} onChange={e => setValidUntil(e.target.value)} /></label>
       </div>
       <label>หมายเหตุ / เงื่อนไข<textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)} placeholder={DEFAULT_TERMS} /></label>
 

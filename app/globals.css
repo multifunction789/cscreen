@@ -406,6 +406,11 @@ textarea.jo-in { height:auto; padding:8px 10px; resize:vertical; min-height:72px
 .jp-hd small { font-weight: 400; font-size: 10px; color: #F5E3A8; }
 .jp-kv { display: grid; grid-template-columns: 78px 10px 1fr; padding: 5px 10px; row-gap: 3px; }
 .jp-kv .hl { color: #8A6500; font-size: 13px; }
+.jp-kv2 { display: grid; grid-template-columns: 1fr 1fr; }
+.jp-notecard { flex: 1 1 auto; flex-shrink: 1; min-height: 110px; display: flex; flex-direction: column; }
+.jp-notebig { padding: 8px 12px; font-size: 13px; line-height: 1.6; white-space: pre-line; flex: 1; overflow: hidden;
+  background-image: repeating-linear-gradient(to bottom, transparent 0, transparent 20px, #EFE6CC 20px, #EFE6CC 21px); background-position: 0 8px; }
+.jp-notebig .empty { color: #9CA3AF; }
 .jp-more { font-size: 10px; color: #6B6250; padding: 2px 10px 4px; text-align: right; }
 .jp-vars { display: grid; padding: 8px 0; }
 .jp-var { display: flex; flex-direction: column; gap: 6px; padding: 0 10px; min-width: 0; }
