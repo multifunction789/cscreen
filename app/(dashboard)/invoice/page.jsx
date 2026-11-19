@@ -16,6 +16,7 @@ import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
 import { MockupPanel, MockupImage, mockupList, mockupPayload } from '@/components/MockupAttach'
 import { SIZES } from '@/lib/sizes'
+import DateInput from '@/components/ui/DateInput'
 
 const emptyItem = { desc: '', category: '', qty: 1, price: 0, amount: 0, material_id: null, sizes: {} }
 
@@ -627,11 +628,11 @@ export default function InvoicePage() {
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
               <label>วันที่เอกสาร</label>
-              <input type="date" value={form.document_date} onChange={e => setForm({...form, document_date:e.target.value})} />
+              <DateInput value={form.document_date} onChange={e => setForm({...form, document_date:e.target.value})} />
             </div>
             <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
               <label>ครบกำหนดชำระ</label>
-              <input type="date" value={form.due_date} onChange={e => setForm({...form, due_date:e.target.value})} />
+              <DateInput value={form.due_date} onChange={e => setForm({...form, due_date:e.target.value})} />
             </div>
           </div>
 

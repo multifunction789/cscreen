@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { todayStr } from '@/lib/docUtils'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 import { notify } from '@/lib/feedback'
+import DateInput from '@/components/ui/DateInput'
 
 const fmt = (d) => d ? new Date(d).toLocaleDateString('th-TH', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'
 
@@ -135,7 +136,7 @@ export default function StockInPage() {
           {/* วันที่ซื้อ */}
           <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
             <label style={{ fontSize:13, fontWeight:600 }}>📅 วันที่ซื้อ *</label>
-            <input type="date" value={form.received_at}
+            <DateInput value={form.received_at}
               onChange={e => setForm({ ...form, received_at: e.target.value })} />
           </div>
 

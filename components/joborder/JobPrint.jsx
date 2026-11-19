@@ -1,7 +1,5 @@
 'use client'
 /* eslint-disable @next/next/no-img-element */
-import { useEffect, useState } from 'react'
-import QRCode from 'qrcode'
 import '@fontsource/sarabun/thai-400.css'
 import '@fontsource/sarabun/thai-700.css'
 import '@fontsource/sarabun/thai-800.css'
@@ -12,22 +10,14 @@ import { SHOP } from '@/lib/shop'
 import { QC_ITEMS, sizeTotal, latestFile, thDateLong, jobVariants, orderSizes, mockSide } from '@/lib/jobV2'
 
 /**
- * ใบงานผลิต A4 แผ่นเดียว (794 × 1122 px) — ไม่แสดงราคา/กำไร และไม่แสดงแผนการผลิต
+ * ใบงานผลิต A4 แผ่นเดียว (794 × 1122 px) — ไม่แสดงราคา/กำไร แผนการผลิต สเปก งานตกแต่ง หรือ QR
+ * รายละเอียดการผลิตทั้งหมดอยู่ใน "หมายเหตุการผลิต" (d.sew_note)
  * พิมพ์ด้วย printDoc('print-area') → ใช้ @page jo-a4 (ขอบ 0) จาก globals.css
  */
 const MAX_VARIANTS = 4   // แสดงรูปแยกสีได้สูงสุด 4 สีต่อหน้า
 const MAX_ROWS = 6       // รายการสินค้าในตารางสูงสุด 6 แถว
-const MAX_DECO = 4       // งานตกแต่งสูงสุด 4 จุด
 
 export default function JobPrint({ job, d, files = [] }) {
-  const [qr, setQr] = useState('')
-  const folderUrl = job.drive_folder_id ? `https://drive.google.com/drive/folders/${job.drive_folder_id}` : ''
-  useEffect(() => {
-    let alive = true
-    if (folderUrl) QRCode.toDataURL(folderUrl, { margin: 0, width: 160, color: { dark: '#1F1A1A' } }).then(u => { if (alive) setQr(u) })
-    return () => { alive = false }
-  }, [folderUrl])
-
   const src = d.source || {}
   const variants = jobVariants(d)
   const total = variants.reduce((t, v) => t + sizeTotal(v.qtys), 0)
@@ -37,15 +27,13 @@ export default function JobPrint({ job, d, files = [] }) {
   const sizeSum = s => variants.reduce((t, v) => t + (parseInt(v.qtys?.[s]) || 0), 0)
   const shown = variants.slice(0, MAX_VARIANTS)
   const cols = Math.max(1, shown.length)
-  const deco = (d.decorations || []).slice(0, MAX_DECO)
-  // ตารางยาวขึ้น → ลดความสูงรูป Mockup ให้ยังลง A4 แผ่นเดียว
-  const extraRows = Math.max(0, Math.min(variants.length, MAX_ROWS) - 2) + Math.max(0, deco.length - 2)
+  // ตารางยาวขึ้น / หมายเหตุยาว → ลดความสูงรูป Mockup ให้ยังลง A4 แผ่นเดียว
+  const note = String(d.sew_note || '').trim()
+  const noteLines = note ? note.split('\n').reduce((t, l) => t + Math.max(1, Math.ceil(l.length / 95)), 0) : 0
+  const extraRows = Math.max(0, Math.min(variants.length, MAX_ROWS) - 2) + Math.max(0, Math.ceil((noteLines - 8) / 2))
   const mockH = Math.max(90, (cols > 2 ? 150 : 186) - extraRows * 30)
   const compact = extraRows >= 3   // ข้อมูลเยอะ → บีบช่อง QC / ลงชื่อ / ระยะบรรทัดตาราง
-  const sp = d.spec || {}
   const itemCount = src.item_count || (src.item_nos || []).length || variants.length
-  const shape = [sp.neck, sp.sleeve, sp.fit].filter(Boolean).join(' · ')
-  const label = [sp.label, sp.buttons && `กระดุม ${sp.buttons}`].filter(Boolean).join(' · ')
 
   return (
     <div id="print-area" style={{ display: 'flex', justifyContent: 'center' }}>
@@ -67,22 +55,16 @@ export default function JobPrint({ job, d, files = [] }) {
           </div>
         </header>
 
-        {/* Customer + spec */}
-        <section className="jp-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
-          <div className="jp-card"><div className="jp-hd">👤 ข้อมูลลูกค้า</div>
+        {/* Customer */}
+        <section className="jp-card"><div className="jp-hd">👤 ข้อมูลลูกค้า</div>
+          <div className="jp-kv2">
             <div className="jp-kv">
               <span>ชื่อลูกค้า</span><span>:</span><b>{d.customer?.name || '—'}</b>
               <span>ผู้ติดต่อ / โทร</span><span>:</span><b>{[d.customer?.contact, d.customer?.phone].filter(Boolean).join(' · ') || '—'}</b>
-              <span>อ้างอิงงาน</span><span>:</span><b>{src.invoice_code || '—'}{itemCount ? ` (${variants.length === itemCount ? `${itemCount} รายการ` : `${variants.length} จาก ${itemCount} รายการ`})` : ''}</b>
-              <span>สินค้า</span><span>:</span><b>{d.product?.name || '—'}</b>
             </div>
-          </div>
-          <div className="jp-card"><div className="jp-hd">👕 สเปกสินค้า</div>
             <div className="jp-kv">
-              <span>เนื้อผ้า</span><span>:</span><b>{sp.fabric || '—'}</b>
-              <span>ทรงคอ / แขน</span><span>:</span><b>{shape || '—'}</b>
-              <span>ป้ายคอ</span><span>:</span><b>{label || '—'}</b>
-              <span>จำนวนรวม</span><span>:</span><b className="hl">{total} ตัว</b>
+              <span>อ้างอิงงาน</span><span>:</span><b>{src.invoice_code || '—'}{itemCount ? ` (${variants.length === itemCount ? `${itemCount} รายการ` : `${variants.length} จาก ${itemCount} รายการ`})` : ''}</b>
+              <span>สินค้า</span><span>:</span><b>{d.product?.name || '—'} · <span className="hl">{total} ตัว</span></b>
             </div>
           </div>
         </section>
@@ -135,43 +117,17 @@ export default function JobPrint({ job, d, files = [] }) {
           </table>
         </section>
 
-        {/* Decorations */}
-        <section className="jp-card"><div className="jp-hd">🎨 รายละเอียดงานตกแต่ง<small>สำหรับช่างสกรีน / ปัก — วัดเป็นนิ้ว</small></div>
-          <div className="jp-deco">
-            <table className="jp-tbl jp-dt">
-              <thead><tr><td style={{ width: 26 }}>#</td><td className="l">ลาย / ไฟล์</td><td className="l">ตำแหน่ง</td><td>เทคนิค</td><td>สีหมึก</td><td>ขนาดลาย<br />(กว้าง × สูง)</td><td>ระยะวาง</td></tr></thead>
-              <tbody>
-                {deco.map((x, i) => (
-                  <tr key={x.id || i}>
-                    <td><span className="n">{i + 1}</span></td>
-                    <td className="l"><div className="lay">{x.image_url ? <img src={x.image_url} alt="" crossOrigin="anonymous" /> : null}<b>{x.name || '—'}</b></div></td>
-                    <td className="l">{x.position || '—'}</td>
-                    <td>{x.technique || '—'}</td>
-                    <td>{x.colors || '—'}</td>
-                    <td className="in">{x.size_in ? `${x.size_in} นิ้ว` : x.size ? `${x.size} ซม.` : '—'}</td>
-                    <td className="in">{x.placement || '—'}{x.placement_note ? <><br /><span className="sub">{x.placement_note}</span></> : null}</td>
-                  </tr>
-                ))}
-                {Array.from({ length: Math.max(1, 3 - deco.length) }).map((_, i) => <tr key={`b${i}`} className="blank"><td /><td /><td /><td /><td /><td /><td /></tr>)}
-              </tbody>
-            </table>
-            <div className="qr">
-              {qr ? <img src={qr} alt="QR โฟลเดอร์ไฟล์งาน" /> : <div className="noqr">ยังไม่มีโฟลเดอร์</div>}
-              <b>ไฟล์แบบ / Artwork</b><span>สแกนเปิดโฟลเดอร์</span>
-            </div>
-          </div>
-          {(d.decorations || []).length > MAX_DECO && <div className="jp-more">+ อีก {(d.decorations || []).length - MAX_DECO} จุด (ดูในระบบ)</div>}
+        {/* Production note */}
+        <section className="jp-card jp-notecard"><div className="jp-hd">📝 หมายเหตุการผลิต</div>
+          <div className="jp-notebig">{note || <span className="empty">—</span>}</div>
         </section>
 
-        {/* QC + note + delivery */}
-        <section className="jp-row jp-grow" style={{ gridTemplateColumns: '1fr 1fr 1fr' }}>
+        {/* QC + delivery */}
+        <section className="jp-row" style={{ gridTemplateColumns: '1fr 1fr' }}>
           <div className="jp-card"><div className="jp-hd">✅ ตรวจสอบคุณภาพ (QC)</div>
             <div className="jp-qc">
               {QC_ITEMS.map(q => <span key={q.key}><i className={`box${d.qc?.[q.key] ? ' on' : ''}`} />{q.label}{q.key === 'qty' ? ` (${total} ตัว)` : ''}</span>)}
             </div>
-          </div>
-          <div className="jp-card"><div className="jp-hd">📝 หมายเหตุการผลิต</div>
-            <div className="jp-note">{d.sew_note || ''}<div className="dots" /><div className="dots" /><div className="dots" /></div>
           </div>
           <div className="jp-card"><div className="jp-hd">🚚 การส่งมอบ</div>
             <div className="jp-deliv">

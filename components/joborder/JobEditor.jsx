@@ -4,19 +4,19 @@ import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import {
   updateJobOrder, getJobSteps, insertJobStep, updateJobStep, deleteJobStep,
-  getJobLogs, insertJobLog, getJobFiles, insertJobFile, updateJobFile, deleteJobFile, currentUserEmail,
+  getJobLogs, insertJobLog, getJobFiles, insertJobFile, currentUserEmail,
 } from '@/lib/db'
 import {
-  SPEC_FIELDS, TECHNIQUES, QUICK_STEPS, PHASES, STEP_STATUSES, FILE_KINDS, QC_ITEMS, DELIVERY_CHANNELS,
-  statusCls, guessPhase, computeOverall, legacyStatus, latestFile, fileKindLabel, sizeTotal, rid, thDate, thDateLong,
-  jobVariants, jobItemNos, aggregateSizes, orderSizes, itemNosLabel, mockSide, sideLabel,
+  QUICK_STEPS, PHASES, STEP_STATUSES, QC_ITEMS, DELIVERY_CHANNELS,
+  statusCls, guessPhase, computeOverall, legacyStatus, latestFile, sizeTotal, rid, thDate, thDateLong,
+  jobVariants, jobItemNos, aggregateSizes, orderSizes, itemNosLabel, mockSide,
 } from '@/lib/jobV2'
 import { uploadJobImage } from '@/lib/jobProduction.mjs'
-import { uploadFileClient } from '@/lib/driveClient'
 import { docHref } from '@/lib/docLinks'
 import { notify, ask } from '@/lib/feedback'
 import { todayStr, printDoc } from '@/lib/docUtils'
 import JobPrint from './JobPrint'
+import DateInput from '@/components/ui/DateInput'
 
 const clone = o => JSON.parse(JSON.stringify(o || {}))
 
@@ -28,27 +28,38 @@ function normalize(items) {
   d.sizes = orderSizes([...(d.sizes || []), ...used])
   if (!d.sizes.length) d.sizes = ['S', 'M', 'L', 'XL', '2XL', '3XL']
   d.decorations = d.decorations || []
+  // สเปกสินค้า / งานตกแต่ง ไม่มีช่องแล้ว — ใบงานเก่าที่เคยกรอกไว้ ย้ายข้อความมาต่อท้ายหมายเหตุการผลิต (ครั้งเดียว)
+  if (!d.note_merged) {
+    const extra = legacyNoteLines(d)
+    if (extra.length) d.sew_note = [d.sew_note, ...extra].filter(Boolean).join('\n')
+    d.note_merged = true
+  }
   return d
 }
-const isImage = f => /^image\//.test(f?.mime || '') || /\.(png|jpe?g|webp|gif)$/i.test(f?.name || '')
+
+/** แปลงสเปกสินค้า + งานตกแต่งของใบงานเก่าเป็นบรรทัดข้อความ */
+function legacyNoteLines(d) {
+  const sp = d.spec || {}
+  const lines = []
+  const spec = [sp.fabric && `ผ้า ${sp.fabric}`, sp.neck, sp.sleeve, sp.fit, sp.color && `สีผ้า ${sp.color}`, sp.buttons && `กระดุม ${sp.buttons}`, sp.label && `ป้ายคอ ${sp.label}`].filter(Boolean)
+  if (spec.length) lines.push(spec.join(' · '))
+  ;(d.decorations || []).forEach(x => {
+    const size = x.size_in ? `${x.size_in} นิ้ว` : x.size ? `${x.size} ซม.` : ''
+    const t = [x.name, x.position, x.technique, x.colors, size && `ขนาด ${size}`, x.placement, x.placement_note].filter(Boolean).join(' · ')
+    if (t) lines.push(t)
+  })
+  return lines
+}
 const fmtTime = t => {
   if (!t) return ''
   const d = new Date(t)
   return `${String(d.getDate()).padStart(2, '0')}/${String(d.getMonth() + 1).padStart(2, '0')}/${String((d.getFullYear() + 543) % 100).padStart(2, '0')} ${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
 }
 
-/** อัปโหลดไฟล์ของใบงาน: เข้าโฟลเดอร์ Drive ของใบงานถ้ามี ไม่งั้นเก็บใน Supabase Storage */
-async function uploadAny(job, file, name) {
-  if (job.drive_folder_id) {
-    const r = await uploadFileClient(file, job.drive_folder_id, name)
-    return { url: r.webViewLink || r.directUrl, thumb: /^image\//.test(file.type) ? r.directUrl : null }
-  }
-  const ext = (file.name.split('.').pop() || 'bin').toLowerCase().replace(/[^a-z0-9]/g, '')
-  const path = `jobs/${job.id}/${crypto.randomUUID()}.${ext}`
-  const { error } = await supabase.storage.from('job-images').upload(path, file, { upsert: false, contentType: file.type || undefined })
-  if (error) throw new Error(error.message)
-  const url = supabase.storage.from('job-images').getPublicUrl(path).data.publicUrl
-  return { url, thumb: /^image\//.test(file.type) ? url : null }
+/** อัปโหลดรูป Mockup ของใบงาน → Supabase Storage (ย่อรูปก่อน · ไม่ผ่าน Google Drive แล้ว) */
+async function uploadAny(job, file) {
+  const url = await uploadJobImage(supabase, 'job-images', file)
+  return { url, thumb: url }
 }
 
 export default function JobEditor({ job, invoice, siblings, suppliers, onBack, onSaved, onCreateFromInvoice }) {
@@ -61,7 +72,6 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   const [logs, setLogs]     = useState([])
   const [files, setFiles]   = useState([])
   const [busyFile, setBusyFile] = useState(false)
-  const [upKind, setUpKind] = useState('artwork')
   const [newSize, setNewSize] = useState('')
   const [printing, setPrinting] = useState(false)
   const [dragIdx, setDragIdx] = useState(null)
@@ -72,7 +82,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
   // โหลดแผนการผลิต / ประวัติ / ไฟล์
   useEffect(() => {
     let alive = true
-    Promise.all([getJobSteps(job.id), getJobLogs(job.id), getJobFiles(job.id), currentUserEmail()]).then(([s, l, f, email]) => {
+    Promise.all([getJobSteps(job.id), getJobLogs(job.id), getJobFiles(job.id, 'mockup'), currentUserEmail()]).then(([s, l, f, email]) => {
       if (!alive) return
       if (s.error || l.error || f.error) notify.error('โหลดแผนการผลิตไม่ครบ: ' + (s.error || l.error || f.error).message)
       setSteps(s.data || []); setLogs(l.data || []); setFiles(f.data || [])
@@ -214,12 +224,9 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
     setBusyFile(true)
     try {
       for (const file of arr) {
-        if (file.size > 25 * 1024 * 1024) { notify.warn(`${file.name} ใหญ่เกิน 25 MB`); continue }
         const sameKind = files.filter(f => f.kind === kind && (f.side || null) === side)
         const version = sameKind.reduce((m, f) => Math.max(m, f.version || 0), 0) + 1
-        const ext = file.name.includes('.') ? '.' + file.name.split('.').pop() : ''
-        const name = `${job.code}_${fileKindLabel(kind)}${side ? '-' + sideLabel(side).replace(/\s·\s/g, '-') : ''}_v${version}${ext}`
-        const up = await uploadAny(job, file, name)
+        const up = await uploadAny(job, file)
         const { data, error } = await insertJobFile({ job_order_id: job.id, kind, side, name: file.name, url: up.url, thumb_url: up.thumb, mime: file.type || null, version, approved: false, uploaded_by: emailRef.current })
         if (error) throw new Error(error.message)
         setFiles(f => [data, ...f])
@@ -230,28 +237,6 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
     } finally {
       setBusyFile(false)
     }
-  }
-
-  async function toggleApprove(f) {
-    const { error } = await updateJobFile(f.id, { approved: !f.approved })
-    if (error) return notify.error('บันทึกไม่สำเร็จ: ' + error.message)
-    setFiles(list => list.map(x => x.id === f.id ? { ...x, approved: !f.approved } : x))
-    log(null, null, null, `${f.approved ? 'ยกเลิกอนุมัติ' : 'อนุมัติ'} ${fileKindLabel(f.kind)} v${f.version}`)
-  }
-
-  async function removeFile(f) {
-    if (!(await ask({ title: 'ลบไฟล์นี้ออกจากใบงาน?', message: `${fileKindLabel(f.kind)} v${f.version} · ${f.name}`, confirmLabel: 'ลบ', danger: true }))) return
-    const { error } = await deleteJobFile(f.id)
-    if (error) return notify.error('ลบไม่สำเร็จ: ' + error.message)
-    setFiles(list => list.filter(x => x.id !== f.id))
-  }
-
-  async function decoImage(idx, file) {
-    if (!file) return
-    try {
-      const url = await uploadJobImage(supabase, 'job-images', file)
-      set(`decorations.${idx}.image_url`, url)
-    } catch (e) { notify.error(e.message) }
   }
 
   const ordered = [...steps].sort((a, b) => a.seq - b.seq)
@@ -304,7 +289,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         </div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           <label style={{ background: '#D7141A', color: '#fff', borderRadius: 8, padding: '6px 12px', fontSize: 12, fontWeight: 700, display: 'flex', flexDirection: 'column', gap: 2 }}>กำหนดส่ง
-            <input type="date" value={due || ''} onChange={e => { setDue(e.target.value); setDirty(true) }}
+            <DateInput value={due || ''} onChange={e => { setDue(e.target.value); setDirty(true) }}
               style={{ border: 'none', background: 'transparent', color: '#fff', fontSize: 19, fontWeight: 800, padding: 0, outline: 'none', colorScheme: 'dark' }} />
           </label>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6 }}>
@@ -353,19 +338,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         </div>
       </section>
 
-      {/* Spec + sizes per item */}
-      <section className="jo-card">
-        <div className="jo-hd" style={{ justifyContent: 'flex-start' }}>สเปกสินค้า <small>(ใช้ร่วมกันทุกรายการในใบงานนี้)</small></div>
-        <div className="jo-spec" style={{ padding: '12px 14px' }}>
-          {SPEC_FIELDS.map(f => (
-            <label key={f.key} className="jo-lbl">{f.label}
-              <input className="jo-in" list={f.options ? `jo-opt-${f.key}` : undefined} value={d.spec?.[f.key] || ''} onChange={e => set(`spec.${f.key}`, e.target.value)} placeholder={f.options ? 'เลือก / พิมพ์' : ''} />
-              {f.options && <datalist id={`jo-opt-${f.key}`}>{f.options.map(o => <option key={o} value={o} />)}</datalist>}
-            </label>
-          ))}
-        </div>
-      </section>
-
+      {/* Sizes per item */}
       <section className="jo-card">
         <div className="jo-hd">รายละเอียดสินค้า &amp; จำนวนตามไซซ์ <small>อ้างอิงจาก {src.invoice_code || 'Invoice'} · แก้ในใบงานได้ ไม่กระทบ Invoice</small></div>
         <div className="table-wrap">
@@ -411,8 +384,15 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
             <button type="button" className="jo-chip" onClick={addSize}>+ เพิ่มไซส์</button>
           </span>
         </div>
-        <div style={{ padding: '0 14px 14px' }}>
-          <label className="jo-lbl">หมายเหตุการผลิต / ตัดเย็บ<textarea className="jo-in" rows={3} value={d.sew_note || ''} onChange={e => set('sew_note', e.target.value)} placeholder="เช่น ผ่าข้าง 1.5 นิ้ว · ปกขลิบขาว 2 เส้น" /></label>
+      </section>
+
+      {/* Production note — ใช้แทนสเปกสินค้าและรายละเอียดงานตกแต่ง (พิมพ์ออกในใบงาน) */}
+      <section className="jo-card">
+        <div className="jo-hd">หมายเหตุการผลิต <small>ผ้า · ทรง · ลาย · ตำแหน่ง · ขนาด · ระยะวาง — พิมพ์ออกในใบงาน</small></div>
+        <div style={{ padding: 12 }}>
+          <textarea className="jo-in" aria-label="หมายเหตุการผลิต" rows={7} value={d.sew_note || ''} onChange={e => set('sew_note', e.target.value)}
+            style={{ fontSize: 15, lineHeight: 1.6, minHeight: 170 }}
+            placeholder={'เช่น\nผ้า Cotton 32 · คอกลม แขนสั้น\nโลโก้หน้าอกซ้าย สกรีน 1 สี ขนาด 3.5 × 3 นิ้ว · ใต้คอ 3 นิ้ว\nตัวอักษรกลางหลัง DFT 11 × 3 นิ้ว · ใต้คอ 4 นิ้ว'} />
         </div>
       </section>
 
@@ -450,84 +430,6 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
         </div>
       </section>
 
-      {/* Decorations */}
-      <section className="jo-card">
-        <div className="jo-hd">รายละเอียดงานตกแต่ง <small>สำหรับช่างสกรีน / ปัก — ใส่ขนาดและระยะวางเป็นนิ้ว</small>
-          <button type="button" className="jo-hbtn" onClick={() => set('decorations', [...(d.decorations || []), { id: rid(), name: '', technique: '', position: '', size_in: '', placement: '', placement_note: '', colors: '', image_url: '' }])}>+ เพิ่ม</button>
-        </div>
-        {(d.decorations || []).map((x, i) => (
-          <div key={x.id || i} style={{ display: 'grid', gridTemplateColumns: '28px 64px minmax(0,1fr) 28px', gap: 10, padding: '10px 12px', borderTop: i ? '1px solid #F1E8CC' : 'none', alignItems: 'start' }}>
-            <span style={{ background: '#B8860B', color: '#fff', borderRadius: '50%', width: 24, height: 24, textAlign: 'center', lineHeight: '24px', fontWeight: 800, marginTop: 22 }}>{i + 1}</span>
-            <label style={{ width: 64, height: 64, marginTop: 4, borderRadius: 6, background: x.image_url ? '#fff' : '#8A6500', border: '1px solid #E9D9A6', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', overflow: 'hidden', color: '#fff', fontSize: 11, textAlign: 'center' }} title="แนบรูปลาย">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              {x.image_url ? <img src={x.image_url} alt="ลาย" style={{ width: '100%', height: '100%', objectFit: 'contain' }} /> : '+ รูปลาย'}
-              <input type="file" accept="image/*" hidden onChange={e => { decoImage(i, e.target.files?.[0]); e.target.value = '' }} />
-            </label>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, minmax(0,1fr))', gap: 6 }}>
-              <label className="jo-lbl" style={{ gridColumn: 'span 2' }}>ลาย / ไฟล์<input className="jo-in" value={x.name || ''} onChange={e => set(`decorations.${i}.name`, e.target.value)} placeholder="โลโก้บริษัท, ตัวอักษรชื่อทีม" /></label>
-              <label className="jo-lbl">ตำแหน่ง<input className="jo-in" value={x.position || ''} onChange={e => set(`decorations.${i}.position`, e.target.value)} placeholder="หน้าอกซ้าย" /></label>
-              <label className="jo-lbl">เทคนิค<input className="jo-in" list="jo-opt-tech" value={x.technique || ''} onChange={e => set(`decorations.${i}.technique`, e.target.value)} placeholder="เลือก / พิมพ์" /></label>
-              <label className="jo-lbl">สีหมึก / สีด้าย<input className="jo-in" value={x.colors || ''} onChange={e => set(`decorations.${i}.colors`, e.target.value)} placeholder="ขาว 1 สี" /></label>
-              <label className="jo-lbl">ขนาดลาย (นิ้ว)<input className="jo-in" value={x.size_in || ''} onChange={e => set(`decorations.${i}.size_in`, e.target.value)} placeholder={x.size ? `เดิม ${x.size} ซม.` : 'กว้าง × สูง เช่น 3.5 × 3'} /></label>
-              <label className="jo-lbl">ระยะวาง (นิ้ว)<input className="jo-in" value={x.placement || ''} onChange={e => set(`decorations.${i}.placement`, e.target.value)} placeholder="ใต้คอ 3 นิ้ว" /></label>
-              <label className="jo-lbl">อ้างอิงเพิ่ม<input className="jo-in" value={x.placement_note || ''} onChange={e => set(`decorations.${i}.placement_note`, e.target.value)} placeholder="ห่างกลางอก 4 นิ้ว" /></label>
-            </div>
-            <button type="button" className="jo-x" aria-label="ลบงานตกแต่ง" onClick={() => set('decorations', d.decorations.filter((_, k) => k !== i))}>×</button>
-          </div>
-        ))}
-        {!(d.decorations || []).length && <div className="empty-state">ยังไม่มีงานตกแต่ง — กด “+ เพิ่ม”</div>}
-        <datalist id="jo-opt-tech">{TECHNIQUES.map(t => <option key={t} value={t} />)}</datalist>
-      </section>
-
-      {/* Files */}
-      <section className="jo-card">
-        <div className="jo-hd">ไฟล์งาน
-          <span style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
-            <select aria-label="ประเภทไฟล์" value={upKind} onChange={e => setUpKind(e.target.value)} style={{ height: 30, borderRadius: 6, border: 'none', fontSize: 13, padding: '0 6px' }}>
-              {FILE_KINDS.map(k => <option key={k.id} value={k.id}>{k.label}</option>)}
-            </select>
-            <label className="jo-hbtn" style={{ display: 'inline-flex', alignItems: 'center', cursor: busyFile ? 'wait' : 'pointer' }}>
-              {busyFile ? 'กำลังอัปโหลด…' : '+ อัปโหลดไฟล์'}
-              <input type="file" multiple hidden disabled={busyFile} onChange={e => { uploadFiles(e.target.files, upKind, upKind === 'mockup' ? 'front' : null); e.target.value = '' }} />
-            </label>
-          </span>
-        </div>
-        <div className="jo-grid2" style={{ gridTemplateColumns: 'minmax(0,1fr) 150px', padding: '6px 14px 12px', alignItems: 'center' }}>
-          <div className="table-wrap">
-            <table className="jo-tbl">
-              <thead><tr><th>ประเภท</th><th>ไฟล์</th><th>เวอร์ชัน</th><th>สถานะ</th><th>อัปโหลดโดย</th><th></th></tr></thead>
-              <tbody>
-                {files.map(f => {
-                  const latest = latestFile(files, f.kind, f.side || undefined)
-                  const isLatestApproved = f.approved && latest?.id === f.id
-                  return (
-                    <tr key={f.id} style={!f.approved && latest?.id !== f.id ? { color: '#9CA3AF' } : undefined}>
-                      <td><b>{fileKindLabel(f.kind)}</b>{f.side ? <span style={{ fontSize: 12, color: '#6B6250' }}> · {sideLabel(f.side)}</span> : null}</td>
-                      <td style={{ maxWidth: 240, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isImage(f) ? '🖼 ' : '📄 '}{f.name}</td>
-                      <td style={{ fontFamily: 'monospace', fontWeight: 700 }}>v{f.version}</td>
-                      <td>
-                        {isLatestApproved ? <span className="jo-badge done">★ อนุมัติล่าสุด</span>
-                          : f.approved ? <span className="jo-badge wait">อนุมัติ (เวอร์ชันเก่า)</span>
-                          : <span className="jo-badge doing">รออนุมัติ</span>}
-                        {' '}<button type="button" className="jo-chip" style={{ height: 26, fontSize: 12 }} onClick={() => toggleApprove(f)}>{f.approved ? 'ยกเลิกอนุมัติ' : 'อนุมัติ'}</button>
-                      </td>
-                      <td style={{ fontSize: 12.5, color: '#6B6250' }}>{f.uploaded_by || '—'} · {fmtTime(f.created_at)}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}><a href={f.url} target="_blank" rel="noreferrer" style={{ fontWeight: 700 }}>เปิดดู</a> <button type="button" className="jo-x" aria-label="ลบไฟล์" onClick={() => removeFile(f)}>×</button></td>
-                    </tr>
-                  )
-                })}
-                {!files.length && <tr><td colSpan={6} className="empty-state">ยังไม่มีไฟล์ — เลือกประเภทแล้วกด “+ อัปโหลดไฟล์”</td></tr>}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ textAlign: 'center', fontSize: 12.5, color: '#6B6250' }}>
-            {job.drive_folder_id
-              ? <a href={`https://drive.google.com/drive/folders/${job.drive_folder_id}`} target="_blank" rel="noreferrer" style={{ fontWeight: 800 }}>📁 เปิดโฟลเดอร์ Drive<br />ของใบงานนี้</a>
-              : 'ลูกค้ายังไม่มีโฟลเดอร์ Drive — ไฟล์เก็บในระบบแทน'}
-          </div>
-        </div>
-      </section>
-
       {/* Phases */}
       <section className="jo-chev" aria-label="ลำดับการผลิต">
         <div className="cap">ลำดับการผลิต</div>
@@ -541,8 +443,8 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
           <small style={{ marginLeft: 'auto' }}>ลาก ⋮⋮ หรือกด ▲▼ เพื่อเรียงลำดับ · บันทึกทันที</small>
         </div>
         <div className="table-wrap">
-          <table className="jo-tbl" style={{ minWidth: 980 }}>
-            <thead><tr><th style={{ width: 54 }}></th><th style={{ width: 40 }}>ลำดับ</th><th>ขั้นตอน</th><th>ช่วง</th><th>Supplier / ผู้รับผิดชอบ</th><th>วันที่ส่ง</th><th>กำหนดรับ</th><th>รับจริง</th><th>สถานะ</th><th>หมายเหตุ</th><th style={{ width: 34 }}></th></tr></thead>
+          <table className="jo-tbl" style={{ minWidth: 820 }}>
+            <thead><tr><th style={{ width: 54 }}></th><th style={{ width: 40 }}>ลำดับ</th><th>ขั้นตอน</th><th>ช่วง</th><th>Supplier / ผู้รับผิดชอบ</th><th>วันที่ส่ง</th><th>สถานะ</th><th>หมายเหตุ</th><th style={{ width: 34 }}></th></tr></thead>
             <tbody>
               {ordered.map((s, i) => (
                 <tr key={s.id} className={`jo-steprow${overIdx === i ? ' dragover' : ''}`}
@@ -562,9 +464,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                     <option value="">— ภายใน / ไม่ระบุ —</option>
                     {suppliers.map(x => <option key={x.id} value={x.id}>{x.name}</option>)}
                   </select></td>
-                  <td><input type="date" className="jo-in" aria-label="วันที่ส่ง" value={s.sent_date || ''} onChange={e => patchStep(s, { sent_date: e.target.value || null })} style={{ width: 132 }} /></td>
-                  <td><input type="date" className="jo-in" aria-label="กำหนดรับ" value={s.due_date || ''} onChange={e => patchStep(s, { due_date: e.target.value || null })} style={{ width: 132, fontWeight: 700 }} /></td>
-                  <td><input type="date" className="jo-in" aria-label="รับจริง" value={s.received_date || ''} onChange={e => patchStep(s, { received_date: e.target.value || null })} style={{ width: 132 }} /></td>
+                  <td><DateInput className="jo-in" aria-label="วันที่ส่ง" value={s.sent_date || ''} onChange={e => patchStep(s, { sent_date: e.target.value || null })} style={{ width: 132 }} /></td>
                   <td><select aria-label="สถานะ" className={`jo-st ${statusCls(s.status)}`} value={s.status} onChange={e => patchStep(s, { status: e.target.value })}>
                     {STEP_STATUSES.map(x => <option key={x.id}>{x.id}</option>)}</select></td>
                   <td><input className="jo-in" aria-label="หมายเหตุ" defaultValue={s.note || ''} style={{ minWidth: 140 }}
@@ -572,7 +472,7 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                   <td><button type="button" className="jo-x" aria-label="ลบขั้นตอน" onClick={() => removeStep(s)}>×</button></td>
                 </tr>
               ))}
-              {!ordered.length && <tr><td colSpan={11} className="empty-state">ยังไม่มีขั้นตอน — กด “+ เพิ่มขั้นตอน” หรือเลือกจากปุ่มด้านล่าง</td></tr>}
+              {!ordered.length && <tr><td colSpan={9} className="empty-state">ยังไม่มีขั้นตอน — กด “+ เพิ่มขั้นตอน” หรือเลือกจากปุ่มด้านล่าง</td></tr>}
             </tbody>
           </table>
           <datalist id="jo-opt-steps">{QUICK_STEPS.map(t => <option key={t} value={t} />)}</datalist>
@@ -608,16 +508,12 @@ export default function JobEditor({ job, invoice, siblings, suppliers, onBack, o
                 {q.label}{q.key === 'qty' ? ` (${total} ตัว)` : ''}
               </label>
             ))}
-            <label className="jo-chip" style={{ display: 'inline-flex', alignItems: 'center', justifySelf: 'start', cursor: 'pointer' }}>
-              + แนบรูปหลังผลิต
-              <input type="file" accept="image/*" multiple hidden onChange={e => { uploadFiles(e.target.files, 'finished'); e.target.value = '' }} />
-            </label>
           </div>
         </div>
         <div className="jo-card">
           <div className="jo-hd">การส่งมอบ / การติดตาม</div>
           <div style={{ padding: '10px 14px', display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10 }}>
-            <label className="jo-lbl">ส่งมอบวันที่<input type="date" className="jo-in" value={d.delivery?.date || ''} onChange={e => set('delivery.date', e.target.value)} /></label>
+            <label className="jo-lbl">ส่งมอบวันที่<DateInput className="jo-in" value={d.delivery?.date || ''} onChange={e => set('delivery.date', e.target.value)} /></label>
             <label className="jo-lbl">ช่องทางจัดส่ง<input className="jo-in" list="jo-opt-deliv" value={d.delivery?.channel || ''} onChange={e => set('delivery.channel', e.target.value)} placeholder="เลือก / พิมพ์" /></label>
             <datalist id="jo-opt-deliv">{DELIVERY_CHANNELS.map(t => <option key={t} value={t} />)}</datalist>
             <label className="jo-lbl" style={{ gridColumn: '1/-1' }}>เลขที่พัสดุ / Tracking<input className="jo-in" value={d.delivery?.tracking || ''} onChange={e => set('delivery.tracking', e.target.value)} placeholder="ใส่เมื่อส่งของ" /></label>

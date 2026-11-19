@@ -11,6 +11,7 @@ import { notify, ask } from '@/lib/feedback'
 import { useDocView } from '@/components/OpenDocParam'
 import DocChain from '@/components/DocChain'
 import { SIZES } from '@/lib/sizes'
+import DateInput from '@/components/ui/DateInput'
 
 /* ── Blue theme ───────────────────────────────────────────── */
 const C = {
@@ -549,11 +550,11 @@ export default function QuotationPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <label>วันที่เอกสาร</label>
-              <input type="date" value={form.document_date} onChange={e => setForm({ ...form, document_date: e.target.value })} />
+              <DateInput value={form.document_date} onChange={e => setForm({ ...form, document_date: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
               <label>ใบเสนอราคาใช้ได้ถึง</label>
-              <input type="date" value={form.valid_until} onChange={e => setForm({ ...form, valid_until: e.target.value })} />
+              <DateInput value={form.valid_until} onChange={e => setForm({ ...form, valid_until: e.target.value })} />
             </div>
           </div>
 

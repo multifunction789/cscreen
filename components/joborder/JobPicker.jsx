@@ -1,8 +1,7 @@
 'use client'
 import { useMemo, useState } from 'react'
-import { insertJobOrder, updateJobOrder, insertJobFile, currentUserEmail } from '@/lib/db'
+import { insertJobOrder, insertJobFile, currentUserEmail } from '@/lib/db'
 import { buildFromInvoice, nextJobCodes, sizeTotal, jobItemNos } from '@/lib/jobV2'
-import { createJobFolderClient } from '@/lib/driveClient'
 import { notify } from '@/lib/feedback'
 import { todayStr } from '@/lib/docUtils'
 import { mockupList } from '@/components/MockupAttach'
@@ -58,13 +57,6 @@ export default function JobPicker({ invoices, customers, jobs, initialInvoiceId 
       const dup = error.code === '23505' || /duplicate|unique/i.test(error.message)
       setBusy(false)
       return notify.error(dup ? 'รายการที่เลือกมีใบงานแล้ว (มีคนสร้างไปก่อน) — กรุณาโหลดหน้าใหม่' : `สร้างใบงานไม่สำเร็จ: ${error.message}`)
-    }
-    // โฟลเดอร์ Drive ของใบงาน (ไม่สำเร็จก็ยังใช้ใบงานได้ — ไฟล์จะเก็บใน Supabase แทน)
-    if (cust.drive_folder_id) {
-      try {
-        const { folderId } = await createJobFolderClient(cust.drive_folder_id, `${code}_${detail.product.name || ''}`.slice(0, 120))
-        if (folderId) { await updateJobOrder(data.id, { drive_folder_id: folderId }); data.drive_folder_id = folderId }
-      } catch { /* ข้ามได้ */ }
     }
     // รูป Mockup ที่แนบไว้ในใบแจ้งหนี้ → รูป 1 = ด้านหน้า, รูป 2 = ด้านหลัง ของรายการแรก (แนบรูปสีอื่นได้ในหน้าแก้ไขใบงาน)
     const mocks = mockupList(inv)

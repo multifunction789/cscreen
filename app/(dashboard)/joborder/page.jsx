@@ -18,6 +18,7 @@ import JobPicker from '@/components/joborder/JobPicker'
 import JobEditor from '@/components/joborder/JobEditor'
 import { isV2, sizeTotal, itemNosLabel, computeOverall } from '@/lib/jobV2'
 import { SIZES } from '@/lib/sizes'
+import DateInput from '@/components/ui/DateInput'
 
 const STATUS_BADGE = {
   'รอมัดจำ'      : 'badge badge-gray',
@@ -1043,11 +1044,11 @@ export default function JobOrderPage() {
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label>วันที่เอกสาร</label>
-              <input type="date" value={form.document_date} onChange={e => setForm({ ...form, document_date: e.target.value })} />
+              <DateInput value={form.document_date} onChange={e => setForm({ ...form, document_date: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label>กำหนดส่ง</label>
-              <input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
+              <DateInput value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} />
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
               <label>หมายเหตุ</label>

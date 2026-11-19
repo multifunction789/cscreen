@@ -2,6 +2,8 @@
 import { notify } from '@/lib/feedback'
 import { useState } from 'react'
 import { getJobOrders, getQuotations, getReceipts, getCustomers, getMaterials, getStockIn, getTransactions, getSuppliers } from '@/lib/db'
+import DateInput from '@/components/ui/DateInput'
+import { fmtDate } from '@/lib/shop'
 
 const salesReports = [
   { id: 'joborder',   icon: '📝', label: 'ใบงาน (Job Order)',     desc: 'Export ใบงานทั้งหมดพร้อมสถานะ, ลูกค้า, มูลค่า' },
@@ -16,7 +18,7 @@ const stockReports = [
   { id: 'supplier',   icon: '🏢', label: 'Supplier',               desc: 'Export รายชื่อซัพพลายเออร์ทั้งหมด' },
 ]
 
-const fmt = (d) => d ? new Date(d).toLocaleDateString('th-TH') : ''
+const fmt = (d) => d ? fmtDate(d) : ''  // DD/MM/YYYY (พ.ศ.)
 
 async function fetchData(id) {
   switch (id) {
@@ -225,11 +227,11 @@ export default function ExcelPage() {
         <div style={{ display: 'flex', gap: 20, flexWrap: 'wrap', alignItems: 'flex-end' }}>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label>ตั้งแต่วันที่</label>
-            <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: 180 }} />
+            <DateInput value={dateFrom} onChange={e => setDateFrom(e.target.value)} style={{ width: 180 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label>ถึงวันที่</label>
-            <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: 180 }} />
+            <DateInput value={dateTo} onChange={e => setDateTo(e.target.value)} style={{ width: 180 }} />
           </div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 5 }}>
             <label>รูปแบบไฟล์</label>
