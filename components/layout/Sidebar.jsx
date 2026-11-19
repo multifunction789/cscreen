@@ -43,6 +43,7 @@ const navItems = [
   ]},
   { group: 'การเงิน / Finance', items: [
     { href: '/payments', icon: '✅', label: 'ตรวจรับเงิน' },
+    { href: '/purchase', icon: '🛒', label: 'จัดซื้อ / ค่าใช้จ่าย' },
     { href: '/finance',  icon: '💰', label: 'รายรับ-รายจ่าย' },
     { href: '/taxdocs',  icon: '📑', label: 'เอกสารภาษี / Tax Docs' },
   ]},

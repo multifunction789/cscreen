@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { getSuppliers, insertSupplier, updateSupplier, getTransactions, getSetting, upsertSetting } from '@/lib/db'
+import { getSuppliers, insertSupplier, updateSupplier, getTransactions, getPurchases, getSetting, upsertSetting } from '@/lib/db'
 import LoadingSpinner from '@/components/ui/LoadingSpinner'
 
 const DEFAULT_CATS = ['เสื้อผ้า','หมึก / สี','อุปกรณ์','ถุงผ้า','อื่น ๆ']
@@ -23,19 +23,20 @@ export default function SupplierPage() {
   useEffect(()=>{ load() },[])
 
   async function load() {
-    const [{ data }, catRes, txRes] = await Promise.all([
+    const [{ data }, catRes, puRes] = await Promise.all([
       getSuppliers(),
       getSetting('supplier_categories'),
-      getTransactions(),
+      getPurchases(),
     ])
     setRows(data||[])
     if (catRes.data?.value) setCats(catRes.data.value)
-    // aggregate spend per supplier from รายจ่าย transactions
+    // ยอดซื้อสะสมต่อ Supplier = หน้าจัดซื้อที่จ่ายแล้ว (ยังไม่ได้รัน SQL หน้าจัดซื้อ → ใช้รายจ่ายเดิม)
     const map = {}
-    for (const t of (txRes.data||[])) {
-      if (t.type === 'รายจ่าย' && t.supplier_id) {
-        map[t.supplier_id] = (map[t.supplier_id] || 0) + (t.amount || 0)
-      }
+    const src = puRes.error
+      ? ((await getTransactions()).data || []).filter(t => t.type === 'รายจ่าย').map(t => ({ supplier_id: t.supplier_id, total: t.amount }))
+      : (puRes.data || []).filter(p => p.status === 'จ่ายแล้ว')
+    for (const t of src) {
+      if (t.supplier_id) map[t.supplier_id] = (map[t.supplier_id] || 0) + (Number(t.total) || 0)
     }
     setSpendMap(map)
     setLoading(false)

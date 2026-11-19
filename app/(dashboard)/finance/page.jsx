@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getTransactions, insertTransaction, updateTransaction, deleteTransaction, getInvoices, getSuppliers, getSetting, upsertSetting } from '@/lib/db'
 import { fmtDate } from '@/lib/shop'
 import { todayStr, exportJpeg, uploadFile } from '@/lib/docUtils'
@@ -138,6 +139,10 @@ export default function FinancePage() {
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', borderRadius: 10, padding: '10px 14px', fontSize: 13.5, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span>⚠️ รายจ่ายย้ายไปหน้า <b>จัดซื้อ / ค่าใช้จ่าย</b> แล้ว — Dashboard และกราฟนับรายจ่ายจากหน้าจัดซื้อ รายจ่ายที่เพิ่มในหน้านี้จะไม่ถูกนับ กรุณาบันทึกที่หน้าจัดซื้อแทน</span>
+        <Link href="/purchase" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}>ไปหน้าจัดซื้อ →</Link>
+      </div>
 
       {/* KPI */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:16 }}>

@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import Link from 'next/link'
 import { getStockIn, getSuppliers, insertStockIn } from '@/lib/db'
 import { supabase } from '@/lib/supabase'
 import { todayStr } from '@/lib/docUtils'
@@ -106,6 +107,10 @@ export default function StockInPage() {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+      <div style={{ background: '#FEF3C7', border: '1px solid #FCD34D', color: '#92400E', borderRadius: 10, padding: '10px 14px', fontSize: 13.5, display: 'flex', gap: 10, alignItems: 'center', flexWrap: 'wrap' }}>
+        <span>⚠️ การรับสินค้าเข้าย้ายไปหน้า <b>จัดซื้อ / ค่าใช้จ่าย</b> (เลือก “📦 เข้าสต๊อก”) แล้ว — รายการที่บันทึกในหน้านี้จะไม่ถูกนับเป็นรายจ่าย</span>
+        <Link href="/purchase" className="btn btn-primary btn-sm" style={{ marginLeft: 'auto' }}>ไปหน้าจัดซื้อ →</Link>
+      </div>
 
       {/* KPI */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3,1fr)', gap: 16 }}>
